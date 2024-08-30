@@ -20,4 +20,4 @@ clean:
 
 publish: clean
 	echo "Publishing not yet supported." 
-	# poetry run publish-to-pypi
+	poetry run publish-to-pypi
