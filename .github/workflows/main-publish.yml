@@ -35,4 +35,4 @@ jobs:
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: | 
           make config
-          make publish
+          make publish-for-ga
