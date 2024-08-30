@@ -20,4 +20,5 @@ clean:
 
 publish: clean
 	echo "Publishing not yet supported." 
+	pip install dcicutils
 	poetry run publish-to-pypi
