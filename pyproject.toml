@@ -6,7 +6,7 @@ authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
 readme = "README.rst"
 homepage = "https://github.com/smaht-dac/hms-utils"
-repository = "https://github.com/smaht-dac/hms-utils"
+repository = "https://github.com/smaht-dac/hms-utils.git"
 documentation = "https://github.com/smaht-dac/hms-utils"
 packages = [{include="hms_utils", from="src"}]
 
