@@ -9,12 +9,78 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.print_tree import print_tree
-from dcicutils.misc_utils import merge_objects
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
 DEFAULT_SECRETS_FILE_NAME = os.environ.get("HMS_SECRETS", "secrets.json")
 DEFAULT_PATH_SEPARATOR = os.environ.get("HMS_PATH_SEPARATOR", "/")
+OBFUSCATED_VALUE = "********"
+
+
+def main():
+
+    args = parse_args(sys.argv[1:])
+    config_file, secrets_file = resolve_files(args)
+    config = None
+    secrets = None
+
+    try:
+        config = Config(config_file,
+                        path_separator=args.path_separator,
+                        ignore_missing_macro=args.ignore_missing_macro,
+                        remove_missing_macro=args.remove_missing_macro,
+                        allow_dictionary_target=args.allow_dictionary_target)
+    except Exception as e:
+        if args.debug or args.config_file_explicit:
+            print(f"Cannot open config file: {config_file}")
+            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
+        sys.exit(1)
+    try:
+        secrets = Config(secrets_file,
+                         path_separator=args.path_separator,
+                         ignore_missing_macro=args.ignore_missing_macro,
+                         remove_missing_macro=args.remove_missing_macro,
+                         allow_dictionary_target=args.allow_dictionary_target)
+    except Exception as e:
+        if args.debug or args.secrets_file_explicit:
+            print(f"Cannot open secret config file: {secrets_file}")
+            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
+            sys.exit(1)
+
+    if not args.name:
+        if config:
+            print(f"\n{config_file}:")
+            data = config.json if not args.debug else config.json_raw
+            if args.nosort is False:
+                data = sort_dictionary(data)
+            if args.yaml:
+                print(yaml.dump(data))
+            elif args.json:
+                print(json.dumps(data, indent=4))
+            else:
+                print_tree(data, indent=1)
+        if secrets:
+            print(f"\n{secrets_file}:")
+            data = secrets.json if not args.debug else secrets.json_raw
+            if args.yaml:
+                print(yaml.dump(data))
+            elif args.json:
+                print(json.dumps(data, indent=4))
+            else:
+                print_tree(data, indent=1, obfuscate_value=None if args.show_secrets else OBFUSCATED_VALUE)
+        if config and secrets:
+            print("\nMerged config and secrets:")
+            merged, unmerged = merge_config_and_secrets(config.json, secrets.json,
+                                                        obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE,
+                                                        path_separator=args.path_separator)
+            print_tree(merged, indent=1)
+            print(unmerged)
+        exit(0)
+
+    if ((value := config.lookup(args.name)) is not None) or ((value := secrets.lookup(args.name)) is not None):
+        print(value)
+        sys.exit(0)
+    sys.exit(1)
 
 
 def parse_args(argv: List[str]) -> object:
@@ -105,70 +171,6 @@ def parse_args(argv: List[str]) -> object:
     return args
 
 
-def main():
-
-    args = parse_args(sys.argv[1:])
-    config_file, secrets_file = resolve_files(args)
-    config = None
-    secrets = None
-
-    try:
-        config = Config(config_file,
-                        path_separator=args.path_separator,
-                        ignore_missing_macro=args.ignore_missing_macro,
-                        remove_missing_macro=args.remove_missing_macro,
-                        allow_dictionary_target=args.allow_dictionary_target)
-    except Exception as e:
-        if args.debug or args.config_file_explicit:
-            print(f"Cannot open config file: {config_file}")
-            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-        sys.exit(1)
-    try:
-        secrets = Config(secrets_file,
-                         path_separator=args.path_separator,
-                         ignore_missing_macro=args.ignore_missing_macro,
-                         remove_missing_macro=args.remove_missing_macro,
-                         allow_dictionary_target=args.allow_dictionary_target)
-    except Exception as e:
-        if args.debug or args.secrets_file_explicit:
-            print(f"Cannot open secret config file: {secrets_file}")
-            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-            sys.exit(1)
-
-    if not args.name:
-        if config:
-            print(f"\n{config_file}:")
-            data = config.json if not args.debug else config.json_raw
-            if args.nosort is False:
-                data = sort_dictionary(data)
-            if args.yaml:
-                print(yaml.dump(data))
-            elif args.json:
-                print(json.dumps(data, indent=4))
-            else:
-                print_tree(data, indent=1)
-        if secrets:
-            print(f"\n{secrets_file}:")
-            data = secrets.json if not args.debug else secrets.json_raw
-            if args.yaml:
-                print(yaml.dump(data))
-            elif args.json:
-                print(json.dumps(data, indent=4))
-            else:
-                print_tree(data, indent=1, hide_values=not args.show_secrets)
-        if config and secrets:
-            print("MERGED")
-            config_copy = deepcopy(config.json)
-            merge_objects(config_copy, secrets.json)
-            print_tree(config_copy, indent=1, hide_values=not args.show_secrets)
-        exit(0)
-
-    if ((value := config.lookup(args.name)) is not None) or ((value := secrets.lookup(args.name)) is not None):
-        print(value)
-        sys.exit(0)
-    sys.exit(1)
-
-
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
 
     def resolve_file_path(file: str, directory: Optional[str] = None,
@@ -208,6 +210,34 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
             sys.exit(1)
 
     return config_file, secrets_file
+
+
+def merge_config_and_secrets(config: dict, secrets: dict,
+                             obfuscated_value: str = OBFUSCATED_VALUE,
+                             path_separator: str = "/") -> Tuple[dict, list]:
+    if not (isinstance(config, dict) or isinstance(secrets, dict)):
+        return None, None
+    merged = deepcopy(config) ; unmerged = []  # noqa
+    secrets = obfuscate_secrets(secrets) if obfuscated_value else secrets
+    def merge(config: dict, secrets: dict, path: str = "") -> None:  # noqa
+        nonlocal unmerged, path_separator
+        for key, value in secrets.items():
+            path = f"{path}{path_separator}{key}" if path else key
+            if key not in config:
+                config[key] = secrets[key]
+            elif isinstance(config[key], dict) and isinstance(secrets[key], dict):
+                merge(config[key], secrets[key], path=path)
+            else:
+                unmerged.append(path)
+    merge(merged, secrets)
+    return merged, unmerged
+
+
+def obfuscate_secrets(secrets: dict, obfuscated_value: str = OBFUSCATED_VALUE) -> dict:
+    obfuscated_secrets = {}
+    for key, value in secrets.items():
+        obfuscated_secrets[key] = obfuscate_secrets(value) if isinstance(value, dict) else obfuscated_value
+    return obfuscated_secrets
 
 
 def sort_dictionary(data: dict) -> dict:
