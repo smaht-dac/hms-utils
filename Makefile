@@ -19,6 +19,7 @@ clean:
 	find . -name __pycache__ -exec rm -rf {} +
 
 publish: clean
-	echo "Publishing not yet supported." 
-	pip install dcicutils
 	poetry run publish-to-pypi
+
+publish-for-ga:
+	python -m dcicutils.scripts.publish_to_pypi --noconfirm
