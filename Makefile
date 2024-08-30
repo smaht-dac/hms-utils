@@ -22,4 +22,5 @@ publish: clean
 	poetry run publish-to-pypi
 
 publish-for-ga:
+	pip install dcicutils
 	python -m dcicutils.scripts.publish_to_pypi --noconfirm
