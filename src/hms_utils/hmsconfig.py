@@ -1,4 +1,5 @@
 from __future__ import annotations
+from copy import deepcopy
 import io
 import json
 import os
@@ -8,6 +9,7 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.print_tree import print_tree
+from dcicutils.misc_utils import merge_objects
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
@@ -154,6 +156,11 @@ def main():
                 print(json.dumps(data, indent=4))
             else:
                 print_tree(data, indent=1, hide_values=not args.show_secrets)
+        if config and secrets:
+            print("MERGED")
+            config_copy = deepcopy(config.json)
+            merge_objects(config_copy, secrets.json)
+            print_tree(config_copy, indent=1, hide_values=not args.show_secrets)
         exit(0)
 
     if ((value := config.lookup(args.name)) is not None) or ((value := secrets.lookup(args.name)) is not None):

@@ -22,7 +22,7 @@ class AwsEcs:
     class Cluster:
         def __init__(self, cluster_arn: str, ecs: Optional[AwsEcs] = None) -> None:
             self.cluster_arn = cluster_arn or ""
-            self.cluster_name = AwsEcs._arn_to_name(cluster_arn)
+            self.cluster_name = AwsEcs._nonarn_name(cluster_arn)
             self._services = None
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.cluster_name)
@@ -121,7 +121,7 @@ class AwsEcs:
     class TaskDefinition:
         def __init__(self, task_definition_arn: str, ecs: Optional[AwsEcs] = None) -> None:
             self.task_definition_arn = task_definition_arn or ""
-            self.task_definition_name = AwsEcs._arn_to_name(task_definition_arn)
+            self.task_definition_name = AwsEcs._nonarn_name(task_definition_arn)
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.task_definition_name)
         @property  # noqa
@@ -176,14 +176,14 @@ class AwsEcs:
 
     def find_task_definition(self, task_definition: Union[str, TaskDefinition]) -> Optional[AwsEcs.TaskDefinition]:
         if isinstance(task_definition, AwsEcs.TaskDefinition):
-            task_definition_name = task_definition.task_definition_name
+            task_definition_name = self._unversioned_name(task_definition.task_definition_name)
         elif isinstance(task_definition, str):
-            task_definition_name = self._arn_to_name(task_definition)
+            task_definition_name = self._unversioned_name(self._nonarn_name(task_definition))
         else:
             return None
         for cluster in self.clusters:
             for service in cluster.services:
-                if (service.task_definition.task_definition_name == task_definition_name):
+                if (self._unversioned_name(service.task_definition.task_definition_name) == task_definition_name):
                     return service.task_definition
         return None
 
@@ -193,7 +193,7 @@ class AwsEcs:
             unassociated_task_definition_names = []
             if task_definition_arns := self._boto_ecs.list_task_definitions().get("taskDefinitionArns"):
                 for task_definition_arn in task_definition_arns:
-                    task_definition_name = self._unversioned_name(self._arn_to_name(task_definition_arn))
+                    task_definition_name = self._unversioned_name(self._nonarn_name(task_definition_arn))
                     if self.find_task_definition(task_definition_name) is None:
                         if task_definition_name not in unassociated_task_definition_names:
                             unassociated_task_definition_names.append(task_definition_name)
@@ -380,8 +380,8 @@ class AwsEcs:
         return None
 
     @staticmethod
-    def _arn_to_name(arn: str) -> str:
-        return arn.split("/")[-1] if isinstance(arn, str) and "/" in arn else ""
+    def _nonarn_name(value: str) -> str:
+        return value.split("/")[-1] if isinstance(value, str) and "/" in value else value
 
     @staticmethod
     def _unversioned_name(value: str) -> str:
