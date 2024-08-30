@@ -11,7 +11,7 @@ from hms_utils.print_tree import print_tree
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
-DEFAULT_SECRET_CONFIG_FILE_NAME = os.environ.get("HMS_SECRET_CONFIG", "secrets.json")
+DEFAULT_SECRETS_FILE_NAME = os.environ.get("HMS_SECRETS", "secrets.json")
 DEFAULT_PATH_SEPARATOR = os.environ.get("HMS_PATH_SEPARATOR", "/")
 
 
@@ -20,14 +20,15 @@ def parse_args(argv: List[str]) -> object:
     class Args:
         config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
         config_file = DEFAULT_CONFIG_FILE_NAME
-        secret_config_file = DEFAULT_SECRET_CONFIG_FILE_NAME
+        secrets_file = DEFAULT_SECRETS_FILE_NAME
         config_file_explicit = False
-        secret_config_file_explicit = False
+        secrets_file_explicit = False
         config_dir_explicit = False
         path_separator = DEFAULT_PATH_SEPARATOR
         ignore_missing_macro = True
         remove_missing_macro = False
         allow_dictionary_target = False
+        show_secrets = False
         name = None
         yaml = False
         json = False
@@ -59,8 +60,8 @@ def parse_args(argv: List[str]) -> object:
               (arg == "--secret") or (arg == "-secret")):
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
-            args.secret_config_file = arg
-            args.secret_config_file_explicit = True
+            args.secrets_file = arg
+            args.secrets_file_explicit = True
             argi += 1
         elif ((arg == "--path-separator") or (arg == "-path-separator") or
               (arg == "--separator") or (arg == "-separator") or
@@ -75,6 +76,10 @@ def parse_args(argv: List[str]) -> object:
             args.ignore_missing_macro = True
         elif (arg == "--remove-missing-macro") or (arg == "-remove-missing-macro"):
             args.remove_missing_macro = True
+        elif ((arg == "--show-secrets") or (arg == "-show-secrets") or
+              (arg == "--show-secret") or (arg == "-show-secret") or
+              (arg == "--show") or (arg == "-show")):
+            args.show_secrets = True
         elif (arg == "--yaml") or (arg == "-yaml") or (arg == "--yml") or (arg == "-yml"):
             args.yaml = True
         elif (arg == "--json") or (arg == "-json"):
@@ -101,9 +106,9 @@ def parse_args(argv: List[str]) -> object:
 def main():
 
     args = parse_args(sys.argv[1:])
-    config_file, secret_config_file = resolve_files(args)
+    config_file, secrets_file = resolve_files(args)
     config = None
-    secret_config = None
+    secrets = None
 
     try:
         config = Config(config_file,
@@ -117,14 +122,14 @@ def main():
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
         sys.exit(1)
     try:
-        secret_config = Config(secret_config_file,
-                               path_separator=args.path_separator,
-                               ignore_missing_macro=args.ignore_missing_macro,
-                               remove_missing_macro=args.remove_missing_macro,
-                               allow_dictionary_target=args.allow_dictionary_target)
+        secrets = Config(secrets_file,
+                         path_separator=args.path_separator,
+                         ignore_missing_macro=args.ignore_missing_macro,
+                         remove_missing_macro=args.remove_missing_macro,
+                         allow_dictionary_target=args.allow_dictionary_target)
     except Exception as e:
-        if args.debug or args.secret_config_file_explicit:
-            print(f"Cannot open secret config file: {secret_config_file}")
+        if args.debug or args.secrets_file_explicit:
+            print(f"Cannot open secret config file: {secrets_file}")
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
             sys.exit(1)
 
@@ -140,23 +145,21 @@ def main():
                 print(json.dumps(data, indent=4))
             else:
                 print_tree(data, indent=1)
-        if secret_config:
-            print(f"\n{secret_config_file}:")
-            data = secret_config.json if not args.debug else secret_config.json_raw
+        if secrets:
+            print(f"\n{secrets_file}:")
+            data = secrets.json if not args.debug else secrets.json_raw
             if args.yaml:
                 print(yaml.dump(data))
             elif args.json:
                 print(json.dumps(data, indent=4))
             else:
-                print_tree(data, indent=1)
+                print_tree(data, indent=1, hide_values=not args.show_secrets)
+        exit(0)
 
-    if args.name:
-        if (value := config.lookup(args.name)) is not None:
-            print(value)
-            sys.exit(0)
-        sys.exit(1)
-
-    sys.exit(0)
+    if ((value := config.lookup(args.name)) is not None) or ((value := secrets.lookup(args.name)) is not None):
+        print(value)
+        sys.exit(0)
+    sys.exit(1)
 
 
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
@@ -182,7 +185,7 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
 
     config_dir = args.config_dir
     config_file = args.config_file
-    secret_config_file = args.secret_config_file
+    secrets_file = args.secrets_file
 
     if not (config_file := resolve_file_path(config_file, config_dir,
                                              file_explicit=args.config_file_explicit,
@@ -190,14 +193,14 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
         if args.config_file_explicit:
             print(f"Cannot find config file: {config_file}")
             sys.exit(1)
-    if not (secret_config_file := resolve_file_path(secret_config_file, config_dir,
-                                                    file_explicit=args.config_file_explicit,
-                                                    directory_explicit=args.config_dir_explicit)):
-        if args.secret_config_file_explicit:
+    if not (secrets_file := resolve_file_path(secrets_file, config_dir,
+                                              file_explicit=args.config_file_explicit,
+                                              directory_explicit=args.config_dir_explicit)):
+        if args.secrets_file_explicit:
             print(f"Cannot find secret config file: {args.config_file_explicit}")
             sys.exit(1)
 
-    return config_file, secret_config_file
+    return config_file, secrets_file
 
 
 def sort_dictionary(data: dict) -> dict:
@@ -346,10 +349,9 @@ class Config:
         return data
 
 
-
 def usage():
     print(f"Reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
-          f" {DEFAULT_SECRET_CONFIG_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
+          f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
     print("usage: python hms_config.py name")
     sys.exit(1)
 
