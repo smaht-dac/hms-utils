@@ -1,4 +1,4 @@
-from hms_utils.hmsconfig import Config
+from hms_utils.hms_config import Config
 
 
 def test_hmsconfig():
