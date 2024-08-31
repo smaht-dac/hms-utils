@@ -22,8 +22,6 @@ OBFUSCATED_VALUE = "********"
 def main():
 
     args = parse_args(sys.argv[1:])
-    config = None
-    secrets = None
 
     try:
         config = Config(args.config_file, path_separator=args.path_separator)
@@ -32,6 +30,7 @@ def main():
         if args.debug: traceback.print_exc() ; print(str(e))  # noqa
         sys.exit(1)
 
+    secrets = None
     if args.secrets_file:
         try:
             secrets = Config(args.secrets_file, path_separator=args.path_separator)
@@ -118,16 +117,17 @@ def parse_args(argv: List[str]) -> object:
         else:
             args.name = arg
 
-    if args.name:
-        if (args.show_secrets or args.show_paths or args.yaml or
-            args.nosort or args.nomerge or args.nocolor or args.yaml):  # noqa
-            print("Option not allowed with a config name/path argument.")
-            usage()
+    if args.name and (args.show_secrets or args.show_paths or args.yaml or
+                      args.nosort or args.nomerge or args.nocolor or args.yaml):
+        print("Option not allowed with a config name/path argument.")
+        usage()
 
     config_file, secrets_file = resolve_files(args)
+    if not config_file:
+        print("No config file found.")
+        usage()
     args.config_file = config_file
     args.secrets_file = secrets_file
-
     return args
 
 
@@ -178,8 +178,7 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         if not args.nosort:
             merged = sort_dictionary(merged)
         print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
-        print_dictionary_tree(merged, indent=1,
-                              paths=args.show_paths, path_separator=args.path_separator,
+        print_dictionary_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                               key_modifier=tree_key_modifier,
                               value_modifier=tree_value_modifier,
                               value_annotator=tree_value_annotator,
@@ -187,8 +186,7 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         if unmerged_secrets:
             print(f"\n{secrets.file}: [secrets unmerged]")
             secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
-            print_dictionary_tree(secrets_json, indent=1,
-                                  paths=args.show_paths, path_separator=args.path_separator,
+            print_dictionary_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier,
                                   value_annotator=tree_value_annotator_secrets,
@@ -210,9 +208,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         elif args.json:
             print(json.dumps(data, indent=4))
         else:
-            print_dictionary_tree(
-                data, indent=1,
-                paths=args.show_paths, path_separator=args.path_separator)
+            print_dictionary_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator)
     if secrets:
         print(f"\n{secrets.file}:")
         data = secrets.json if not args.debug else secrets.rawjson
@@ -324,7 +320,7 @@ class Config:
         if value is not None:
             return value
         elif config and allow_dictionary:
-            return str(self._cleanup_json(config))
+            return str(self._cleanjson(config))
         return None
 
     @property
@@ -333,7 +329,7 @@ class Config:
 
     @property
     def json(self) -> dict:
-        return self._cleanup_json(self._config)
+        return self._cleanjson(self._config)
 
     @property
     def rawjson(self) -> dict:
@@ -420,12 +416,12 @@ class Config:
         return data
 
     @staticmethod
-    def _cleanup_json(data: dict) -> dict:
+    def _cleanjson(data: dict) -> dict:
         if isinstance(data, dict):
             if Config._PARENT in data:
                 del data[Config._PARENT]
             for key, value in list(data.items()):
-                Config._cleanup_json(value)
+                Config._cleanjson(value)
         return data
 
 
