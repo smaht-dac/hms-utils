@@ -68,8 +68,12 @@ def main():
             else:
                 status = 1
         if args.export_file:
+            if args.verbose:
+                print(f"Writing exports to file: {args.export_file}")
             with io.open(args.export_file, "w") as f:
                 for export in exports:
+                    if args.verbose:
+                        print(f"{chars.rarrow_hollow} {export}")
                     f.write(f"{export}\n")
         else:
             for export in exports:
@@ -107,6 +111,7 @@ def parse_args(argv: List[str]) -> object:
         nosort = False
         export = False
         export_file = None
+        verbose = False
         debug = False
 
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
@@ -158,6 +163,8 @@ def parse_args(argv: List[str]) -> object:
             args.export_file = argv[argi] ; argi += 1  # noqa
         elif arg in ["--debug", "-debug"]:
             args.debug = True
+        elif arg in ["--verbose", "-verbose"]:
+            args.verbose = True
         elif arg in ["--version", "-version"]:
             print(f"hms-utils version: {get_version()}")
             usage()
