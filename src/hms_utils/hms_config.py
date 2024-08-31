@@ -49,7 +49,14 @@ def main():
 
     if (((value := config.lookup(args.name, allow_dictionary=args.json)) is not None) or
         ((value := secrets.lookup(args.name, allow_dictionary=args.json)) is not None)):  # noqa
-        print(value)
+        if args.exports:
+            def basename(name: str) -> str:
+                if (index := name.rfind(args.path_separator)) > 0:
+                    return name[index + 1:]
+                return name
+            print(f"export {basename(args.name)}={value}")
+        else:
+            print(value)
         sys.exit(0)
 
     sys.exit(1)
@@ -74,6 +81,7 @@ def parse_args(argv: List[str]) -> object:
         nocolor = False
         nomerge = False
         nosort = False
+        exports = False
         debug = False
 
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
@@ -113,6 +121,8 @@ def parse_args(argv: List[str]) -> object:
             args.nomerge = True
         elif arg in ["--nosort", "-nosort"]:
             args.nosort = True
+        elif arg in ["--exports", "-exports", "--export", "-export"]:
+            args.exports = True
         elif arg in ["--debug", "-debug"]:
             args.debug = True
         elif arg in ["--help", "-help", "help"]:
