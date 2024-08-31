@@ -52,7 +52,7 @@ def main():
     if not args.name:
         merged_secrets = None
         unmerged_secrets = None
-        if (not args.nomerge) and config and secrets:
+        if (not args.nomerge) and (not args.json) and (not args.yaml) and config and secrets:
             def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
                 nonlocal secrets
                 return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
