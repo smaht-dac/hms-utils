@@ -64,8 +64,8 @@ def main():
                     continue
             else:
                 export_name = path_basename(name, args.path_separator)
-            if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
-                ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
+            if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
+                (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
                 exports.append(f"export {export_name}={value}")
             else:
                 if args.verbose:
@@ -85,8 +85,10 @@ def main():
                 print(export)
     else:
         for name in args.names:
-            if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
-                ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
+            import pdb ; pdb.set_trace()  # noqa
+            pass
+            if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
+                (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
                 print(value)
             else:
                 status = 1
@@ -217,14 +219,14 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
 
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
-        return ((key or key_path) if (secrets.lookup(key_path) is None)
+        return ((key or key_path) if (secrets and (secrets.lookup(key_path) is None))
                 else color(key or key_path, "red", nocolor=args.nocolor))
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
         nonlocal args, secrets
-        if (not args.show_secrets) and secrets.contains(key_path):
+        if (not args.show_secrets) and secrets and secrets.contains(key_path):
             value = OBFUSCATED_VALUE
-        return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
+        return value if (secrets and (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
     def tree_value_annotator(key_path: str) -> Optional[str]:
         nonlocal merged_secrets
@@ -242,7 +244,7 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
 
     def tree_arrow_indicator(key_path: str) -> str:
         nonlocal secrets
-        return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
+        return chars.rarrow_hollow if (secrets and (secrets.lookup(key_path) is not None)) else ""
 
     if config and secrets:
         merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(config.json, secrets.json,
@@ -287,14 +289,15 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
 
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
-        return ((key or key_path) if (secrets.lookup(key_path) is None)
+        return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
                 else color(key or key_path, "red", nocolor=args.nocolor))
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
         nonlocal args, secrets
-        if (not args.show_secrets) and secrets.contains(key_path):
+        if (not args.show_secrets) and secrets and secrets.contains(key_path):
             value = OBFUSCATED_VALUE
-        return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
+        return value if ((not secrets) or
+                         (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
     if config:
         print(f"\n{config.file}:")
