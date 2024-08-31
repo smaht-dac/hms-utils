@@ -245,17 +245,16 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
             return None
         return file
 
-    config_dir = args.config_dir
     config_file = args.config_file
     secrets_file = args.secrets_file
 
-    if not (config_file := resolve_file_path(config_file, config_dir,
+    if not (config_file := resolve_file_path(config_file, args.config_dir,
                                              file_explicit=args.config_file_explicit,
                                              directory_explicit=args.config_dir_explicit)):
         if args.config_file_explicit:
             print(f"Cannot find config file: {config_file}")
             sys.exit(1)
-    if not (secrets_file := resolve_file_path(secrets_file, config_dir,
+    if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
                                               file_explicit=args.config_file_explicit,
                                               directory_explicit=args.config_dir_explicit)):
         if args.secrets_file_explicit:
