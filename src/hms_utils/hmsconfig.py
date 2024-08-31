@@ -66,6 +66,13 @@ def main():
                 if key_path in unmerged_secrets:
                     return f"{chars.rarrow} unmerged {chars.xmark}"
                 return None
+            def tree_value_annotator_secrets(key_path: str) -> Optional[str]:  # noqa
+                nonlocal merged_secrets
+                if key_path in unmerged_secrets:
+                    return f"{chars.rarrow} unmerged {chars.xmark}"
+                elif key_path in merged_secrets:
+                    return f"{chars.rarrow_hollow} merged {chars.check}"
+                return None
             def tree_arrow_indicator(key_path: str) -> str:  # noqa
                 nonlocal secrets
                 return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
@@ -84,10 +91,12 @@ def main():
                            arrow_indicator=tree_arrow_indicator)
                 if unmerged_secrets:
                     print(f"\n{secrets_file}: [secrets unmerged]")
-                    print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                    secrets_json = deepcopy(secrets.json)
+                    print_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                                key_modifier=tree_key_modifier,
                                value_modifier=tree_value_modifier,
-                               value_annotator=tree_value_annotator,
+                               #value_annotator=tree_value_annotator,
+                               value_annotator=tree_value_annotator_secrets,
                                arrow_indicator=tree_arrow_indicator)
                     if args.debug:
                         print("\nMerged from secrets:")
