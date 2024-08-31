@@ -116,8 +116,9 @@ def main():
                 elif args.json:
                     print(json.dumps(data, indent=4))
                 else:
-                    print_dictionary_tree(data, indent=1,
-                                          paths=args.show_paths, path_separator=args.path_separator)
+                    print_dictionary_tree(
+                        data, indent=1,
+                        paths=args.show_paths, path_separator=args.path_separator)
             if secrets:
                 print(f"\n{secrets_file}:")
                 data = secrets.json if not args.debug else secrets.json_raw
@@ -126,9 +127,10 @@ def main():
                 elif args.json:
                     print(json.dumps(data, indent=4))
                 else:
-                    print_dictionary_tree(data, indent=1,
-                                          paths=args.show_paths, path_separator=args.path_separator,
-                                          value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
+                    print_dictionary_tree(
+                        data, indent=1,
+                        paths=args.show_paths, path_separator=args.path_separator,
+                        value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
             if unmerged_secrets:
                 print(f"\nSecret not mergeable into config:")
                 for unmerged_secret_key in unmerged_secrets:
