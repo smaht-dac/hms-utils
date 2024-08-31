@@ -35,11 +35,11 @@ def print_tree(data: dict,
                 inner_indent = indent + (space if last else f"{' ' if first else '│'}{space[1:]}")
                 traverse(value, indent=inner_indent, last=last, path=key_path)
             else:
+                if paths:
+                    key = key_path
                 key_modification = key_modifier(key_path, key) if key_modifier else key
                 value_modification = value_modifier(key_path, value) if value_modifier else key
                 value_annotation = value_annotator(key_path) if value_annotator else ""
-                if paths:
-                    key = key_path
                 if key_modification:
                     key = key_modification
                 if value_modification:

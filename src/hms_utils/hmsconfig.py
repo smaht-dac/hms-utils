@@ -49,18 +49,23 @@ def main():
             sys.exit(1)
 
     if not args.name:
+        def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
+            pass
+        def tree_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
+            pass
+        def tree_key_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
+            # TODO: Do obfuscation here.
+            if secrets.lookup(key_path) is not None:
+                return terminal_color(key, "red")
+            return key
         def tree_value_annotator(key_path: str) -> Optional[str]:
             if config.lookup(key_path) is not None:
-                annotation = "[config]"  # TODO remove
+                annotation = "[config]"  # TODO: remove this.
             elif secrets.lookup(key_path) is not None:
                 annotation = terminal_color("[secret]", "red")
             else:
                 annotation = "[nothing]"
             return annotation
-        def tree_key_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
-            if secrets.lookup(key_path) is not None:
-                return terminal_color(key, "red")
-            return key_path
         unmerged_secrets = None
         unmerged_secrets = None
         if (not args.nomerge) and config and secrets:
