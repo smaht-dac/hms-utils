@@ -50,9 +50,39 @@ def print_dictionary_tree(data: dict,
                     value = value_modification
                 if arrow_indication:
                     corner = corner[:-1] + arrow_indication
-                key_value = f"{key}: {value}{f' {value_annotation}' if value_annotation else ''}"
-                output(indent + corner + " " + key_value)
+                output(f"{indent}{corner} {key}: {value}{f' {value_annotation}' if value_annotation else ''}")
     traverse(data, first=True)
+
+
+def print_dictionary_list(data: dict,
+                          path_separator: str = "/",
+                          prefix: str = None,
+                          key_modifier: Optional[Callable] = None,
+                          value_modifier: Optional[Callable] = None,
+                          value_annotator: Optional[Callable] = None) -> None:
+    if not callable(key_modifier):
+        key_modifier = None
+    if not callable(value_annotator):
+        value_annotator = None
+    if not callable(value_modifier):
+        value_modifier = None
+    def traverse(data: dict, path: str = "") -> None:
+        nonlocal path_separator, key_modifier, value_annotator, value_modifier
+        for key in data:
+            key_path = f"{path}{path_separator}{key}" if path else key
+            if isinstance(item := data[key], dict):
+                traverse(item, path=key_path)
+            else:
+                value = str(item)
+                key_modification = key_modifier(key_path) if key_modifier else key_path
+                value_modification = value_modifier(key_path, value) if value_modifier else value
+                value_annotation = value_annotator(key_path) if value_annotator else ""
+                if key_modification:
+                    key = key_modification
+                if value_modification:
+                    value = value_modification
+                print(f"{key}: {value}{f' {value_annotation}' if value_annotation else ''}")
+    traverse(data)
 
 
 def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = "/", copy: bool = True):

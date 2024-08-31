@@ -10,7 +10,10 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import delete_paths_from_dictionary, print_dictionary_tree, sort_dictionary
+from hms_utils.dictionary_utils import (
+    delete_paths_from_dictionary, print_dictionary_list,
+    print_dictionary_tree, sort_dictionary
+)
 from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
@@ -62,11 +65,12 @@ def parse_args(argv: List[str]) -> object:
         secrets_file_explicit = False
         config_dir_explicit = False
         path_separator = DEFAULT_PATH_SEPARATOR
+        name = None
+        list = False
+        yaml = False
+        json = False
         show_secrets = False
         show_paths = False
-        yaml = False
-        name = None
-        json = False
         nocolor = False
         nomerge = False
         nosort = False
@@ -97,6 +101,8 @@ def parse_args(argv: List[str]) -> object:
         elif arg in ["--show-paths", "-show-paths", "--show-path",
                      "-show-path", "--paths", "-paths", "--path", "-path"]:
             args.show_paths = True
+        elif arg in ["--list", "-list"]:
+            args.list = True
         elif arg in ["--yaml", "-yaml", "--yml", "-yml"]:
             args.yaml = True
         elif arg in ["--json", "-json"]:
@@ -145,9 +151,9 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
     merged_secrets = None
     unmerged_secrets = None
 
-    def tree_key_modifier(key_path: str, key: str) -> Optional[str]:
+    def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
-        return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
+        return (key or key_path) if (secrets.lookup(key_path) is None) else color(key or key_path, "red", nocolor=args.nocolor)
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
         nonlocal args, secrets
@@ -179,19 +185,28 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         if not args.nosort:
             merged = sort_dictionary(merged)
         print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
-        print_dictionary_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                              key_modifier=tree_key_modifier,
-                              value_modifier=tree_value_modifier,
-                              value_annotator=tree_value_annotator,
-                              arrow_indicator=tree_arrow_indicator)
+        if args.list:
+            print_dictionary_list(merged, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ",
+                                  key_modifier=tree_key_modifier,
+                                  value_modifier=tree_value_modifier,
+                                  value_annotator=tree_value_annotator)
+        else:
+            print_dictionary_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                                  key_modifier=tree_key_modifier,
+                                  value_modifier=tree_value_modifier,
+                                  value_annotator=tree_value_annotator,
+                                  arrow_indicator=tree_arrow_indicator)
         if unmerged_secrets:
             print(f"\n{secrets.file}: [secrets unmerged]")
             secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
-            print_dictionary_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                                  key_modifier=tree_key_modifier,
-                                  value_modifier=tree_value_modifier,
-                                  value_annotator=tree_value_annotator_secrets,
-                                  arrow_indicator=tree_arrow_indicator)
+            if args.list:
+                print_dictionary_list(secrets_json, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
+            else:
+                print_dictionary_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                                      key_modifier=tree_key_modifier,
+                                      value_modifier=tree_value_modifier,
+                                      value_annotator=tree_value_annotator_secrets,
+                                      arrow_indicator=tree_arrow_indicator)
             if args.debug:
                 print("\nMerged from secrets:") ; [print(f"- {item}") for item in merged_secrets]  # noqa
                 print("\nUnmerged from secrets") ; [print(f"- {item}") for item in unmerged_secrets]  # noqa
