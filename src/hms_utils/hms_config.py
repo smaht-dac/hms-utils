@@ -32,7 +32,7 @@ def main():
     config = None
     if args.config_file:
         try:
-            config = Config(args.config_file, path_separator=args.path_separator)
+            config = Config(args.config_file, path_separator=args.path_separator, nomacros=args.nomacros)
         except Exception as e:
             print(f"Cannot process config file: {args.config_file}")
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
@@ -41,7 +41,7 @@ def main():
     secrets = None
     if args.secrets_file:
         try:
-            secrets = Config(args.secrets_file, path_separator=args.path_separator)
+            secrets = Config(args.secrets_file, path_separator=args.path_separator, nomacros=args.nomacros)
         except Exception as e:
             print(f"Cannot process secrets file: {args.secrets_file}")
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
@@ -85,8 +85,6 @@ def main():
                 print(export)
     else:
         for name in args.names:
-            import pdb ; pdb.set_trace()  # noqa
-            pass
             if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
                 (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
                 print(value)
@@ -116,6 +114,7 @@ def parse_args(argv: List[str]) -> object:
         nocolor = False
         nomerge = False
         nosort = False
+        nomacros = False
         export = False
         export_file = None
         verbose = False
@@ -161,6 +160,8 @@ def parse_args(argv: List[str]) -> object:
             args.nomerge = True
         elif arg in ["--nosort", "-nosort"]:
             args.nosort = True
+        elif arg in ["--nomacros", "-nomacros", "--nomacro", "-nomacro"]:
+            args.nomacros = True
         elif arg in ["--export", "-export"]:
             args.export = True
         elif arg in ["--export-file", "-export-file"]:
@@ -414,11 +415,12 @@ class Config:
     _PARENT = "@@@__PARENT__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
-    def __init__(self, file_or_dictionary: Union[str, dict], path_separator: bool = ".") -> None:
+    def __init__(self, file_or_dictionary: Union[str, dict],
+                 path_separator: bool = ".", nomacros: bool = False) -> None:
         self._json = None
         self._path_separator = path_separator
+        self._expand_macros = nomacros is not True
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
-        self._expand_macros = True
         self._ignore_missing_macro = True
         self._remove_missing_macro = True
         self._stringize_non_primitive_types = True
