@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import stat
 import sys
 import traceback
 from typing import Any, List, Optional, Tuple, Union
@@ -35,7 +36,7 @@ def main():
         try:
             secrets = Config(args.secrets_file, path_separator=args.path_separator)
         except Exception as e:
-            print(f"Cannot process secret config file: {args.secrets_file}")
+            print(f"Cannot process secrets file: {args.secrets_file}")
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
             sys.exit(1)
 
@@ -245,6 +246,12 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
             return None
         return file
 
+    def ensure_secrets_file_protected(file: str) -> bool:
+        try:
+            return stat.S_IMODE(os.stat(file).st_mode) in (0o600, 0o400)
+        except Exception:
+            return False
+
     config_file = args.config_file
     secrets_file = args.secrets_file
 
@@ -258,8 +265,10 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                                               file_explicit=args.config_file_explicit,
                                               directory_explicit=args.config_dir_explicit)):
         if args.secrets_file_explicit:
-            print(f"Cannot find secret config file: {args.config_file_explicit}")
+            print(f"Cannot find secrets file: {args.config_file_explicit}")
             sys.exit(1)
+    elif not ensure_secrets_file_protected(secrets_file):
+        print(f"{color('WARNING', 'red')}: Your secrets file is not read protected for others: {secrets_file}")
 
     return config_file, secrets_file
 
