@@ -48,18 +48,21 @@ def main():
         exit(0)
 
     status = 0
+    export_f = None
     for name in args.names:
         if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
             ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
             if args.export:
-                def basename(name: str) -> str:
-                    if (index := name.rfind(args.path_separator)) > 0:
-                        return name[index + 1:]
-                    return name
                 if args.export_file:
-                    with io.open(args.export_file, "w") as f:
-                        f.write(f"export {basename(name)}={value}")
-                print(f"export {basename(name)}={value}")
+                    if not export_f:
+                        if os.path.exists(args.export_file):
+                            print(f"Export file already exists;"
+                                  f" should be temporary file; will not overwrite: {args.export_file}")
+                            exit(1)
+                        export_f = io.open(args.export_file, "w")
+                    export_f.write(f"export {path_basename(name, args.path_separator)}={value}")
+                else:
+                    print(f"export {path_basename(name, args.path_separator)}={value}")
             else:
                 print(value)
         else:
@@ -95,7 +98,7 @@ def parse_args(argv: List[str]) -> object:
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
     while argi < argn:
         arg = argv[argi] ; argi += 1  # noqa
-        if (arg == "--shell") or (arg == "-shell"):
+        if arg in ["--function", "-function", "--shell", "-shell"]:
             print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hms_config.sh"))
             exit(1)
         elif arg in ["--dir", "-dir", "--directory", "-directory"]:
@@ -338,6 +341,12 @@ def merge_config_and_secrets(config: dict, secrets: dict, path_separator: str = 
                 unmerged_secrets.append(key_path)
     merge(merged, secrets)
     return merged, merged_secrets, unmerged_secrets
+
+
+def path_basename(name: str, separator: str = "/") -> str:
+    if (index := name.rfind(separator)) > 0:
+        return name[index + 1:]
+    return name
 
 
 class Config:
