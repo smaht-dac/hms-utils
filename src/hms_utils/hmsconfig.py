@@ -8,6 +8,7 @@ import sys
 import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
+from hms_utils.chars import chars
 from hms_utils.print_tree import print_tree
 from hms_utils.terminal_utils import terminal_color
 
@@ -49,20 +50,25 @@ def main():
             sys.exit(1)
 
     if not args.name:
-        def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
-            pass
-        def tree_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
-            pass
-        def tree_key_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
-            # TODO: Do obfuscation here.
-            if secrets.lookup(key_path) is not None:
-                return terminal_color(key, "red")
-            return key
-        def tree_value_annotator(key_path: str) -> Optional[str]:
-            return terminal_color("◀◀", "red") if secrets.lookup(key_path) is not None else ""
-        unmerged_secrets = None
+        merged_secrets = None
         unmerged_secrets = None
         if (not args.nomerge) and config and secrets:
+            def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
+                nonlocal secrets
+                return key if (secrets.lookup(key_path) is None) else terminal_color(key, "red")
+            def tree_value_modifier(key_path: str, value: str) -> Optional[str]: # noqa
+                nonlocal args, secrets, args
+                if (not args.show_secrets) and secrets.contains(key_path):
+                    value = OBFUSCATED_VALUE
+                return value if (secrets.lookup(key_path) is None) else terminal_color(value, "red")
+            def tree_value_annotator(key_path: str) -> Optional[str]:  # noqa
+                nonlocal merged_secrets
+                if key_path in unmerged_secrets:
+                    return f"{chars.rarrow} unmerged {chars.xmark}"
+                return None
+            def tree_arrow_indicator(key_path: str) -> str:  # noqa
+                nonlocal secrets
+                return chars.rarrow if secrets.lookup(key_path) is not None else ""
             if config and secrets:
                 merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
                     config.json, secrets.json,
@@ -71,17 +77,17 @@ def main():
                 print(f"\n{config_file}: [with {os.path.basename(secrets_file)}"
                       f"{' partially' if unmerged_secrets else ''} merged]")
                 print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                           key_modifier=tree_key_value_modifier,
-                           value_modifier=tree_key_value_modifier,
-                           value_annotator=tree_value_annotator)
+                           key_modifier=tree_key_modifier,
+                           value_modifier=tree_value_modifier,
+                           value_annotator=tree_value_annotator,
+                           arrow_indicator=tree_arrow_indicator)
                 if unmerged_secrets:
-                    # TODO: Show which ones were unmerged from secrets.
                     print(f"\n{secrets_file}: [unmerged into {os.path.basename(config_file)}]")
                     print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                               key_modifier=tree_key_value_modifier,
-                               value_modifier=tree_key_value_modifier,
+                               key_modifier=tree_key_modifier,
+                               value_modifier=tree_value_modifier,
                                value_annotator=tree_value_annotator,
-                               obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE)
+                               arrow_indicator=tree_arrow_indicator)
                     print("DUMP UNMERGED")
                     print(json.dumps(unmerged_secrets, indent=4))
                     print("DUMP MERGED")
@@ -107,7 +113,7 @@ def main():
                     print(json.dumps(data, indent=4))
                 else:
                     print_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                               obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE)
+                               value_modifier=lambda key_path, value: OBFUSCATED_VALUE)
             if unmerged_secrets:
                 print(f"\nSecret not mergeable into config:")
                 for unmerged_secret_key in unmerged_secrets:
@@ -318,6 +324,9 @@ class Config:
         self._allow_dictionary_target = allow_dictionary_target
         self._imap = {}
         self._load_config(file_or_dictionary)
+
+    def contains(self, name: str) -> bool:
+        return self.lookup(name) is not None
 
     def lookup(self, name: str, config: Optional[dict] = None) -> Optional[str]:
         if config is None:
