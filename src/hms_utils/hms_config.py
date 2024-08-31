@@ -430,16 +430,34 @@ class Config:
     def contains(self, name: str) -> bool:
         return self.lookup(name) is not None
 
-    def lookup(self, name: str, config: Optional[dict] = None, allow_dictionary: bool = False) -> Optional[str]:
+    def lookup(self, name: str, config: Optional[dict] = None, allow_dictionary: bool = False, expanding_macros: bool = False) -> Optional[str]:
+        # xyzzy
+        def get_parent(item: dict) -> Optional[dict]:
+            nonlocal self
+            return self._imap.get(item.get(Config._PARENT))
+        def is_primitive_type(value: Any) -> bool:
+            return isinstance(value, (int, float, str, bool))
+        def lookup_outward(name: str, config: dict) -> Optional[str]:
+            if parent := get_parent(config):
+                while parent:
+                    if ((value := parent.get(name)) is not None) and is_primitive_type(value):
+                        return value
+                    parent = get_parent(parent)
+            return None
+        # xyzzy
         if config is None:
             config = self._json
         value = None
-        for name_component in name.split(self._path_separator):
+        for index, name_component in enumerate(name_components := name.split(self._path_separator)):
             if value is not None:
                 return None
             if not (name_component := name_component.strip()):
                 continue
             if not (value := config.get(name_component)):
+                # TODO: if this is called not from macro expansion and if this is that last name_component then look UP the tree
+                if (not expanding_macros) and (index == (len(name_components) - 1)):
+                    if (value := lookup_outward(name_component, config)) is not None:
+                        return value
                 return None
             if isinstance(value, dict):
                 config = value
@@ -492,13 +510,13 @@ class Config:
 
         def lookup_macro_value(macro_name: str, data: dict) -> Optional[str]:
             nonlocal self
-            if (macro_value := self.lookup(macro_name, data)) is not None:
+            if (macro_value := self.lookup(macro_name, data, expanding_macros=True)) is not None:
                 if is_primitive_type(macro_value):
                     return str(macro_value)
                 return None
             data = get_parent(data)
             while data:
-                if (macro_value := self.lookup(macro_name, data)) is not None:
+                if (macro_value := self.lookup(macro_name, data, expanding_macros=True)) is not None:
                     if is_primitive_type(macro_value):
                         return str(macro_value)
                     return None
