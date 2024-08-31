@@ -22,22 +22,21 @@ OBFUSCATED_VALUE = "********"
 def main():
 
     args = parse_args(sys.argv[1:])
-    config_file, secrets_file = resolve_files(args)
     config = None
     secrets = None
 
     try:
-        config = Config(config_file, path_separator=args.path_separator)
+        config = Config(args.config_file, path_separator=args.path_separator)
     except Exception as e:
-        print(f"Cannot process config file: {config_file}")
+        print(f"Cannot process config file: {args.config_file}")
         if args.debug: traceback.print_exc() ; print(str(e))  # noqa
         sys.exit(1)
 
-    if secrets_file:
+    if args.secrets_file:
         try:
-            secrets = Config(secrets_file, path_separator=args.path_separator)
+            secrets = Config(args.secrets_file, path_separator=args.path_separator)
         except Exception as e:
-            print(f"Cannot process secret config file: {secrets_file}")
+            print(f"Cannot process secret config file: {args.secrets_file}")
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
             sys.exit(1)
 
@@ -79,27 +78,20 @@ def parse_args(argv: List[str]) -> object:
         if arg in ["--dir", "-dir", "--directory", "-directory"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
-            args.config_dir = arg
-            args.config_dir_explicit = True
-            argi += 1
+            args.config_dir = arg ; args.config_dir_explicit = True ; argi += 1  # noqa
         elif arg in ["--config", "-config", "--conf", "-conf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
-            args.config_file = arg
-            args.config_file_explicit = True
-            argi += 1
+            args.config_file = arg ; args.config_file_explicit = True ; argi += 1  # noqa
         elif arg in ["--secrets-config", "-secrets-config", "--secrets-conf", "-secrets-conf", "--secret-config",
                      "-secret-config", "--secret-conf", "-secret-conf", "--secrets", "-secrets", "--secret", "-secret"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
-            args.secrets_file = arg
-            args.secrets_file_explicit = True
-            argi += 1
+            args.secrets_file = arg ; args.secrets_file_explicit = True ; argi += 1  # noqa
         elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
-            args.path_separator = arg
-            argi += 1
+            args.path_separator = arg ; argi += 1  # noqa
         elif arg in ["--show-secrets", "-show-secrets", "--show-secret", "-show-secret", "--show", "-show"]:
             args.show_secrets = True
         elif arg in ["--show-paths", "-show-paths", "--show-path",
@@ -131,6 +123,10 @@ def parse_args(argv: List[str]) -> object:
             args.nosort or args.nomerge or args.nocolor or args.yaml):  # noqa
             print("Option not allowed with a config name/path argument.")
             usage()
+
+    config_file, secrets_file = resolve_files(args)
+    args.config_file = config_file
+    args.secrets_file = secrets_file
 
     return args
 
