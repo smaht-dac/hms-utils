@@ -29,12 +29,14 @@ def main():
 
     args = parse_args(sys.argv[1:])
 
-    try:
-        config = Config(args.config_file, path_separator=args.path_separator)
-    except Exception as e:
-        print(f"Cannot process config file: {args.config_file}")
-        if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-        sys.exit(1)
+    config = None
+    if args.config_file:
+        try:
+            config = Config(args.config_file, path_separator=args.path_separator)
+        except Exception as e:
+            print(f"Cannot process config file: {args.config_file}")
+            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
+            sys.exit(1)
 
     secrets = None
     if args.secrets_file:
@@ -176,6 +178,13 @@ def parse_args(argv: List[str]) -> object:
         else:
             args.names.append(arg)
 
+    # If either config or secrets file is explicit ignore the other implicit one.
+    if args.config_file_explicit:
+        if not args.secrets_file_explicit:
+            args.secrets_file = None
+    elif args.secrets_file_explicit:
+        args.config_file = None
+
     if args.names and (args.show_secrets or args.show_paths or args.yaml or
                        args.nosort or args.nomerge or args.nocolor or args.yaml or args.list):
         print("Option not allowed with a config name/path argument.")
@@ -185,8 +194,8 @@ def parse_args(argv: List[str]) -> object:
         usage()
 
     config_file, secrets_file = resolve_files(args)
-    if not config_file:
-        print("No config file found.")
+    if (not config_file) and (not secrets_file):
+        print("No config or secrets file found.")
         usage()
     args.config_file = config_file
     args.secrets_file = secrets_file
@@ -275,6 +284,18 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
 
 
 def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: object) -> None:
+
+    def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
+        nonlocal args, secrets
+        return ((key or key_path) if (secrets.lookup(key_path) is None)
+                else color(key or key_path, "red", nocolor=args.nocolor))
+
+    def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
+        nonlocal args, secrets
+        if (not args.show_secrets) and secrets.contains(key_path):
+            value = OBFUSCATED_VALUE
+        return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
+
     if config:
         print(f"\n{config.file}:")
         data = config.json if not args.debug else config.rawjson
@@ -287,7 +308,9 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         elif args.list:
             print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
         else:
-            print_dictionary_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator)
+            print_dictionary_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                                  key_modifier=tree_key_modifier,
+                                  value_modifier=tree_value_modifier)
     if secrets:
         print(f"\n{secrets.file}:")
         data = secrets.json if not args.debug else secrets.rawjson
@@ -302,7 +325,8 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                 print_dictionary_tree(
                     data, indent=1,
                     paths=args.show_paths, path_separator=args.path_separator,
-                    value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
+                    key_modifier=tree_key_modifier,
+                    value_modifier=tree_value_modifier)
     print()
 
 
@@ -336,20 +360,23 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
     config_file = args.config_file
     secrets_file = args.secrets_file
 
-    if not (config_file := resolve_file_path(config_file, args.config_dir,
-                                             file_explicit=args.config_file_explicit,
-                                             directory_explicit=args.config_dir_explicit)):
-        if args.config_file_explicit:
-            print(f"Cannot find config file: {config_file}")
-            sys.exit(1)
-    if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
-                                              file_explicit=args.config_file_explicit,
-                                              directory_explicit=args.config_dir_explicit)):
-        if args.secrets_file_explicit:
-            print(f"Cannot find secrets file: {args.config_file_explicit}")
-            sys.exit(1)
-    elif not ensure_secrets_file_protected(secrets_file):
-        print(f"{color('WARNING', 'red')}: Your secrets file is not read protected for others: {secrets_file}")
+    if config_file:
+        if not (config_file := resolve_file_path(config_file, args.config_dir,
+                                                 file_explicit=args.config_file_explicit,
+                                                 directory_explicit=args.config_dir_explicit)):
+            if args.config_file_explicit:
+                print(f"Cannot find config file: {config_file}")
+                sys.exit(1)
+
+    if secrets_file:
+        if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
+                                                  file_explicit=args.secrets_file_explicit,
+                                                  directory_explicit=args.config_dir_explicit)):
+            if args.secrets_file_explicit:
+                print(f"Cannot find secrets file: {args.config_file_explicit}")
+                sys.exit(1)
+        elif not ensure_secrets_file_protected(secrets_file):
+            print(f"WARNING: Your secrets file is not read protected for others: {secrets_file}")
 
     return config_file, secrets_file
 
