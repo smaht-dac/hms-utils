@@ -448,22 +448,22 @@ class Config:
         def is_primitive_type(value: Any) -> bool:
             return isinstance(value, (int, float, str, bool))
 
-        def lookup_macro_value(macro_name: str, data: dict) -> Optional[Union[int, float, str, bool]]:
+        def lookup_macro_value(macro_name: str, data: dict) -> Optional[str]:
             nonlocal self
             if (macro_value := self.lookup(macro_name, data)) is not None:
                 if is_primitive_type(macro_value):
-                    return macro_value
+                    return str(macro_value)
                 return None
             data = get_parent(data)
             while data:
                 if (macro_value := self.lookup(macro_name, data)) is not None:
                     if is_primitive_type(macro_value):
-                        return macro_value
+                        return str(macro_value)
                     return None
                 data = get_parent(data)
             return None
 
-        def macro_expand_value(value, data):  # noqa
+        def macro_expand_value(value: str, data: dict) -> Optional[str]:
             nonlocal self
             expanding_macros = set()
             missing_macro_found = False
