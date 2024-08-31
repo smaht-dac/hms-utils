@@ -9,7 +9,7 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import print_dictionary_tree, delete_paths_from_dictionary
+from hms_utils.dictionary_utils import delete_paths_from_dictionary, print_dictionary_tree,  sort_dictionary
 from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
@@ -67,9 +67,9 @@ def parse_args(argv: List[str]) -> object:
         name = None
         yaml = False
         json = False
-        nosort = False
-        nomerge = False
         nocolor = False
+        nomerge = False
+        nosort = False
         debug = False
 
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
@@ -91,8 +91,7 @@ def parse_args(argv: List[str]) -> object:
               (arg == "--secrets-conf") or (arg == "-secrets-conf") or
               (arg == "--secret-config") or (arg == "-secret-config") or
               (arg == "--secret-conf") or (arg == "-secret-conf") or
-              (arg == "--secrets") or (arg == "-secrets") or
-              (arg == "--secret") or (arg == "-secret")):
+              (arg == "--secrets") or (arg == "-secrets") or (arg == "--secret") or (arg == "-secret")):
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.secrets_file = arg
@@ -118,12 +117,12 @@ def parse_args(argv: List[str]) -> object:
             args.yaml = True
         elif (arg == "--json") or (arg == "-json"):
             args.json = True
-        elif (arg == "--nosort") or (arg == "-nosort"):
-            args.nosort = True
-        elif (arg == "--nomerge") or (arg == "-nomerge"):
-            args.nomerge = True
         elif (arg == "--nocolor") or (arg == "-nocolor"):
             args.nocolor = True
+        elif (arg == "--nomerge") or (arg == "-nomerge"):
+            args.nomerge = True
+        elif (arg == "--nosort") or (arg == "-nosort"):
+            args.nosort = True
         elif (arg == "--debug") or (arg == "-debug"):
             args.debug = True
         elif (arg == "--help") or (arg == "-help") or (arg == "help"):
@@ -136,8 +135,9 @@ def parse_args(argv: List[str]) -> object:
             args.name = arg
 
     if args.name:
-        if args.yaml:
-            print("The --yaml argument not allowed with a config name/path")
+        if (args.show_secrets or args.show_paths or args.yaml or
+            args.nosort or args.nomerge or args.nocolor or args.yaml):
+            print("Option not allowed with a config name/path argument.")
             usage()
 
     return args
@@ -185,10 +185,8 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
 
     if config and secrets:
-        merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
-            config.json, secrets.json,
-            obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE,
-            path_separator=args.path_separator)
+        merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(config.json, secrets.json,
+                                                                            path_separator=args.path_separator)
         if not args.nosort:
             merged = sort_dictionary(merged)
         print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
@@ -284,13 +282,10 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return config_file, secrets_file
 
 
-def merge_config_and_secrets(config: dict, secrets: dict,
-                             obfuscated_value: str = OBFUSCATED_VALUE,
-                             path_separator: str = "/") -> Tuple[dict, list, list]:
+def merge_config_and_secrets(config: dict, secrets: dict, path_separator: str = "/") -> Tuple[dict, list, list]:
     if not (isinstance(config, dict) or isinstance(secrets, dict)):
         return None, None
     merged = deepcopy(config) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
-    secrets = obfuscate_secrets(secrets) if obfuscated_value else secrets
     def merge(config: dict, secrets: dict, path: str = "") -> None:  # noqa
         nonlocal unmerged_secrets, path_separator
         for key, value in secrets.items():
@@ -304,22 +299,6 @@ def merge_config_and_secrets(config: dict, secrets: dict,
                 unmerged_secrets.append(key_path)
     merge(merged, secrets)
     return merged, merged_secrets, unmerged_secrets
-
-
-def obfuscate_secrets(secrets: dict, obfuscated_value: str = OBFUSCATED_VALUE) -> dict:
-    obfuscated_secrets = {}
-    for key, value in secrets.items():
-        obfuscated_secrets[key] = obfuscate_secrets(value) if isinstance(value, dict) else obfuscated_value
-    return obfuscated_secrets
-
-
-def sort_dictionary(data: dict) -> dict:
-    if not isinstance(data, dict):
-        return data
-    sorted_data = {}
-    for key in sorted(data.keys()):
-        sorted_data[key] = sort_dictionary(data[key])
-    return sorted_data
 
 
 class Config:
@@ -463,9 +442,9 @@ class Config:
 
 
 def usage():
-    print(f"hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
+    print(f"{chars.rarrow} hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
-    print("usage: python hms_config.py name")
+    print(f"  {chars.rarrow_hollow} usage: python hms_config.py [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
     sys.exit(1)
 
 

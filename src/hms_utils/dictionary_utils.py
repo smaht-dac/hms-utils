@@ -77,3 +77,12 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
         keys = path.split('/')
         delete(data, keys)
     return data
+
+
+def sort_dictionary(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return data
+    sorted_data = {}
+    for key in sorted(data.keys()):
+        sorted_data[key] = sort_dictionary(data[key])
+    return sorted_data
