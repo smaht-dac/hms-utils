@@ -98,9 +98,7 @@ def parse_args(argv: List[str]) -> object:
             args.secrets_file = arg
             args.secrets_file_explicit = True
             argi += 1
-        elif ((arg == "--path-separator") or (arg == "-path-separator") or
-              (arg == "--separator") or (arg == "-separator") or
-              (arg == "--sep") or (arg == "-sep")):
+        elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.path_separator = arg
