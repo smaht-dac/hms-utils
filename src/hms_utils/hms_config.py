@@ -20,6 +20,7 @@ DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
 DEFAULT_SECRETS_FILE_NAME = os.environ.get("HMS_SECRETS", "secrets.json")
 DEFAULT_PATH_SEPARATOR = os.environ.get("HMS_PATH_SEPARATOR", "/")
+DEFAULT_EXPORT_NAME_SEPARATOR = os.environ.get("HMS_EXPORT_NAME_SEPARATOR", ":")
 OBFUSCATED_VALUE = "********"
 
 
@@ -48,25 +49,37 @@ def main():
         exit(0)
 
     status = 0
-    export_f = None
-    for name in args.names:
-        if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
-            ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
-            if args.export:
-                if args.export_file:
-                    if not export_f:
-                        if os.path.exists(args.export_file):
-                            print(f"Export file already exists;"
-                                  f" should be temporary file; will not overwrite: {args.export_file}")
-                            exit(1)
-                        export_f = io.open(args.export_file, "w")
-                    export_f.write(f"export {path_basename(name, args.path_separator)}={value}")
-                else:
-                    print(f"export {path_basename(name, args.path_separator)}={value}")
+    if args.export:
+        if args.export_file and os.path.exists(args.export_file):
+            print(f"Export file must not already exist: {args.export_file}")
+            exit(1)
+        exports = []
+        for name in args.names:
+            if (colon := name.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
+                export_name = name[0:colon]
+                if not (name := name[colon + 1:].strip()):
+                    continue
             else:
-                print(value)
+                export_name = path_basename(name, args.path_separator)
+            if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
+                ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
+                exports.append(f"export {export_name}={value}")
+            else:
+                status = 1
+        if args.export_file:
+            with io.open(args.export_file, "w") as f:
+                for export in exports:
+                    f.write(f"{export}\n")
         else:
-            status = 1
+            for export in exports:
+                print(export)
+    else:
+        for name in args.names:
+            if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
+                ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
+                print(value)
+            else:
+                status = 1
 
     sys.exit(status)
 
@@ -152,6 +165,9 @@ def parse_args(argv: List[str]) -> object:
     if args.names and (args.show_secrets or args.show_paths or args.yaml or
                        args.nosort or args.nomerge or args.nocolor or args.yaml or args.list):
         print("Option not allowed with a config name/path argument.")
+        usage()
+    elif args.export and (not args.names):
+        print("The --export option must be used with a config name/path argument.")
         usage()
 
     config_file, secrets_file = resolve_files(args)
