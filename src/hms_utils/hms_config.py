@@ -56,6 +56,9 @@ def main():
                     if (index := name.rfind(args.path_separator)) > 0:
                         return name[index + 1:]
                     return name
+                if args.export_file:
+                    with io.open(args.export_file, "w") as f:
+                        f.write(f"export {basename(name)}={value}")
                 print(f"export {basename(name)}={value}")
             else:
                 print(value)
@@ -86,6 +89,7 @@ def parse_args(argv: List[str]) -> object:
         nomerge = False
         nosort = False
         export = False
+        export_file = None
         debug = False
 
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
@@ -127,6 +131,11 @@ def parse_args(argv: List[str]) -> object:
             args.nosort = True
         elif arg in ["--export", "-export"]:
             args.export = True
+        elif arg in ["--export-file", "-export-file"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                usage()
+            args.export = True
+            args.export_file = argv[argi] ; argi += 1  # noqa
         elif arg in ["--debug", "-debug"]:
             args.debug = True
         elif (arg in ["--help", "-help", "help"]) or arg.startswith("-"):
