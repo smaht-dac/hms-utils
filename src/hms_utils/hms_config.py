@@ -65,8 +65,8 @@ def parse_args(argv: List[str]) -> object:
         path_separator = DEFAULT_PATH_SEPARATOR
         show_secrets = False
         show_paths = False
-        name = None
         yaml = False
+        name = None
         json = False
         nocolor = False
         nomerge = False
