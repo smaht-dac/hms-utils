@@ -28,10 +28,9 @@ function hms_config() {
     SCRIPT=hms-config
     TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
     $SCRIPT --export-file $TMPFILE $*
-    STATUS=$?
+    hms_config_status=$?
     if [ -f $TMPFILE ] ; then
         source $TMPFILE
         rm -f $TMPFILE
     fi
-    return $STATUS
 }

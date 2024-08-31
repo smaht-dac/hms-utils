@@ -66,7 +66,10 @@ def main():
                 ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
                 exports.append(f"export {export_name}={value}")
             else:
+                if args.verbose:
+                    print(f"Cannot find config name/path: {name}")
                 status = 1
+        exports = sorted(exports)
         if args.export_file:
             if args.verbose:
                 print(f"Writing exports to file: {args.export_file}")
