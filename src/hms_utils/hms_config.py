@@ -290,7 +290,7 @@ class Config:
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
     def __init__(self, file_or_dictionary: Union[str, dict], path_separator: bool = ".") -> None:
-        self._config = None
+        self._json = None
         self._path_separator = path_separator
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._expand_macros = True
@@ -305,7 +305,7 @@ class Config:
 
     def lookup(self, name: str, config: Optional[dict] = None, allow_dictionary: bool = False) -> Optional[str]:
         if config is None:
-            config = self._config
+            config = self._json
         value = None
         for name_component in name.split(self._path_separator):
             if value is not None:
@@ -329,21 +329,21 @@ class Config:
 
     @property
     def json(self) -> dict:
-        return self._cleanjson(self._config)
+        return self._cleanjson(self._json)
 
     @property
     def rawjson(self) -> dict:
-        return self._config
+        return self._json
 
     def _load(self, file_or_dictionary: Union[str, dict]) -> None:
         if isinstance(file_or_dictionary, dict):
-            self._config = file_or_dictionary
+            self._json = file_or_dictionary
         else:
             self._file = file_or_dictionary
             with io.open(file_or_dictionary, "r") as f:
-                self._config = json.load(f)
+                self._json = json.load(f)
         if self._expand_macros:
-            _ = self._macro_expand_json(self._config)
+            _ = self._macro_expand_json(self._json)
 
     def _macro_expand_json(self, data: dict) -> dict:
 
