@@ -350,8 +350,8 @@ def main() -> None:
             print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "awsenv.sh"))
             exit(1)
         elif ((arg == "--nocheck") or (arg == "-nocheck") or (arg == "nocheck") or
-            (arg == "--nc") or (arg == "-nc") or (arg == "nc") or (arg == "--n") or (arg == "-n") or
-            (arg == "--quick") or (arg == "-quick") or (arg == "quick") or (arg == "--q") or (arg == "-q")):  # noqa
+              (arg == "--nc") or (arg == "-nc") or (arg == "nc") or (arg == "--n") or (arg == "-n") or
+              (arg == "--quick") or (arg == "-quick") or (arg == "quick") or (arg == "--q") or (arg == "-q")):  # noqa
             nocheck = True
         elif ((arg == "--active") or (arg == "-active") or (arg == "active") or
               (arg == "--activate") or (arg == "-activate") or (arg == "activate") or

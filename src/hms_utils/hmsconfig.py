@@ -49,7 +49,7 @@ def main():
 
     if not args.name:
         unmerged_secrets = None
-        if not (nomerge := args.nomerge) and config and secrets:
+        if (not args.nomerge) and config and secrets:
             if config and secrets:
                 merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
                     config.json, secrets.json,

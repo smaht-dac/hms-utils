@@ -197,7 +197,7 @@ class AwsEcs:
                     if self.find_task_definition(task_definition_name) is None:
                         if task_definition_name not in unassociated_task_definition_names:
                             unassociated_task_definition_names.append(task_definition_name)
-        except Exception as e:
+        except Exception:
             pass
         return sorted(unassociated_task_definition_names)
 
