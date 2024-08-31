@@ -30,9 +30,9 @@ pytest-redis = "^3.0.2"
 pytest-runner = ">=5.1"
 
 [tool.poetry.scripts]
-hms-awsecs = "hms_utils.awsecs:main"
-hms-awsenv = "hms_utils.awsenv:main"
-hms-config = "hms_utils.hmsconfig:main"
+hms-aws-ecs = "hms_utils.aws_ecs:main"
+hms-aws-env = "hms_utils.aws_env:main"
+hms-config = "hms_utils.hms_config:main"
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 
 [build-system]

@@ -15,10 +15,10 @@ from typing import List, Optional, Tuple
 # Mostly just viewing features; the only "manage" feature being setting the default profile;
 # and also refreshing credentials (i.e. logging in via aws sso login). Usage:
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# usage: python awsenv.py [profile-name-pattern] [nocheck]
-#        python awsenv.py default [profile-name] | awsenv nodefault
-#        python awsenv.py current [profile-name] | awsenv nocurrent
-#        python awsenv.py refresh [profile-name]
+# usage: python aws_env.py [profile-name-pattern] [nocheck]
+#        python aws_env.py default [profile-name] | aws_env nodefault
+#        python aws_env.py current [profile-name] | aws_env nocurrent
+#        python aws_env.py refresh [profile-name]
 # ----------------------------------------------------------------------------------------------------------------------
 
 AWS_CONFIG_FILE_PATH = os.path.expanduser("~/.aws/config")
@@ -293,12 +293,12 @@ def confirm(message: str) -> bool:
 
 
 def usage(status: int = 1) -> None:
-    print("usage: python awsenv.py [profile-name-pattern] [nocheck]")
-    print("       python awsenv.py login [profile-name]")
-    print("       python awsenv.py default [profile-name]")
-    print("       python awsenv.py nodefault")
-    print("       python awsenv.py current [profile-name]")
-    print("       python awsenv.py nocurrent")
+    print("usage: python aws_env.py [profile-name-pattern] [nocheck]")
+    print("       python aws_env.py login [profile-name]")
+    print("       python aws_env.py default [profile-name]")
+    print("       python aws_env.py nodefault")
+    print("       python aws_env.py current [profile-name]")
+    print("       python aws_env.py nocurrent")
     sys.exit(status)
 
 
@@ -347,7 +347,7 @@ def main() -> None:
     while argi < len(args):
         arg = args[argi]
         if (arg == "--shell") or (arg == "-shell"):
-            print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "awsenv.sh"))
+            print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "aws_env.sh"))
             exit(1)
         elif ((arg == "--nocheck") or (arg == "-nocheck") or (arg == "nocheck") or
               (arg == "--nc") or (arg == "-nc") or (arg == "nc") or (arg == "--n") or (arg == "-n") or
@@ -375,11 +375,11 @@ def main() -> None:
             verbose = True
         elif (arg == "--help") or (arg == "-help") or (arg == "help") or (arg == "--h") or (arg == "-h"):
             usage(0)
-        elif (arg == "--current-export-file"):  # to support awsenv.sh script
+        elif (arg == "--current-export-file"):  # to support aws_env.sh script
             if (argi := argi + 1) >= len(args):
                 usage(1)
             current_export_file = args[argi]
-        elif (arg == "--post-current-export-file"):  # to support awsenv.sh script
+        elif (arg == "--post-current-export-file"):  # to support aws_env.sh script
             post_current_export_file = args[argi]
         elif arg.startswith("-"):
             usage(1)
