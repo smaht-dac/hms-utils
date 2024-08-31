@@ -27,22 +27,14 @@ def main():
     secrets = None
 
     try:
-        config = Config(config_file,
-                        path_separator=args.path_separator,
-                        ignore_missing_macro=args.ignore_missing_macro,
-                        remove_missing_macro=args.remove_missing_macro,
-                        allow_dictionary_target=args.allow_dictionary_target)
+        config = Config(config_file, path_separator=args.path_separator)
     except Exception as e:
         print(f"Cannot process config file: {config_file}")
         if args.debug: traceback.print_exc() ; print(str(e))  # noqa
         sys.exit(1)
 
     try:
-        secrets = Config(secrets_file,
-                         path_separator=args.path_separator,
-                         ignore_missing_macro=args.ignore_missing_macro,
-                         remove_missing_macro=args.remove_missing_macro,
-                         allow_dictionary_target=args.allow_dictionary_target)
+        secrets = Config(secrets_file, path_separator=args.path_separator)
     except Exception as e:
         print(f"Cannot process secret config file: {secrets_file}")
         if args.debug: traceback.print_exc() ; print(str(e))  # noqa
@@ -50,12 +42,13 @@ def main():
 
     if not args.name:
         print_config_and_secrets(config, secrets, args)
-        merged_secrets = None
         exit(0)
 
-    if ((value := config.lookup(args.name)) is not None) or ((value := secrets.lookup(args.name)) is not None):
+    if (((value := config.lookup(args.name, allow_dictionary=args.json)) is not None) or
+        ((value := secrets.lookup(args.name, allow_dictionary=args.json)) is not None)):  # noqa
         print(value)
         sys.exit(0)
+
     sys.exit(1)
 
 
@@ -69,10 +62,6 @@ def parse_args(argv: List[str]) -> object:
         secrets_file_explicit = False
         config_dir_explicit = False
         path_separator = DEFAULT_PATH_SEPARATOR
-        ignore_missing_macro = True  # immutable
-        remove_missing_macro = False  # immutable
-        stringize_non_primitive_types = False  # immutable
-        allow_dictionary_target = False
         show_secrets = False
         show_paths = False
         name = None
@@ -81,8 +70,6 @@ def parse_args(argv: List[str]) -> object:
         nosort = False
         nomerge = False
         nocolor = False
-        verbose = False
-        dump = False
         debug = False
 
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
@@ -118,12 +105,6 @@ def parse_args(argv: List[str]) -> object:
                 usage()
             args.path_separator = arg
             argi += 1
-        elif (arg == "--allow-dictionary-target") or (arg == "-allow-dictionary-target"):
-            args.allow_dictionary_target = True
-        elif (arg == "--ignore-missing-macro") or (arg == "-ignore-missing-macro"):
-            args.ignore_missing_macro = True
-        elif (arg == "--remove-missing-macro") or (arg == "-remove-missing-macro"):
-            args.remove_missing_macro = True
         elif ((arg == "--show-secrets") or (arg == "-show-secrets") or
               (arg == "--show-secret") or (arg == "-show-secret") or
               (arg == "--show") or (arg == "-show")):
@@ -143,10 +124,6 @@ def parse_args(argv: List[str]) -> object:
             args.nomerge = True
         elif (arg == "--nocolor") or (arg == "-nocolor"):
             args.nocolor = True
-        elif (arg == "--dump") or (arg == "-dump"):
-            args.dump = True
-        elif (arg == "--verbose") or (arg == "-verbose"):
-            args.verbose = True
         elif (arg == "--debug") or (arg == "-debug"):
             args.debug = True
         elif (arg == "--help") or (arg == "-help") or (arg == "help"):
@@ -157,95 +134,113 @@ def parse_args(argv: List[str]) -> object:
             usage()
         else:
             args.name = arg
+
+    if args.name:
+        if args.yaml:
+            print("The --yaml argument not allowed with a config name/path")
+            usage()
+
     return args
 
 
 def print_config_and_secrets(config: Config, secrets: Config, args: object) -> None:
+    if (not args.nomerge) and (not args.json) and (not args.yaml) and config and secrets:
+        print_config_and_secrets_merged(config, secrets, args)
+    else:
+        print_config_and_secrets_unmerged(config, secrets, args)
+        return
+
+
+def print_config_and_secrets_merged(config: Config, secrets: Config, args: object) -> None:
+
     merged_secrets = None
     unmerged_secrets = None
-    if (not args.nomerge) and (not args.json) and (not args.yaml) and config and secrets:
-        def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
-            nonlocal secrets
-            return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
-        def tree_value_modifier(key_path: str, value: str) -> Optional[str]: # noqa
-            nonlocal args, secrets, args
-            if (not args.show_secrets) and secrets.contains(key_path):
-                value = OBFUSCATED_VALUE
-            return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
-        def tree_value_annotator(key_path: str) -> Optional[str]:  # noqa
-            nonlocal merged_secrets
-            if key_path in unmerged_secrets:
-                return f"{chars.rarrow} unmerged {chars.xmark}"
-            return None
-        def tree_value_annotator_secrets(key_path: str) -> Optional[str]:  # noqa
-            nonlocal merged_secrets
-            if key_path in unmerged_secrets:
-                return f"{chars.rarrow} unmerged {chars.xmark}"
-            elif key_path in merged_secrets:
-                return f"{chars.rarrow_hollow} merged {chars.check}"
-            return None
-        def tree_arrow_indicator(key_path: str) -> str:  # noqa
-            nonlocal secrets
-            return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
-        if config and secrets:
-            merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
-                config.json, secrets.json,
-                obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE,
-                path_separator=args.path_separator)
-            if not args.nosort:
-                merged = sort_dictionary(merged)
-            print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
-            print_dictionary_tree(merged, indent=1,
+
+    def tree_key_modifier(key_path: str, key: str) -> Optional[str]:
+        nonlocal secrets
+        return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
+
+    def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
+        nonlocal args, secrets, args
+        if (not args.show_secrets) and secrets.contains(key_path):
+            value = OBFUSCATED_VALUE
+        return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
+
+    def tree_value_annotator(key_path: str) -> Optional[str]:
+        nonlocal merged_secrets
+        if key_path in unmerged_secrets:
+            return f"{chars.rarrow} unmerged {chars.xmark}"
+        return None
+
+    def tree_value_annotator_secrets(key_path: str) -> Optional[str]:
+        nonlocal merged_secrets
+        if key_path in unmerged_secrets:
+            return f"{chars.rarrow} unmerged {chars.xmark}"
+        elif key_path in merged_secrets:
+            return f"{chars.rarrow_hollow} merged {chars.check}"
+        return None
+
+    def tree_arrow_indicator(key_path: str) -> str:
+        nonlocal secrets
+        return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
+
+    if config and secrets:
+        merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
+            config.json, secrets.json,
+            obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE,
+            path_separator=args.path_separator)
+        if not args.nosort:
+            merged = sort_dictionary(merged)
+        print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
+        print_dictionary_tree(merged, indent=1,
+                              paths=args.show_paths, path_separator=args.path_separator,
+                              key_modifier=tree_key_modifier,
+                              value_modifier=tree_value_modifier,
+                              value_annotator=tree_value_annotator,
+                              arrow_indicator=tree_arrow_indicator)
+        if unmerged_secrets:
+            print(f"\n{secrets.file}: [secrets unmerged]")
+            secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
+            print_dictionary_tree(secrets_json, indent=1,
                                   paths=args.show_paths, path_separator=args.path_separator,
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier,
-                                  value_annotator=tree_value_annotator,
+                                  value_annotator=tree_value_annotator_secrets,
                                   arrow_indicator=tree_arrow_indicator)
-            if unmerged_secrets:
-                print(f"\n{secrets.file}: [secrets unmerged]")
-                secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
-                print_dictionary_tree(secrets_json, indent=1,
-                                      paths=args.show_paths, path_separator=args.path_separator,
-                                      key_modifier=tree_key_modifier,
-                                      value_modifier=tree_value_modifier,
-                                      value_annotator=tree_value_annotator_secrets,
-                                      arrow_indicator=tree_arrow_indicator)
-                if args.debug:
-                    print("\nMerged from secrets:")
-                    [print(f"{chars.rarrow} {item}") for item in merged_secrets]
-                    print("\nUnmerged from secrets")
-                    [print(f"{chars.rarrow} {item}") for item in unmerged_secrets]
-            print()
-    else:
-        if config:
-            print(f"\n{config.file}:")
-            data = config.json if not args.debug else config.json_raw
-            if not args.nosort:
-                data = sort_dictionary(data)
-            if args.yaml:
-                print(yaml.dump(data))
-            elif args.json:
-                print(json.dumps(data, indent=4))
-            else:
-                print_dictionary_tree(
-                    data, indent=1,
-                    paths=args.show_paths, path_separator=args.path_separator)
-        if secrets:
-            print(f"\n{secrets.file}:")
-            data = secrets.json if not args.debug else secrets.json_raw
-            if args.yaml:
-                print(yaml.dump(data))
-            elif args.json:
-                print(json.dumps(data, indent=4))
-            else:
-                    print_dictionary_tree(
-                    data, indent=1,
-                    paths=args.show_paths, path_separator=args.path_separator,
-                    value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
-        if unmerged_secrets:
-            print(f"\nSecret not mergeable into config:")
-            for unmerged_secret_key in unmerged_secrets:
-                print(f"▷ {unmerged_secret_key}")
+            if args.debug:
+                print("\nMerged from secrets:")
+                [print(f"{chars.rarrow} {item}") for item in merged_secrets]
+                print("\nUnmerged from secrets")
+                [print(f"{chars.rarrow} {item}") for item in unmerged_secrets]
+        print()
+
+
+def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: object) -> None:
+    if config:
+        print(f"\n{config.file}:")
+        data = config.json if not args.debug else config.json_raw
+        if not args.nosort:
+            data = sort_dictionary(data)
+        if args.yaml:
+            print(yaml.dump(data))
+        elif args.json:
+            print(json.dumps(data, indent=4))
+        else:
+            print_dictionary_tree(
+                data, indent=1,
+                paths=args.show_paths, path_separator=args.path_separator)
+    if secrets:
+        print(f"\n{secrets.file}:")
+        data = secrets.json if not args.debug else secrets.json_raw
+        if args.yaml:
+            print(yaml.dump(data))
+        elif args.json:
+            print(json.dumps(data, indent=4))
+        else:
+            print_dictionary_tree(
+                data, indent=1,
+                paths=args.show_paths, path_separator=args.path_separator,
+                value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
 
 
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
@@ -332,27 +327,20 @@ class Config:
     _PARENT = "@@@__PARENT__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
-    def __init__(self, file_or_dictionary: Union[str, dict],
-                 path_separator: bool = ".",
-                 ignore_missing_macro: bool = True,
-                 remove_missing_macro: bool = False,
-                 stringize_non_primitive_types: bool = True,
-                 allow_dictionary_target: bool = False,
-                 expand_macros: bool = True) -> None:
+    def __init__(self, file_or_dictionary: Union[str, dict], path_separator: bool = ".") -> None:
         self._config = None
         self._path_separator = path_separator
-        self._expand_macros = expand_macros
-        self._ignore_missing_macro = ignore_missing_macro
-        self._remove_missing_macro = remove_missing_macro
-        self._stringize_non_primitive_types = stringize_non_primitive_types
-        self._allow_dictionary_target = allow_dictionary_target
+        self._expand_macros = True
+        self._ignore_missing_macro = True
+        self._remove_missing_macro = True
+        self._stringize_non_primitive_types = True
         self._imap = {}
         self._load(file_or_dictionary)
 
     def contains(self, name: str) -> bool:
         return self.lookup(name) is not None
 
-    def lookup(self, name: str, config: Optional[dict] = None) -> Optional[str]:
+    def lookup(self, name: str, config: Optional[dict] = None, allow_dictionary: bool = False) -> Optional[str]:
         if config is None:
             config = self._config
         value = None
@@ -368,7 +356,7 @@ class Config:
                 value = None
         if value is not None:
             return value
-        elif config and self._allow_dictionary_target:
+        elif config and allow_dictionary:
             return str(self._cleanup_json(config))
         return None
 
@@ -475,7 +463,7 @@ class Config:
 
 
 def usage():
-    print(f"Reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
+    print(f"hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
     print("usage: python hms_config.py name")
     sys.exit(1)
