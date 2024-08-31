@@ -66,7 +66,7 @@ def print_dictionary_list(data: dict,
         value_annotator = None
     if not callable(value_modifier):
         value_modifier = None
-    def traverse(data: dict, path: str = "") -> None:
+    def traverse(data: dict, path: str = "") -> None:  # noqa
         nonlocal path_separator, key_modifier, value_annotator, value_modifier
         for key in data:
             key_path = f"{path}{path_separator}{key}" if path else key
