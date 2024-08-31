@@ -9,7 +9,7 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import delete_paths_from_dictionary, print_dictionary_tree,  sort_dictionary
+from hms_utils.dictionary_utils import delete_paths_from_dictionary, print_dictionary_tree, sort_dictionary
 from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
@@ -136,7 +136,7 @@ def parse_args(argv: List[str]) -> object:
 
     if args.name:
         if (args.show_secrets or args.show_paths or args.yaml or
-            args.nosort or args.nomerge or args.nocolor or args.yaml):
+            args.nosort or args.nomerge or args.nocolor or args.yaml):  # noqa
             print("Option not allowed with a config name/path argument.")
             usage()
 
@@ -206,17 +206,15 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
                                   value_annotator=tree_value_annotator_secrets,
                                   arrow_indicator=tree_arrow_indicator)
             if args.debug:
-                print("\nMerged from secrets:")
-                [print(f"{chars.rarrow} {item}") for item in merged_secrets]
-                print("\nUnmerged from secrets")
-                [print(f"{chars.rarrow} {item}") for item in unmerged_secrets]
+                print("\nMerged from secrets:") ; [print(f"- {item}") for item in merged_secrets]  # noqa
+                print("\nUnmerged from secrets") ; [print(f"- {item}") for item in unmerged_secrets]  # noqa
         print()
 
 
 def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: object) -> None:
     if config:
         print(f"\n{config.file}:")
-        data = config.json if not args.debug else config.json_raw
+        data = config.json if not args.debug else config.rawjson
         if not args.nosort:
             data = sort_dictionary(data)
         if args.yaml:
@@ -229,7 +227,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                 paths=args.show_paths, path_separator=args.path_separator)
     if secrets:
         print(f"\n{secrets.file}:")
-        data = secrets.json if not args.debug else secrets.json_raw
+        data = secrets.json if not args.debug else secrets.rawjson
         if args.yaml:
             print(yaml.dump(data))
         elif args.json:
@@ -309,6 +307,7 @@ class Config:
     def __init__(self, file_or_dictionary: Union[str, dict], path_separator: bool = ".") -> None:
         self._config = None
         self._path_separator = path_separator
+        # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._expand_macros = True
         self._ignore_missing_macro = True
         self._remove_missing_macro = True
@@ -348,7 +347,7 @@ class Config:
         return self._cleanup_json(self._config)
 
     @property
-    def json_raw(self) -> dict:
+    def rawjson(self) -> dict:
         return self._config
 
     def _load(self, file_or_dictionary: Union[str, dict]) -> None:
@@ -444,7 +443,8 @@ class Config:
 def usage():
     print(f"{chars.rarrow} hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
-    print(f"  {chars.rarrow_hollow} usage: python hms_config.py [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
+    print(f"  {chars.rarrow_hollow} usage: python hms_config.py"
+          f" [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
     sys.exit(1)
 
 
