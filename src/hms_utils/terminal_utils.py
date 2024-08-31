@@ -1,12 +1,19 @@
 from termcolor import colored
 
 
-def terminal_color(value: str, color: str, dark: bool = False, bold: bool = False, underline: bool = False) -> str:
+def terminal_color(value: str,
+                   color: str,
+                   dark: bool = False,
+                   bold: bool = False,
+                   underline: bool = False,
+                   nocolor: bool = False) -> str:
+    if nocolor is True:
+        return value
     attributes = []
-    if dark:
+    if dark is True:
         attributes.append("dark")
-    if bold:
+    if bold is True:
         attributes.append("bold")
-    if underline:
+    if underline is True:
         attributes.append("underline")
     return colored(value, color.lower(), attrs=attributes)

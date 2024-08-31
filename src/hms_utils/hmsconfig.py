@@ -55,12 +55,12 @@ def main():
         if (not args.nomerge) and config and secrets:
             def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
                 nonlocal secrets
-                return key if (secrets.lookup(key_path) is None) else terminal_color(key, "red")
+                return key if (secrets.lookup(key_path) is None) else terminal_color(key, "red", nocolor=args.nocolor)
             def tree_value_modifier(key_path: str, value: str) -> Optional[str]: # noqa
                 nonlocal args, secrets, args
                 if (not args.show_secrets) and secrets.contains(key_path):
                     value = OBFUSCATED_VALUE
-                return value if (secrets.lookup(key_path) is None) else terminal_color(value, "red")
+                return value if (secrets.lookup(key_path) is None) else terminal_color(value, "red", nocolor=args.nocolor)
             def tree_value_annotator(key_path: str) -> Optional[str]:  # noqa
                 nonlocal merged_secrets
                 if key_path in unmerged_secrets:
@@ -68,7 +68,7 @@ def main():
                 return None
             def tree_arrow_indicator(key_path: str) -> str:  # noqa
                 nonlocal secrets
-                return chars.rarrow if secrets.lookup(key_path) is not None else ""
+                return chars.rarrow_hollow if secrets.lookup(key_path) is not None else ""
             if config and secrets:
                 merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(
                     config.json, secrets.json,
@@ -76,24 +76,25 @@ def main():
                     path_separator=args.path_separator)
                 if not args.nosort:
                     merged = sort_dictionary(merged)
-                print(f"\n{config_file}: [with {os.path.basename(secrets_file)}"
-                      f"{' partially' if unmerged_secrets else ''} merged]")
+                print(f"\n{config_file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
                 print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                            key_modifier=tree_key_modifier,
                            value_modifier=tree_value_modifier,
                            value_annotator=tree_value_annotator,
                            arrow_indicator=tree_arrow_indicator)
                 if unmerged_secrets:
-                    print(f"\n{secrets_file}: [unmerged into {os.path.basename(config_file)}]")
+                    print(f"\n{secrets_file}: [secrets unmerged]")
                     print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                                key_modifier=tree_key_modifier,
                                value_modifier=tree_value_modifier,
                                value_annotator=tree_value_annotator,
                                arrow_indicator=tree_arrow_indicator)
-                    print("DUMP UNMERGED")
-                    print(json.dumps(unmerged_secrets, indent=4))
-                    print("DUMP MERGED")
-                    print(json.dumps(merged_secrets, indent=4))
+                    if args.debug:
+                        print("\nMerged from secrets:")
+                        [print(f"{chars.rarrow} {item}") for item in merged_secrets]
+                        print("\nUnmerged from secrets")
+                        [print(f"{chars.rarrow} {item}") for item in unmerged_secrets]
+                print()
         else:
             if config:
                 print(f"\n{config_file}:")
