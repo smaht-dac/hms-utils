@@ -95,7 +95,10 @@ def parse_args(argv: List[str]) -> object:
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
     while argi < argn:
         arg = argv[argi] ; argi += 1  # noqa
-        if arg in ["--dir", "-dir", "--directory", "-directory"]:
+        if (arg == "--shell") or (arg == "-shell"):
+            print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hms_config.sh"))
+            exit(1)
+        elif arg in ["--dir", "-dir", "--directory", "-directory"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.config_dir = arg ; args.config_dir_explicit = True ; argi += 1  # noqa
