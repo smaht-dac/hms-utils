@@ -74,6 +74,8 @@ def main():
                     config.json, secrets.json,
                     obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE,
                     path_separator=args.path_separator)
+                if not args.nosort:
+                    merged = sort_dictionary(merged)
                 print(f"\n{config_file}: [with {os.path.basename(secrets_file)}"
                       f"{' partially' if unmerged_secrets else ''} merged]")
                 print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
@@ -96,7 +98,7 @@ def main():
             if config:
                 print(f"\n{config_file}:")
                 data = config.json if not args.debug else config.json_raw
-                if args.nosort is False:
+                if not args.nosort:
                     data = sort_dictionary(data)
                 if args.yaml:
                     print(yaml.dump(data))
@@ -362,7 +364,7 @@ class Config:
         else:
             with io.open(file_or_dictionary, "r") as f:
                 self._config = json.load(f)
-        if self._expand_macros is True:
+        if self._expand_macros:
             _ = self._macro_expand_json(self._config)
 
     def _macro_expand_json(self, data: dict) -> dict:
