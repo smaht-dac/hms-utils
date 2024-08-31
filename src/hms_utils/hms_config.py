@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+from pkg_resources import get_distribution as get_package_version
 import stat
 import sys
 import traceback
@@ -157,7 +158,10 @@ def parse_args(argv: List[str]) -> object:
             args.export_file = argv[argi] ; argi += 1  # noqa
         elif arg in ["--debug", "-debug"]:
             args.debug = True
-        elif (arg in ["--help", "-help", "help"]) or arg.startswith("-"):
+        elif arg in ["--version", "-version"]:
+            print(f"hms-utils version: {get_version()}")
+            usage()
+        elif (arg in ["--help", "-help"]) or arg.startswith("-"):
             usage()
         else:
             args.names.append(arg)
@@ -504,6 +508,13 @@ class Config:
             for key, value in list(data.items()):
                 Config._cleanjson(value)
         return data
+
+
+def get_version(package_name: str = "hms-utils") -> str:
+    try:
+        return get_package_version(package_name).version
+    except Exception:
+        return ""
 
 
 def usage():
