@@ -33,7 +33,7 @@ def print_tree(data: dict,
                 if paths:
                     key = key_path
                 if obfuscated_value:
-                    output(indent + corner + f"{key}: {obfuscated_value}{annotation}")
+                    output(indent + corner + f"{key}: {obfuscated_value}{f' {annotation}' if annotation else ''}")
                 else:
-                    output(indent + corner + f"{key}: {value}{annotation}")
+                    output(indent + corner + f"{key}: {value}{f' {annotation}' if annotation else ''}")
     traverse(data, first=True)

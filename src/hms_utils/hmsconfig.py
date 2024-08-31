@@ -9,6 +9,7 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.print_tree import print_tree
+from hms_utils.terminal_utils import terminal_color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
@@ -48,6 +49,14 @@ def main():
             sys.exit(1)
 
     if not args.name:
+        def annotate_tree_value(key_path: str) -> Optional[str]:
+            if config.lookup(key_path) is not None:
+                annotation = "[config]"
+            elif secrets.lookup(key_path) is not None:
+                annotation = terminal_color("[secret]", "red")
+            else:
+                annotation = "[nothing]"
+            return annotation
         unmerged_secrets = None
         if (not args.nomerge) and config and secrets:
             if config and secrets:
@@ -57,11 +66,11 @@ def main():
                     path_separator=args.path_separator)
                 print(f"\n{config_file}: [with {os.path.basename(secrets_file)}"
                       f"{' partially' if unmerged_secrets else ''} merged]")
-                print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator)
+                print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator, annotator=annotate_tree_value)
                 if unmerged_secrets:
                     # TODO: Show which ones were unmerged from secrets.
                     print(f"\n{secrets_file}: [unmerged into {os.path.basename(config_file)}]")
-                    print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator)
+                    print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator, annotator=annotate_tree_value)
                     print("DUMP UNMERGED")
                     print(json.dumps(unmerged_secrets, indent=4))
                     print("DUMP MERGED")
@@ -120,6 +129,7 @@ def parse_args(argv: List[str]) -> object:
         json = False
         nosort = False
         nomerge = False
+        nocolor = False
         verbose = False
         dump = False
         debug = False
@@ -180,6 +190,8 @@ def parse_args(argv: List[str]) -> object:
             args.nosort = True
         elif (arg == "--nomerge") or (arg == "-nomerge"):
             args.nomerge = True
+        elif (arg == "--nocolor") or (arg == "-nocolor"):
+            args.nocolor = True
         elif (arg == "--dump") or (arg == "-dump"):
             args.dump = True
         elif (arg == "--verbose") or (arg == "-verbose"):
