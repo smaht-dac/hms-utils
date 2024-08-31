@@ -24,7 +24,7 @@ def print_tree(data: dict,
         printf = print
     output = (lambda value: printf(f"{' ' * indent}{value}")) if isinstance(indent, int) and indent > 0 else printf
     def traverse(data: dict, indent: str = "", first: bool = False, last: bool = True, path: str = ""):  # noqa
-        nonlocal output, paths
+        nonlocal output, paths, key_modifier, value_annotator, value_modifier
         space = "    " if not first else "  "
         for index, key in enumerate(keys := list(data.keys())):
             last = (index == len(keys) - 1)

@@ -59,13 +59,7 @@ def main():
                 return terminal_color(key, "red")
             return key
         def tree_value_annotator(key_path: str) -> Optional[str]:
-            if config.lookup(key_path) is not None:
-                annotation = "[config]"  # TODO: remove this.
-            elif secrets.lookup(key_path) is not None:
-                annotation = terminal_color("[secret]", "red")
-            else:
-                annotation = "[nothing]"
-            return annotation
+            return terminal_color("◀◀", "red") if secrets.lookup(key_path) is not None else ""
         unmerged_secrets = None
         unmerged_secrets = None
         if (not args.nomerge) and config and secrets:
