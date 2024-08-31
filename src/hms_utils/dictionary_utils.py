@@ -55,7 +55,13 @@ def print_dictionary_tree(data: dict,
     traverse(data, first=True)
 
 
-def delete_paths_from_dictionary(data: dict, paths: List[str], copy: bool = True):
+def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = "/", copy: bool = True):
+    """
+    Deletes from the given dictionary the keys/properies specified in the given list of key paths;
+    the paths being (by default) a hierarchical-like slash-separated key names, e.g. abc/def/ghi.
+    If the copy flag is True this a copy is made of the given dictionary, otherwise it is
+    changed in place. In any case returns the resultant dictionary
+    """
     if copy is not False:
         data = deepcopy(data)
     def delete(data, keys):  # noqa
