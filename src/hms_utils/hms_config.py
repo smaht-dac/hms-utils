@@ -43,23 +43,26 @@ def main():
             if args.debug: traceback.print_exc() ; print(str(e))  # noqa
             sys.exit(1)
 
-    if not args.name:
+    if not args.names:
         print_config_and_secrets(config, secrets, args)
         exit(0)
 
-    if (((value := config.lookup(args.name, allow_dictionary=args.json)) is not None) or
-        ((value := secrets.lookup(args.name, allow_dictionary=args.json)) is not None)):  # noqa
-        if args.exports:
-            def basename(name: str) -> str:
-                if (index := name.rfind(args.path_separator)) > 0:
-                    return name[index + 1:]
-                return name
-            print(f"export {basename(args.name)}={value}")
+    status = 0
+    for name in args.names:
+        if (((value := config.lookup(name, allow_dictionary=args.json)) is not None) or
+            ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None)):  # noqa
+            if args.exports:
+                def basename(name: str) -> str:
+                    if (index := name.rfind(args.path_separator)) > 0:
+                        return name[index + 1:]
+                    return name
+                print(f"export {basename(name)}={value}")
+            else:
+                print(value)
         else:
-            print(value)
-        sys.exit(0)
+            status = 1
 
-    sys.exit(1)
+    sys.exit(status)
 
 
 def parse_args(argv: List[str]) -> object:
@@ -73,6 +76,7 @@ def parse_args(argv: List[str]) -> object:
         config_dir_explicit = False
         path_separator = DEFAULT_PATH_SEPARATOR
         name = None
+        names = []
         list = False
         yaml = False
         json = False
@@ -125,17 +129,13 @@ def parse_args(argv: List[str]) -> object:
             args.exports = True
         elif arg in ["--debug", "-debug"]:
             args.debug = True
-        elif arg in ["--help", "-help", "help"]:
-            usage()
-        elif arg.startswith("-"):
-            usage()
-        elif args.name:
+        elif (arg in ["--help", "-help", "help"]) or arg.startswith("-"):
             usage()
         else:
-            args.name = arg
+            args.names.append(arg)
 
-    if args.name and (args.show_secrets or args.show_paths or args.yaml or
-                      args.nosort or args.nomerge or args.nocolor or args.yaml):
+    if args.names and (args.show_secrets or args.show_paths or args.yaml or
+                       args.nosort or args.nomerge or args.nocolor or args.yaml or args.list):
         print("Option not allowed with a config name/path argument.")
         usage()
 

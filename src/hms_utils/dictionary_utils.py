@@ -81,7 +81,7 @@ def print_dictionary_list(data: dict,
                     key = key_modification
                 if value_modification:
                     value = value_modification
-                print(f"{key}: {value}{f' {value_annotation}' if value_annotation else ''}")
+                print(f"{prefix}{key}: {value}{f' {value_annotation}' if value_annotation else ''}")
     traverse(data)
 
 
