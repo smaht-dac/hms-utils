@@ -49,14 +49,19 @@ def main():
             sys.exit(1)
 
     if not args.name:
-        def annotate_tree_value(key_path: str) -> Optional[str]:
+        def tree_value_annotator(key_path: str) -> Optional[str]:
             if config.lookup(key_path) is not None:
-                annotation = "[config]"
+                annotation = "[config]"  # TODO remove
             elif secrets.lookup(key_path) is not None:
                 annotation = terminal_color("[secret]", "red")
             else:
                 annotation = "[nothing]"
             return annotation
+        def tree_key_value_modifier(key_path: str, key: str) -> Optional[str]: # noqa
+            if secrets.lookup(key_path) is not None:
+                return terminal_color(key, "red")
+            return key_path
+        unmerged_secrets = None
         unmerged_secrets = None
         if (not args.nomerge) and config and secrets:
             if config and secrets:
@@ -66,11 +71,18 @@ def main():
                     path_separator=args.path_separator)
                 print(f"\n{config_file}: [with {os.path.basename(secrets_file)}"
                       f"{' partially' if unmerged_secrets else ''} merged]")
-                print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator, annotator=annotate_tree_value)
+                print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                           key_modifier=tree_key_value_modifier,
+                           value_modifier=tree_key_value_modifier,
+                           value_annotator=tree_value_annotator)
                 if unmerged_secrets:
                     # TODO: Show which ones were unmerged from secrets.
                     print(f"\n{secrets_file}: [unmerged into {os.path.basename(config_file)}]")
-                    print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator, annotator=annotate_tree_value)
+                    print_tree(secrets.json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+                               key_modifier=tree_key_value_modifier,
+                               value_modifier=tree_key_value_modifier,
+                               value_annotator=tree_value_annotator,
+                               obfuscated_value=None if args.show_secrets else OBFUSCATED_VALUE)
                     print("DUMP UNMERGED")
                     print(json.dumps(unmerged_secrets, indent=4))
                     print("DUMP MERGED")
