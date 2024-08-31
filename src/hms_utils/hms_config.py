@@ -33,12 +33,13 @@ def main():
         if args.debug: traceback.print_exc() ; print(str(e))  # noqa
         sys.exit(1)
 
-    try:
-        secrets = Config(secrets_file, path_separator=args.path_separator)
-    except Exception as e:
-        print(f"Cannot process secret config file: {secrets_file}")
-        if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-        sys.exit(1)
+    if secrets_file:
+        try:
+            secrets = Config(secrets_file, path_separator=args.path_separator)
+        except Exception as e:
+            print(f"Cannot process secret config file: {secrets_file}")
+            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
+            sys.exit(1)
 
     if not args.name:
         print_config_and_secrets(config, secrets, args)
@@ -237,6 +238,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                 data, indent=1,
                 paths=args.show_paths, path_separator=args.path_separator,
                 value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
+    print()
 
 
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
