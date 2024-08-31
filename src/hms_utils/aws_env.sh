@@ -8,7 +8,7 @@ DIR=`realpath $(dirname $BASH_SOURCE)`
 # environment variables from the calling (command-line-shell) process. To use this
 # you need to put an alias like this is your ~/.bash_profile or wherever:
 #
-# >>> alias awsenv='source hms-aws-env --shell'
+# >>> alias awsenv='source `hms-aws-env --shell`'
 #
 # The fact that this is an alias, and the 'source' there, is crucial to allow
 # your AWS_PROFILE environment variable to be set (or unset for nocurrent).
@@ -20,7 +20,7 @@ DIR=`realpath $(dirname $BASH_SOURCE)`
 #        awsenv refresh [profile-name]
 #
 SCRIPT=hms-aws-env
-TMPFILE=/tmp/.aws_env-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
+TMPFILE=/tmp/.hms_aws_env-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
 $SCRIPT --current-export-file $TMPFILE $*
 STATUS=$?
 if [ -f $TMPFILE ] ; then
