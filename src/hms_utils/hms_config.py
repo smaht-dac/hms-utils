@@ -172,7 +172,8 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
 
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
-        return (key or key_path) if (secrets.lookup(key_path) is None) else color(key or key_path, "red", nocolor=args.nocolor)
+        return ((key or key_path) if (secrets.lookup(key_path) is None)
+                else color(key or key_path, "red", nocolor=args.nocolor))
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
         nonlocal args, secrets
@@ -205,7 +206,8 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
             merged = sort_dictionary(merged)
         print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
         if args.list:
-            print_dictionary_list(merged, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ",
+            print_dictionary_list(merged, path_separator=args.path_separator,
+                                  prefix=f" {chars.rarrow_hollow} ",
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier,
                                   value_annotator=tree_value_annotator)
@@ -219,7 +221,11 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
             print(f"\n{secrets.file}: [secrets unmerged]")
             secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
             if args.list:
-                print_dictionary_list(secrets_json, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
+                print_dictionary_list(secrets_json, path_separator=args.path_separator,
+                                      prefix=f" {chars.rarrow_hollow} ",
+                                      key_modifier=tree_key_modifier,
+                                      value_modifier=tree_value_modifier,
+                                      value_annotator=tree_value_annotator)
             else:
                 print_dictionary_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                                       key_modifier=tree_key_modifier,
@@ -242,6 +248,8 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
             print(yaml.dump(data))
         elif args.json:
             print(json.dumps(data, indent=4))
+        elif args.list:
+            print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
         else:
             print_dictionary_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator)
     if secrets:
@@ -252,10 +260,13 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         elif args.json:
             print(json.dumps(data, indent=4))
         else:
-            print_dictionary_tree(
-                data, indent=1,
-                paths=args.show_paths, path_separator=args.path_separator,
-                value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
+            if args.list:
+                print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
+            else:
+                print_dictionary_tree(
+                    data, indent=1,
+                    paths=args.show_paths, path_separator=args.path_separator,
+                    value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
     print()
 
 
