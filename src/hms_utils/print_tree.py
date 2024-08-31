@@ -1,15 +1,16 @@
-from typing import Optional, Callable
+from copy import deepcopy
+from typing import List, Optional, Callable
 
 
-def print_tree(data: dict,
-               indent: Optional[int] = None,
-               paths: bool = False,
-               path_separator: str = "/",
-               key_modifier: Optional[Callable] = None,
-               value_modifier: Optional[Callable] = None,
-               value_annotator: Optional[Callable] = None,
-               arrow_indicator: Optional[Callable] = None,
-               printf: Optional[Callable] = None) -> None:
+def print_dictionary_tree(data: dict,
+                          indent: Optional[int] = None,
+                          paths: bool = False,
+                          path_separator: str = "/",
+                          key_modifier: Optional[Callable] = None,
+                          value_modifier: Optional[Callable] = None,
+                          value_annotator: Optional[Callable] = None,
+                          arrow_indicator: Optional[Callable] = None,
+                          printf: Optional[Callable] = None) -> None:
     """
     Pretty prints the given dictionary. ONLY handles dictionaries
     containing primitive values or other dictionaries recursively.
@@ -52,3 +53,21 @@ def print_tree(data: dict,
                 key_value = f"{key}: {value}{f' {value_annotation}' if value_annotation else ''}"
                 output(indent + corner + " " + key_value)
     traverse(data, first=True)
+
+
+def delete_paths_from_dictionary(data: dict, paths: List[str], copy: bool = True):
+    if copy is not False:
+        data = deepcopy(data)
+    def delete(data, keys):  # noqa
+        if len(keys) == 1:
+            data.pop(keys[0], None)
+        else:
+            key = keys[0]
+            if key in data and isinstance(data[key], dict):
+                delete(data[key], keys[1:])
+            if not data[key]:
+                data.pop(key, None)
+    for path in paths:
+        keys = path.split('/')
+        delete(data, keys)
+    return data

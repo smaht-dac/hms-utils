@@ -9,8 +9,8 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.print_tree import print_tree
-from hms_utils.terminal_utils import terminal_color
+from hms_utils.print_tree import print_dictionary_tree as print_tree, delete_paths_from_dictionary
+from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
 DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
@@ -55,12 +55,12 @@ def main():
         if (not args.nomerge) and config and secrets:
             def tree_key_modifier(key_path: str, key: str) -> Optional[str]: # noqa
                 nonlocal secrets
-                return key if (secrets.lookup(key_path) is None) else terminal_color(key, "red", nocolor=args.nocolor)
+                return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
             def tree_value_modifier(key_path: str, value: str) -> Optional[str]: # noqa
                 nonlocal args, secrets, args
                 if (not args.show_secrets) and secrets.contains(key_path):
                     value = OBFUSCATED_VALUE
-                return value if (secrets.lookup(key_path) is None) else terminal_color(value, "red", nocolor=args.nocolor)
+                return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
             def tree_value_annotator(key_path: str) -> Optional[str]:  # noqa
                 nonlocal merged_secrets
                 if key_path in unmerged_secrets:
@@ -91,11 +91,11 @@ def main():
                            arrow_indicator=tree_arrow_indicator)
                 if unmerged_secrets:
                     print(f"\n{secrets_file}: [secrets unmerged]")
-                    secrets_json = deepcopy(secrets.json)
+                    #secrets_json = deepcopy(secrets.json)
+                    secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
                     print_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
                                key_modifier=tree_key_modifier,
                                value_modifier=tree_value_modifier,
-                               #value_annotator=tree_value_annotator,
                                value_annotator=tree_value_annotator_secrets,
                                arrow_indicator=tree_arrow_indicator)
                     if args.debug:
