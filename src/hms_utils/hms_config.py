@@ -149,11 +149,11 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
     unmerged_secrets = None
 
     def tree_key_modifier(key_path: str, key: str) -> Optional[str]:
-        nonlocal secrets
+        nonlocal args, secrets
         return key if (secrets.lookup(key_path) is None) else color(key, "red", nocolor=args.nocolor)
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
-        nonlocal args, secrets, args
+        nonlocal args, secrets
         if (not args.show_secrets) and secrets.contains(key_path):
             value = OBFUSCATED_VALUE
         return value if (secrets.lookup(key_path) is None) else color(value, "red", nocolor=args.nocolor)
@@ -165,7 +165,7 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         return None
 
     def tree_value_annotator_secrets(key_path: str) -> Optional[str]:
-        nonlocal merged_secrets
+        nonlocal merged_secrets, unmerged_secrets
         if key_path in unmerged_secrets:
             return f"{chars.rarrow} unmerged {chars.xmark}"
         elif key_path in merged_secrets:
