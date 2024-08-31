@@ -9,7 +9,7 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.print_tree import print_dictionary_tree as print_tree, delete_paths_from_dictionary
+from hms_utils.dictionary_utils import print_dictionary_tree, delete_paths_from_dictionary
 from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
@@ -84,20 +84,21 @@ def main():
                 if not args.nosort:
                     merged = sort_dictionary(merged)
                 print(f"\n{config_file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
-                print_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                           key_modifier=tree_key_modifier,
-                           value_modifier=tree_value_modifier,
-                           value_annotator=tree_value_annotator,
-                           arrow_indicator=tree_arrow_indicator)
+                print_dictionary_tree(merged, indent=1,
+                                      paths=args.show_paths, path_separator=args.path_separator,
+                                      key_modifier=tree_key_modifier,
+                                      value_modifier=tree_value_modifier,
+                                      value_annotator=tree_value_annotator,
+                                      arrow_indicator=tree_arrow_indicator)
                 if unmerged_secrets:
                     print(f"\n{secrets_file}: [secrets unmerged]")
-                    #secrets_json = deepcopy(secrets.json)
                     secrets_json = delete_paths_from_dictionary(secrets.json, merged_secrets)
-                    print_tree(secrets_json, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                               key_modifier=tree_key_modifier,
-                               value_modifier=tree_value_modifier,
-                               value_annotator=tree_value_annotator_secrets,
-                               arrow_indicator=tree_arrow_indicator)
+                    print_dictionary_tree(secrets_json, indent=1,
+                                          paths=args.show_paths, path_separator=args.path_separator,
+                                          key_modifier=tree_key_modifier,
+                                          value_modifier=tree_value_modifier,
+                                          value_annotator=tree_value_annotator_secrets,
+                                          arrow_indicator=tree_arrow_indicator)
                     if args.debug:
                         print("\nMerged from secrets:")
                         [print(f"{chars.rarrow} {item}") for item in merged_secrets]
@@ -115,7 +116,8 @@ def main():
                 elif args.json:
                     print(json.dumps(data, indent=4))
                 else:
-                    print_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator)
+                    print_dictionary_tree(data, indent=1,
+                                          paths=args.show_paths, path_separator=args.path_separator)
             if secrets:
                 print(f"\n{secrets_file}:")
                 data = secrets.json if not args.debug else secrets.json_raw
@@ -124,8 +126,9 @@ def main():
                 elif args.json:
                     print(json.dumps(data, indent=4))
                 else:
-                    print_tree(data, indent=1, paths=args.show_paths, path_separator=args.path_separator,
-                               value_modifier=lambda key_path, value: OBFUSCATED_VALUE)
+                    print_dictionary_tree(data, indent=1,
+                                          paths=args.show_paths, path_separator=args.path_separator,
+                                          value_modifier=None if args.show_secrets else lambda key_path, value: OBFUSCATED_VALUE)
             if unmerged_secrets:
                 print(f"\nSecret not mergeable into config:")
                 for unmerged_secret_key in unmerged_secrets:
