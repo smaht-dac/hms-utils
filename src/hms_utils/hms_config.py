@@ -76,23 +76,20 @@ def parse_args(argv: List[str]) -> object:
     args = Args() ; argi = 0 ; argn = len(argv)  # noqa
     while argi < argn:
         arg = argv[argi] ; argi += 1  # noqa
-        if (arg == "--dir") or (arg == "-dir") or (arg == "--directory") or (arg == "-directory"):
+        if arg in ["--dir", "-dir", "--directory", "-directory"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.config_dir = arg
             args.config_dir_explicit = True
             argi += 1
-        elif (arg == "--config") or (arg == "-config") or (arg == "--conf") or (arg == "-conf"):
+        elif arg in ["--config", "-config", "--conf", "-conf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.config_file = arg
             args.config_file_explicit = True
             argi += 1
-        elif ((arg == "--secrets-config") or (arg == "-secrets-config") or
-              (arg == "--secrets-conf") or (arg == "-secrets-conf") or
-              (arg == "--secret-config") or (arg == "-secret-config") or
-              (arg == "--secret-conf") or (arg == "-secret-conf") or
-              (arg == "--secrets") or (arg == "-secrets") or (arg == "--secret") or (arg == "-secret")):
+        elif arg in ["--secrets-config", "-secrets-config", "--secrets-conf", "-secrets-conf", "--secret-config",
+                     "-secret-config", "--secret-conf", "-secret-conf", "--secrets", "-secrets", "--secret", "-secret"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 usage()
             args.secrets_file = arg
@@ -103,28 +100,24 @@ def parse_args(argv: List[str]) -> object:
                 usage()
             args.path_separator = arg
             argi += 1
-        elif ((arg == "--show-secrets") or (arg == "-show-secrets") or
-              (arg == "--show-secret") or (arg == "-show-secret") or
-              (arg == "--show") or (arg == "-show")):
+        elif arg in ["--show-secrets", "-show-secrets", "--show-secret", "-show-secret", "--show", "-show"]:
             args.show_secrets = True
-        elif ((arg == "--show-paths") or (arg == "-show-paths") or
-              (arg == "--show-path") or (arg == "-show-path") or
-              (arg == "--paths") or (arg == "-paths") or
-              (arg == "--path") or (arg == "-path")):
+        elif arg in ["--show-paths", "-show-paths", "--show-path",
+                     "-show-path", "--paths", "-paths", "--path", "-path"]:
             args.show_paths = True
-        elif (arg == "--yaml") or (arg == "-yaml") or (arg == "--yml") or (arg == "-yml"):
+        elif arg in ["--yaml", "-yaml", "--yml", "-yml"]:
             args.yaml = True
-        elif (arg == "--json") or (arg == "-json"):
+        elif arg in ["--json", "-json"]:
             args.json = True
-        elif (arg == "--nocolor") or (arg == "-nocolor"):
+        elif arg in ["--nocolor", "-nocolor"]:
             args.nocolor = True
-        elif (arg == "--nomerge") or (arg == "-nomerge"):
+        elif arg in ["--nomerge", "-nomerge"]:
             args.nomerge = True
-        elif (arg == "--nosort") or (arg == "-nosort"):
+        elif arg in ["--nosort", "-nosort"]:
             args.nosort = True
-        elif (arg == "--debug") or (arg == "-debug"):
+        elif arg in ["--debug", "-debug"]:
             args.debug = True
-        elif (arg == "--help") or (arg == "-help") or (arg == "help"):
+        elif arg in ["--help", "-help", "help"]:
             usage()
         elif arg.startswith("-"):
             usage()
