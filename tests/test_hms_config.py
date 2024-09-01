@@ -127,14 +127,14 @@ def test_hmsconfig_c():
 def test_hmsconfig_d():
     config = {
         "foursight": {
-            "SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
-            "SSH_TUNNEL_ELASTICSEARCH_NAME": "${SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX}_${SSH_TUNNEL_ELASTICSEARCH_ENV}_${SSH_TUNNEL_ELASTICSEARCH_PORT}",  # noqa
-            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}",
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
             "smaht": {
                 "wolf": {
-                    "SSH_TUNNEL_ELASTICSEARCH_PORT": 9209,
-                    "SSH_TUNNEL_ELASTICSEARCH_ENV": "smaht_wolf",
-                    "SSH_TUNNEL_ELASTICSEARCH_NAME": "${foursight/SSH_TUNNEL_ELASTICSEARCH_NAME}"
+                    "SSH_TUNNEL_ES_PORT": 9209,
+                    "SSH_TUNNEL_ES_ENV": "smaht_wolf",
+                    "SSH_TUNNEL_ES_NAME": "${foursight/SSH_TUNNEL_ES_NAME}"
                 }
             }
         }
@@ -146,18 +146,67 @@ def test_hmsconfig_d():
 def test_hmsconfig_e():
     config = {
         "foursight": {
-            "SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
-            "SSH_TUNNEL_ELASTICSEARCH_NAME": "${SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX}_${SSH_TUNNEL_ELASTICSEARCH_ENV}_${SSH_TUNNEL_ELASTICSEARCH_PORT}",  # noqa
-            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}",
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
             "smaht": {
                 "wolf": {
-                    "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}x",
-                    "SSH_TUNNEL_ELASTICSEARCH_PORT": 9209,
-                    "SSH_TUNNEL_ELASTICSEARCH_ENV": "smaht_wolf",
-                    "SSH_TUNNEL_ELASTICSEARCH_NAME": "${foursight/SSH_TUNNEL_ELASTICSEARCH_NAME}"
+                    "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}x",
+                    "SSH_TUNNEL_ES_PORT": 9209,
+                    "SSH_TUNNEL_ES_ENV": "smaht_wolf",
+                    "SSH_TUNNEL_ES_NAME": "${foursight/SSH_TUNNEL_ES_NAME}"
                 }
             }
         }
     }
     config = Config(config)
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209x"
+
+
+def test_hmsconfig_f():
+    config = Config({
+        "foursight": {
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh-tunnel-es-proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}-${SSH_TUNNEL_ES_ENV}-${SSH_TUNNEL_ES_PORT}",
+            "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
+            "4dn": {
+                "AWS_PROFILE": "4dn",
+                "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}-mastertest",
+                "SSH_TUNNEL_ES_PORT": "9201",
+                "dev": {
+                    "IDENTITY": "FoursightDevelopmentLocalApplicationSecret",
+                },
+                "prod": {
+                    "IDENTITY": "FoursightProductionApplicationConfiguration",
+                }
+            },
+            "cgap": {
+                "wolf": {
+                    "AWS_PROFILE": "cgap-wolf",
+                    "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+                    "SSH_TUNNEL_ES_PORT": 9203
+                }
+            },
+            "smaht": {
+                "wolf": {
+                    "AWS_PROFILE": "smaht-wolf",
+                    "SSH_TUNNEL_ES_PORT": 9209
+                }
+            }
+        }
+    })
+
+    # These were the tricky ones.
+    assert config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-smaht-wolf-9209"
+    assert config.lookup("foursight/cgap/wolf/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-cgap-wolf-9203"
+    assert config.lookup("foursight/4dn/prod/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-4dn-mastertest-9201"
+
+    assert config.lookup("foursight/4dn/AWS_PROFILE") == "4dn"
+    assert config.lookup("foursight/4dn/dev/AWS_PROFILE") == "4dn"
+    assert config.lookup("foursight/4dn/SSH_TUNNEL_ES_ENV") == "4dn-mastertest"
+    assert config.lookup("foursight/4dn/dev/SSH_TUNNEL_ES_ENV") == "4dn-mastertest"
+    assert config.lookup("foursight/4dn/SSH_TUNNEL_ES_PORT") == "9201"
+    assert config.lookup("foursight/4dn/dev/SSH_TUNNEL_ES_PORT") == "9201"
+
+    assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
