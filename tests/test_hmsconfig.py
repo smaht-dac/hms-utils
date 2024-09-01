@@ -46,6 +46,7 @@ def test_hmsconfig_a():
     assert config.lookup("charlie/echo") == "3_1_2_4_echooooo99"
     assert config.lookup("charlie/zulu/xx") == "zuluhere"
 
+
 def test_hmsconfig_b():
     config = {
         "A": {
@@ -64,10 +65,7 @@ def test_hmsconfig_b():
         }
     }
     config = Config(config)
-    #assert config.json == expected
-    import pdb ; pdb.set_trace()  # noqa
-    x = config.json
+    assert config.json == expected
     assert config.lookup("A/A1") == "123"
     assert config.lookup("A/B/B1") == "123"
-    import pdb ; pdb.set_trace()  # noqa
     assert config.lookup("A/B/A1") == "123"

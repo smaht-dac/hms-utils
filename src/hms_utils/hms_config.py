@@ -584,7 +584,7 @@ class Config:
     @staticmethod
     def _cleanjson(data: dict) -> dict:
         data = deepcopy(data)
-        def remove_parent_properties(data: dict) -> dict:
+        def remove_parent_properties(data: dict) -> dict:  # noqa
             if isinstance(data, dict):
                 if Config._PARENT in data:
                     del data[Config._PARENT]
