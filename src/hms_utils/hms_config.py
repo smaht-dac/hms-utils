@@ -380,18 +380,28 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
         if not (config_file := resolve_file_path(config_file, args.config_dir,
                                                  file_explicit=args.config_file_explicit,
                                                  directory_explicit=args.config_dir_explicit)):
-            if args.config_file_explicit:
-                print(f"Cannot find config file: {config_file}")
-                sys.exit(1)
+            if args.config_file.endswith(".json"):
+                config_file = args.config_file[:-5] + ".yaml"
+                config_file = resolve_file_path(config_file, args.config_dir,
+                                                file_explicit=args.config_file_explicit,
+                                                directory_explicit=args.config_dir_explicit)
+        if (not config_file) and args.config_file_explicit:
+            print(f"Cannot find config file: {args.config_file}")
+            sys.exit(1)
 
     if secrets_file:
         if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
                                                   file_explicit=args.secrets_file_explicit,
                                                   directory_explicit=args.config_dir_explicit)):
-            if args.secrets_file_explicit:
-                print(f"Cannot find secrets file: {args.config_file_explicit}")
-                sys.exit(1)
-        elif not ensure_secrets_file_protected(secrets_file):
+            if args.secrets_file.endswith(".json"):
+                secrets_file = args.secrets_file[:-5] + ".yaml"
+                secrets_file = resolve_file_path(secrets_file, args.config_dir,
+                                                 file_explicit=args.secrets_file_explicit,
+                                                 directory_explicit=args.secrets_dir_explicit)
+        if (not secrets_file) and args.secrets_file_explicit:
+            print(f"Cannot find secrets file: {args.config_file_explicit}")
+            sys.exit(1)
+        if not ensure_secrets_file_protected(secrets_file):
             print(f"WARNING: Your secrets file is not read protected for others: {secrets_file}")
 
     return config_file, secrets_file
@@ -495,7 +505,10 @@ class Config:
         else:
             self._file = file_or_dictionary
             with io.open(file_or_dictionary, "r") as f:
-                self._json = json.load(f)
+                if self._file.endswith(".yaml") or self._file.endswith(".yml"):
+                    self._json = yaml.safe_load(f)
+                else:
+                    self._json = json.load(f)
         if self._expand_macros:
             _ = self._macro_expand_json(self._json)
 
