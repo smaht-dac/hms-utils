@@ -17,11 +17,11 @@ from hms_utils.dictionary_utils import (
 )
 from hms_utils.terminal_utils import terminal_color as color
 
-DEFAULT_CONFIG_DIR = os.environ.get("HMS_CONFIG_DIR", "~/.config/hms")
-DEFAULT_CONFIG_FILE_NAME = os.environ.get("HMS_CONFIG", "config.json")
-DEFAULT_SECRETS_FILE_NAME = os.environ.get("HMS_SECRETS", "secrets.json")
-DEFAULT_PATH_SEPARATOR = os.environ.get("HMS_PATH_SEPARATOR", "/")
-DEFAULT_EXPORT_NAME_SEPARATOR = os.environ.get("HMS_EXPORT_NAME_SEPARATOR", ":")
+DEFAULT_CONFIG_DIR = "~/.config/hms"
+DEFAULT_CONFIG_FILE_NAME = "config.json"
+DEFAULT_SECRETS_FILE_NAME = "secrets.json"
+DEFAULT_PATH_SEPARATOR = "/"
+DEFAULT_EXPORT_NAME_SEPARATOR = ":"
 OBFUSCATED_VALUE = "********"
 
 
@@ -120,7 +120,19 @@ def parse_args(argv: List[str]) -> object:
         verbose = False
         debug = False
 
-    args = Args() ; argi = 0 ; argn = len(argv)  # noqa
+    args = Args()
+
+    if value := os.environ.get("HMS_CONFIG_DIR"):
+        args.config_dir = value
+        args.config_dir_explicit = True
+    if value := os.environ.get("HMS_CONFIG"):
+        args.config_file = value
+        args.config_file_explicit = True
+    if value := os.environ.get("HMS_SECRETS"):
+        args.secrets_file = value
+        args.secrets_file_explicit = True
+
+    argi = 0 ; argn = len(argv)  # noqa
     while argi < argn:
         arg = argv[argi] ; argi += 1  # noqa
         if arg in ["--function", "-function", "--shell", "-shell"]:
@@ -430,14 +442,15 @@ class Config:
     def contains(self, name: str) -> bool:
         return self.lookup(name) is not None
 
-    def lookup(self, name: str, config: Optional[dict] = None, allow_dictionary: bool = False, expanding_macros: bool = False) -> Optional[str]:
+    def lookup(self, name: str, config: Optional[dict] = None,
+               allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str]:
         # xyzzy
         def get_parent(item: dict) -> Optional[dict]:
             nonlocal self
             return self._imap.get(item.get(Config._PARENT))
-        def is_primitive_type(value: Any) -> bool:
+        def is_primitive_type(value: Any) -> bool:  # noqa
             return isinstance(value, (int, float, str, bool))
-        def lookup_outward(name: str, config: dict) -> Optional[str]:
+        def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             if parent := get_parent(config):
                 while parent:
                     if ((value := parent.get(name)) is not None) and is_primitive_type(value):
@@ -454,9 +467,10 @@ class Config:
             if not (name_component := name_component.strip()):
                 continue
             if not (value := config.get(name_component)):
-                # TODO: if this is called not from macro expansion and if this is that last name_component then look UP the tree
-                if (not expanding_macros) and (index == (len(name_components) - 1)):
-                    if (value := lookup_outward(name_component, config)) is not None:
+                # If this is not called during macro expansion and if this
+                # is that last name_component then look straight UP the tree.
+                if (not _macro_expansion) and (index == (len(name_components) - 1)):
+                    if (value := lookup_upwards(name_component, config)) is not None:
                         return value
                 return None
             if isinstance(value, dict):
@@ -510,13 +524,13 @@ class Config:
 
         def lookup_macro_value(macro_name: str, data: dict) -> Optional[str]:
             nonlocal self
-            if (macro_value := self.lookup(macro_name, data, expanding_macros=True)) is not None:
+            if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
                 if is_primitive_type(macro_value):
                     return str(macro_value)
                 return None
             data = get_parent(data)
             while data:
-                if (macro_value := self.lookup(macro_name, data, expanding_macros=True)) is not None:
+                if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
                     if is_primitive_type(macro_value):
                         return str(macro_value)
                     return None
