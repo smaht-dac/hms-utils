@@ -2,7 +2,7 @@ from hms_utils.hms_config import Config
 
 
 def test_hmsconfig_a():
-    config = {
+    config = Config({
         "alpha": "1",
         "bravo": "${alpha}_2",
         "charlie": {
@@ -20,7 +20,7 @@ def test_hmsconfig_a():
             "hotel": "3"
         },
         "zulu": "99"
-    }
+    })
     expected = {
         "alpha": "1",
         "bravo": "1_2",
@@ -40,7 +40,6 @@ def test_hmsconfig_a():
         },
         "zulu": "99"
     }
-    config = Config(config)
     assert config.json == expected
     assert config.lookup("zulu") == "99"
     assert config.lookup("charlie/echo") == "3_1_2_4_echooooo99"
@@ -48,14 +47,14 @@ def test_hmsconfig_a():
 
 
 def test_hmsconfig_b():
-    config = {
+    config = Config({
         "A": {
             "A1": "123",
             "B": {
                 "B1": "${A1}"
             }
         }
-    }
+    })
     expected = {
         "A": {
             "A1": "123",
@@ -64,7 +63,6 @@ def test_hmsconfig_b():
             }
         }
     }
-    config = Config(config)
     assert config.json == expected
     assert config.lookup("A/A1") == "123"
     assert config.lookup("A/B/B1") == "123"
@@ -73,7 +71,7 @@ def test_hmsconfig_b():
 
 
 def test_hmsconfig_c():
-    config = {
+    config = Config({
         "A": {
             "A1": "123",
             "A2": "${A1}_456_${B2}",
@@ -83,15 +81,14 @@ def test_hmsconfig_c():
                 "B3": "b3value_${A2}"
             }
         }
-    }
-    config = Config(config)
+    })
     assert config.lookup("A/B/B3") == "b3value_123_456_b2value_123"
     # This one is even trickier; want to get A2 from A/B context like test_hmsconfig_b
     # but then notice that is has unexpanded macros, i.e. 123_456_${B2}, and
     # then evaluate the macros within the context of A/A.
     assert config.lookup("A/B/A2") == "123_456_b2value_123"
 
-    config = {
+    config = Config({
         "A": {
             "A1": "123",
             "A2": "${A1}_456_${B2}",
@@ -103,11 +100,10 @@ def test_hmsconfig_c():
                }
             }
         }
-    }
-    config = Config(config)
+    })
     assert config.lookup("A/X/B/B3") == "b3value_123_456_b2value_123"
 
-    config = {
+    config = Config({
         "A": {
             "A1": "123",
             "A2": "${A1}_456_${C2}",
@@ -119,13 +115,12 @@ def test_hmsconfig_c():
                 }
             }
         }
-    }
-    config = Config(config)
+    })
     assert config.lookup("A/B/C/C3") == "b3value_123_456_b2value_123"
 
 
 def test_hmsconfig_d():
-    config = {
+    config = Config({
         "foursight": {
             "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
             "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
@@ -138,13 +133,12 @@ def test_hmsconfig_d():
                 }
             }
         }
-    }
-    config = Config(config)
+    })
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
 
 
 def test_hmsconfig_e():
-    config = {
+    config = Config({
         "foursight": {
             "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
             "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
@@ -158,8 +152,7 @@ def test_hmsconfig_e():
                 }
             }
         }
-    }
-    config = Config(config)
+    })
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209x"
 
 
