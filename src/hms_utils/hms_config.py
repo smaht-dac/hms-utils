@@ -473,12 +473,12 @@ class Config:
             if not (name_component := name_component.strip()):
                 continue
             if not (value := config.get(name_component)):
-                # If this is not called during macro expansion and if this
-                # is that last name_component then look straight UP the tree.
+                # If this is not called during macro expansion (i.e. rather during lookup), and if this
+                # is that last name_component, then look straight upwards/outwards in tree for a resolution.
                 if (not _macro_expansion) and (index == (len(name_components) - 1)):
                     if (value := lookup_upwards(name_component, config)) is not None:
-                        # if "${" in value and "}" in value:  # TODO: contains unexpanded macros
                         if Config._contains_macro(value):
+                            # And if the value contains a macro try resolving from this context.
                             if macro_expanded_value := self._expand_macro_value(value, config):
                                 return macro_expanded_value
                         return value
