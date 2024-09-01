@@ -4,7 +4,7 @@ import io
 import json
 import os
 import re
-from pkg_resources import get_distribution as get_package_version
+from importlib.metadata import version as get_package_version
 import stat
 import sys
 import traceback
@@ -593,7 +593,7 @@ class Config:
 
 def get_version(package_name: str = "hms-utils") -> str:
     try:
-        return get_package_version(package_name).version
+        return get_package_version(package_name)
     except Exception:
         return ""
 
