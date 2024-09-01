@@ -556,7 +556,7 @@ class Config:
         while True:
             if not (match := Config._MACRO_PATTERN.search(value)):
                 break
-            if (macro_name := match.group(1)) and (macro_value := self._lookup_macro_value(macro_name, data)):  # and (not Config._is_macro(macro_value)):
+            if (macro_name := match.group(1)) and (macro_value := self._lookup_macro_value(macro_name, data)):
                 if Config._is_macro(macro_value):
                     original_simple_macros_to_retain[macro_value] = macro_name
                 #
