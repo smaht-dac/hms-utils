@@ -35,7 +35,7 @@ function hms_config_exports() {
     fi
 }
 function hms_config_export() {
-    hms_config_exports
+    hms_config_exports $*
 }
 function hms_config() {
     $SCRIPT $*

@@ -69,7 +69,7 @@ def main():
                 exports.append(f"export {export_name}={value}")
             else:
                 if args.verbose:
-                    print(f"Cannot find config name/path: {name}")
+                    print(f"{chars.rarrow} Cannot find config name/path: {name}")
                 status = 1
         if args.export_file:
             if args.verbose:
@@ -403,7 +403,7 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
             print(f"Cannot find secrets file: {args.config_file_explicit}")
             sys.exit(1)
         if not ensure_secrets_file_protected(secrets_file):
-            print(f"WARNING: Your secrets file is not read protected for others: {secrets_file}")
+            print(f"WARNING: Your secrets file is not read protected from others: {secrets_file}")
 
     return config_file, secrets_file
 
