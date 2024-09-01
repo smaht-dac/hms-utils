@@ -134,7 +134,7 @@ def parse_args(argv: List[str]) -> object:
     argi = 0 ; argn = len(argv)  # noqa
     while argi < argn:
         arg = argv[argi] ; argi += 1  # noqa
-        if arg in ["--function", "-function", "--shell", "-shell"]:
+        if arg in ["--functions", "-functions", "--function", "-function", "--shell", "-shell"]:
             print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hms_config.sh"))
             exit(1)
         elif arg in ["--dir", "-dir", "--directory", "-directory"]:
