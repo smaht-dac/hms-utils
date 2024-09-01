@@ -143,7 +143,6 @@ def test_hmsconfig_d():
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
 
 
-
 def test_hmsconfig_e():
     config = {
         "foursight": {

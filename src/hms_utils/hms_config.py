@@ -86,7 +86,10 @@ def main():
         for name in args.names:
             if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
                 (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
-                print(value)
+                if args.json_formatted and isinstance(value, dict):
+                    print(json.dumps(value, indent=4))
+                else:
+                    print(value)
             else:
                 status = 1
 
@@ -108,6 +111,7 @@ def parse_args(argv: List[str]) -> object:
         list = False
         yaml = False
         json = False
+        json_formatted = False
         show_secrets = False
         show_paths = False
         nocolor = False
@@ -165,6 +169,9 @@ def parse_args(argv: List[str]) -> object:
             args.yaml = True
         elif arg in ["--json", "-json"]:
             args.json = True
+        elif arg in ["--jsonf", "-jsonf"]:
+            args.json = True
+            args.json_formatted = True
         elif arg in ["--nocolor", "-nocolor"]:
             args.nocolor = True
         elif arg in ["--nomerge", "-nomerge"]:
@@ -451,7 +458,7 @@ class Config:
         self._load(file_or_dictionary)
 
     def lookup(self, name: str, config: Optional[dict] = None,
-               allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str]:
+               allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -486,7 +493,7 @@ class Config:
         if value is not None:
             return value
         elif config and allow_dictionary:
-            return str(self._cleanjson(config))
+            return self._cleanjson(config)
         return None
 
     def contains(self, name: str) -> bool:
