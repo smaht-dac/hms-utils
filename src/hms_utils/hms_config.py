@@ -438,6 +438,8 @@ class Config:
 
     _PARENT = "@@@__PARENT__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _MACRO_START = "${"
+    _MACRO_END = "}"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  path_separator: bool = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
@@ -475,7 +477,8 @@ class Config:
                 # is that last name_component then look straight UP the tree.
                 if (not _macro_expansion) and (index == (len(name_components) - 1)):
                     if (value := lookup_upwards(name_component, config)) is not None:
-                        if "${" in value and "}" in value:  # TODO: contains_unexpanded_macros
+                        # if "${" in value and "}" in value:  # TODO: contains unexpanded macros
+                        if Config._contains_macro(value):
                             if macro_expanded_value := self._expand_macro_value(value, config):
                                 return macro_expanded_value
                         return value
@@ -551,7 +554,38 @@ class Config:
         while True:
             if not (match := Config._MACRO_PATTERN.search(value)):
                 break
-            if (macro_name := match.group(1)) and (macro_value := self._lookup_macro_value(macro_name, data)):
+            if ((macro_name := match.group(1)) and
+                (macro_value := self._lookup_macro_value(macro_name, data)) and
+                (not Config._is_macro(macro_value))):  # noqa
+                #
+                # Note the _is_macro call above is a bit of a special case; if the macro we are expanding resolves
+                # simply to another macro, then retain the original macro; this can be useful for this for example:
+                #
+                # foursight:
+                #   SSH_TUNNEL_ES_NAME_PREFIX: ssh-tunnel-es-proxy
+                #   SSH_TUNNEL_ES_NAME: ${SSH_TUNNEL_ES_NAME_PREFIX}-${SSH_TUNNEL_ES_ENV}-${SSH_TUNNEL_ES_PORT}
+                #   SSH_TUNNEL_ES_ENV: ${AWS_PROFILE}
+                #   4dn:
+                #     AWS_PROFILE: 4dn
+                #     SSH_TUNNEL_ES_ENV: ${AWS_PROFILE}-mastertest
+                #     SSH_TUNNEL_ES_PORT: 9203
+                #     dev:
+                #       IDENTITY: whatever
+                #   smaht:
+                #     wolf:
+                #       AWS_PROFILE: smaht-wolf
+                #       SSH_TUNNEL_ES_PORT: 9209
+                #       IDENTITY: whatever
+                #
+                # For lookup of foursight/smaht/wolf/SSH_TUNNEL_ES_NAME we will get ssh-tunnel-es-proxy-smaht-wolf-9209
+                # as it takes the default foursight/SSH_TUNNEL_ES_ENV value which is foursight/smaht/wolf/AWS_PROFILE,
+                # i.e. smaht-wolf; remember - we evaluate/expand the macro starting in the context of the lookup, i.e.
+                # foursight/smaht/wolf. But for lookup of foursight/4dn/dev/SSH_TUNNEL_ES_NAME we want to (and do)
+                # get ssh-tunnel-es-proxy-4dn-mastertest-9203 because retaining the ${SSH_TUNNEL_ES_ENV} in
+                # foursight/SSH_TUNNEL_ES_NAME we will pick up the "overriding" foursight/4dn/SSH_TUNNEL_ES_ENV;
+                # without this _is_macro call, we would get ssh-tunnel-es-proxy-4dn-9203 because ${SSH_TUNNEL_ES_ENV}
+                # in foursight/SSH_TUNNEL_ES_NAME would have been expaned to ${AWS_PROFILE}.
+                #
                 if macro_name in expanding_macros:
                     raise Exception(f"Circular macro definition found: {macro_name}")
                 expanding_macros.add(macro_name)
@@ -576,6 +610,17 @@ class Config:
 
     def _is_parent(self, name: str) -> None:
         return name == Config._PARENT
+
+    @staticmethod
+    def _is_macro(value: str) -> bool:
+        return value.startswith(Config._MACRO_START) and value.endswith(Config._MACRO_END)
+
+    @staticmethod
+    def _contains_macro(value: str) -> bool:
+        if (index := value.find(Config._MACRO_START)) >= 0:
+            if value[index + len(Config._MACRO_START):].find(Config._MACRO_END) > 0:
+                return True
+        return False
 
     @staticmethod
     def _is_primitive_type(value: Any) -> bool:  # noqa
