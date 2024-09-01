@@ -34,18 +34,14 @@ def main():
         try:
             config = Config(args.config_file, path_separator=args.path_separator, nomacros=args.nomacros)
         except Exception as e:
-            print(f"Cannot process config file: {args.config_file}")
-            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-            sys.exit(1)
+            error(f"Cannot process config file: {args.config_file}", exception=e, trace=True)
 
     secrets = None
     if args.secrets_file:
         try:
             secrets = Config(args.secrets_file, path_separator=args.path_separator, nomacros=args.nomacros)
         except Exception as e:
-            print(f"Cannot process secrets file: {args.secrets_file}")
-            if args.debug: traceback.print_exc() ; print(str(e))  # noqa
-            sys.exit(1)
+            error(f"Cannot process secrets file: {args.secrets_file}", exception=e, trace=True)
 
     if not args.names:
         print_config_and_secrets(config, secrets, args)
@@ -54,8 +50,7 @@ def main():
     status = 0
     if args.export:
         if args.export_file and os.path.exists(args.export_file):
-            print(f"Export file must not already exist: {args.export_file}")
-            exit(1)
+            error(f"Export file must not already exist: {args.export_file}")
         exports = []
         for name in args.names:
             if (colon := name.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
@@ -69,7 +64,7 @@ def main():
                 exports.append(f"export {export_name}={value}")
             else:
                 if args.verbose:
-                    print(f"{chars.rarrow} Cannot find config name/path: {name}")
+                    warning(f"{chars.rarrow} Cannot find config name/path: {name}")
                 status = 1
         if args.export_file:
             if args.verbose:
@@ -140,23 +135,23 @@ def parse_args(argv: List[str]) -> object:
         arg = argv[argi] ; argi += 1  # noqa
         if arg in ["--functions", "-functions", "--function", "-function", "--shell", "-shell"]:
             print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hms_config.sh"))
-            exit(1)
+            exit(0)
         elif arg in ["--dir", "-dir", "--directory", "-directory"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
-                usage()
+                _usage()
             args.config_dir = arg ; args.config_dir_explicit = True ; argi += 1  # noqa
         elif arg in ["--config", "-config", "--conf", "-conf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
-                usage()
+                _usage()
             args.config_file = arg ; args.config_file_explicit = True ; argi += 1  # noqa
         elif arg in ["--secrets-config", "-secrets-config", "--secrets-conf", "-secrets-conf", "--secret-config",
                      "-secret-config", "--secret-conf", "-secret-conf", "--secrets", "-secrets", "--secret", "-secret"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
-                usage()
+                _usage()
             args.secrets_file = arg ; args.secrets_file_explicit = True ; argi += 1  # noqa
         elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
-                usage()
+                _usage()
             args.path_separator = arg ; argi += 1  # noqa
         elif arg in ["--show-secrets", "-show-secrets", "--show-secret", "-show-secret", "--show", "-show"]:
             args.show_secrets = True
@@ -184,7 +179,7 @@ def parse_args(argv: List[str]) -> object:
             args.export = True
         elif arg in ["--export-file", "-export-file"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
-                usage()
+                _usage()
             args.export = True
             args.export_file = argv[argi] ; argi += 1  # noqa
         elif arg in ["--debug", "-debug"]:
@@ -193,9 +188,9 @@ def parse_args(argv: List[str]) -> object:
             args.verbose = True
         elif arg in ["--version", "-version"]:
             print(f"hms-utils version: {get_version()}")
-            usage()
+            _usage()
         elif (arg in ["--help", "-help"]) or arg.startswith("-"):
-            usage()
+            _usage()
         else:
             args.names.append(arg)
 
@@ -209,16 +204,13 @@ def parse_args(argv: List[str]) -> object:
     if args.names and (args.show_secrets or args.show_paths or
                        args.yaml or args.nosort or args.nomerge or
                        args.nomacros or args.nocolor or args.yaml or args.list):
-        print("Option not allowed with a config name/path argument.")
-        usage()
+        error("Option not allowed with a config name/path argument.", usage=True)
     elif args.export and (not args.names):
-        print("The --export option must be used with a config name/path argument.")
-        usage()
+        error("The --export option must be used with a config name/path argument.", usage=True)
 
     config_file, secrets_file = resolve_files(args)
     if (not config_file) and (not secrets_file):
-        print("No config or secrets file found.")
-        usage()
+        error("No config or secrets file found.", usage=True)
     args.config_file = config_file
     args.secrets_file = secrets_file
     return args
@@ -394,8 +386,7 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                                                 file_explicit=args.config_file_explicit,
                                                 directory_explicit=args.config_dir_explicit)
         if (not config_file) and args.config_file_explicit:
-            print(f"Cannot find config file: {args.config_file}")
-            sys.exit(1)
+            error(f"Cannot find config file: {args.config_file}")
 
     if secrets_file:
         if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
@@ -407,10 +398,9 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                                                  file_explicit=args.secrets_file_explicit,
                                                  directory_explicit=args.secrets_dir_explicit)
         if (not secrets_file) and args.secrets_file_explicit:
-            print(f"Cannot find secrets file: {args.config_file_explicit}")
-            sys.exit(1)
+            error(f"Cannot find secrets file: {args.config_file_explicit}")
         if not ensure_secrets_file_protected(secrets_file):
-            print(f"WARNING: Your secrets file is not read protected from others: {secrets_file}")
+            warning(f"Your secrets file is not read protected from others: {secrets_file}")
 
     return config_file, secrets_file
 
@@ -608,7 +598,23 @@ def get_version(package_name: str = "hms-utils") -> str:
         return ""
 
 
-def usage():
+def warning(message: str) -> None:
+    print(f"WARNING: {message}", file=sys.stderr)
+
+
+def error(message: str, usage: bool = False, status: int = 1,
+          exception: Optional[Exception] = None, trace: bool = False) -> None:
+    print(f"ERROR: {message}", file=sys.stderr)
+    if usage:
+        _usage()
+    if isinstance(exception, Exception):
+        print(str(exception))
+    if trace:
+        traceback.print_exc()
+    sys.exit(status)
+
+
+def _usage():
     print(f"{chars.rarrow} hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
     print(f"  {chars.rarrow_hollow} usage: python hms_config.py"
