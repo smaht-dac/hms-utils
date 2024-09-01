@@ -264,7 +264,7 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
                                                                             path_separator=args.path_separator)
         if not args.nosort:
             merged = sort_dictionary(merged)
-        print(f"\n{config.file}: [secrets{' partially' if unmerged_secrets else ''} merged]")
+        print(f"\n{config.file}: [with {os.path.basename(args.secrets_file)}{' partially' if unmerged_secrets else ''} merged in]")
         if args.list:
             print_dictionary_list(merged, path_separator=args.path_separator,
                                   prefix=f" {chars.rarrow_hollow} ",
