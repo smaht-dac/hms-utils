@@ -408,7 +408,8 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return config_file, secrets_file
 
 
-def merge_config_and_secrets(config: dict, secrets: dict, path_separator: str = "/") -> Tuple[dict, list, list]:
+def merge_config_and_secrets(config: dict, secrets: dict,
+                             path_separator: str = DEFAULT_PATH_SEPARATOR) -> Tuple[dict, list, list]:
     if not (isinstance(config, dict) or isinstance(secrets, dict)):
         return None, None
     merged = deepcopy(config) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
@@ -427,7 +428,7 @@ def merge_config_and_secrets(config: dict, secrets: dict, path_separator: str = 
     return merged, merged_secrets, unmerged_secrets
 
 
-def path_basename(name: str, separator: str = "/") -> str:
+def path_basename(name: str, separator: str = DEFAULT_PATH_SEPARATOR) -> str:
     if (index := name.rfind(separator)) > 0:
         return name[index + 1:]
     return name
@@ -439,7 +440,7 @@ class Config:
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
     def __init__(self, file_or_dictionary: Union[str, dict],
-                 path_separator: bool = ".", nomacros: bool = False) -> None:
+                 path_separator: bool = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
         self._json = None
         self._path_separator = path_separator
         self._expand_macros = nomacros is not True
@@ -582,12 +583,15 @@ class Config:
 
     @staticmethod
     def _cleanjson(data: dict) -> dict:
-        if isinstance(data, dict):
-            if Config._PARENT in data:
-                del data[Config._PARENT]
-            for key, value in list(data.items()):
-                Config._cleanjson(value)
-        return data
+        data = deepcopy(data)
+        def remove_parent_properties(data: dict) -> dict:
+            if isinstance(data, dict):
+                if Config._PARENT in data:
+                    del data[Config._PARENT]
+                for key, value in list(data.items()):
+                    remove_parent_properties(value)
+            return data
+        return remove_parent_properties(data)
 
 
 def get_version(package_name: str = "hms-utils") -> str:
