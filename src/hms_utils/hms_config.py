@@ -71,17 +71,16 @@ def main():
                 if args.verbose:
                     print(f"Cannot find config name/path: {name}")
                 status = 1
-        exports = sorted(exports)
         if args.export_file:
             if args.verbose:
                 print(f"Writing exports to file: {args.export_file}")
             with io.open(args.export_file, "w") as f:
-                for export in exports:
+                for export in sorted(exports):
                     if args.verbose:
                         print(f"{chars.rarrow_hollow} {export}")
                     f.write(f"{export}\n")
         else:
-            for export in exports:
+            for export in sorted(exports):
                 print(export)
     else:
         for name in args.names:
@@ -200,8 +199,9 @@ def parse_args(argv: List[str]) -> object:
     elif args.secrets_file_explicit:
         args.config_file = None
 
-    if args.names and (args.show_secrets or args.show_paths or args.yaml or
-                       args.nosort or args.nomerge or args.nocolor or args.yaml or args.list):
+    if args.names and (args.show_secrets or args.show_paths or
+                       args.yaml or args.nosort or args.nomerge or
+                       args.nomacros or args.nocolor or args.yaml or args.list):
         print("Option not allowed with a config name/path argument.")
         usage()
     elif args.export and (not args.names):
@@ -434,7 +434,6 @@ class Config:
         self._expand_macros = nomacros is not True
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._ignore_missing_macro = True
-        self._remove_missing_macro = True
         self._stringize_non_primitive_types = True
         self._imap = {}
         self._load(file_or_dictionary)
@@ -444,20 +443,16 @@ class Config:
 
     def lookup(self, name: str, config: Optional[dict] = None,
                allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str]:
-        # xyzzy
-        def get_parent(item: dict) -> Optional[dict]:
-            nonlocal self
-            return self._imap.get(item.get(Config._PARENT))
-        def is_primitive_type(value: Any) -> bool:  # noqa
-            return isinstance(value, (int, float, str, bool))
+
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
-            if parent := get_parent(config):
+            nonlocal self
+            if parent := self._get_parent(config):
                 while parent:
-                    if ((value := parent.get(name)) is not None) and is_primitive_type(value):
+                    if ((value := parent.get(name)) is not None) and Config._is_primitive_type(value):
                         return value
-                    parent = get_parent(parent)
+                    parent = self._get_parent(parent)
             return None
-        # xyzzy
+
         if config is None:
             config = self._json
         value = None
@@ -506,35 +501,19 @@ class Config:
 
     def _macro_expand_json(self, data: dict) -> dict:
 
-        def set_parent(item: dict, parent: dict) -> None:
-            nonlocal self
-            parent_id = id(parent)
-            self._imap[parent_id] = parent
-            item[Config._PARENT] = parent_id
-
-        def get_parent(item: dict) -> Optional[dict]:
-            nonlocal self
-            return self._imap.get(item.get(Config._PARENT))
-
-        def is_parent(name: str) -> None:
-            return name == Config._PARENT
-
-        def is_primitive_type(value: Any) -> bool:
-            return isinstance(value, (int, float, str, bool))
-
         def lookup_macro_value(macro_name: str, data: dict) -> Optional[str]:
             nonlocal self
             if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
-                if is_primitive_type(macro_value):
+                if Config._is_primitive_type(macro_value):
                     return str(macro_value)
                 return None
-            data = get_parent(data)
+            data = self._get_parent(data)
             while data:
                 if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
-                    if is_primitive_type(macro_value):
+                    if Config._is_primitive_type(macro_value):
                         return str(macro_value)
                     return None
-                data = get_parent(data)
+                data = self._get_parent(data)
             return None
 
         def macro_expand_value(value: str, data: dict) -> Optional[str]:
@@ -552,8 +531,6 @@ class Config:
                 elif self._ignore_missing_macro:
                     missing_macro_found = True
                     value = value.replace(f"${{{macro_name}}}", f"@@@__[{macro_name}]__@@@")
-                elif self._remove_missing_macro:
-                    value = value.replace(f"${{{macro_name}}}", "")
                 else:
                     raise Exception(f"Macro name not found: {macro_name}")
             if missing_macro_found and self._ignore_missing_macro:
@@ -562,17 +539,32 @@ class Config:
             return value
 
         for name in data:  # TODO: check for duplicate keys.
-            if not ((name := name.strip()) and (not is_parent(name))):
+            if not ((name := name.strip()) and (not self._is_parent(name))):
                 continue
             if isinstance(data[name], dict):
-                set_parent(data[name], data)
+                self._set_parent(data[name], data)
                 data[name] = self._macro_expand_json(data[name])
-            elif not is_primitive_type(data[name]) and not self._stringize_non_primitive_types:
+            elif not Config._is_primitive_type(data[name]) and not self._stringize_non_primitive_types:
                 raise Exception(f"Non-primitive type found: {name}")
             else:
                 data[name] = macro_expand_value(str(data[name]), data)
 
         return data
+
+    def _get_parent(self, item: dict) -> Optional[dict]:
+        return self._imap.get(item.get(Config._PARENT))
+
+    def _set_parent(self, item: dict, parent: dict) -> None:
+        parent_id = id(parent)
+        self._imap[parent_id] = parent
+        item[Config._PARENT] = parent_id
+
+    def _is_parent(self, name: str) -> None:
+        return name == Config._PARENT
+
+    @staticmethod
+    def _is_primitive_type(value: Any) -> bool:  # noqa
+        return isinstance(value, (int, float, str, bool))
 
     @staticmethod
     def _cleanjson(data: dict) -> dict:
