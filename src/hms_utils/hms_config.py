@@ -450,9 +450,6 @@ class Config:
         self._imap = {}
         self._load(file_or_dictionary)
 
-    def contains(self, name: str) -> bool:
-        return self.lookup(name) is not None
-
     def lookup(self, name: str, config: Optional[dict] = None,
                allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str]:
 
@@ -478,6 +475,9 @@ class Config:
                 # is that last name_component then look straight UP the tree.
                 if (not _macro_expansion) and (index == (len(name_components) - 1)):
                     if (value := lookup_upwards(name_component, config)) is not None:
+                        if "${" in value and "}" in value:  # TODO: contains_unexpanded_macros
+                            if macro_expanded_value := self._expand_macro_value(value, config):
+                                return macro_expanded_value
                         return value
                 return None
             if isinstance(value, dict):
@@ -488,6 +488,9 @@ class Config:
         elif config and allow_dictionary:
             return str(self._cleanjson(config))
         return None
+
+    def contains(self, name: str) -> bool:
+        return self.lookup(name) is not None
 
     @property
     def file(self) -> dict:
@@ -512,59 +515,56 @@ class Config:
                 else:
                     self._json = json.load(f)
         if self._expand_macros:
-            _ = self._macro_expand_json(self._json)
+            _ = self._macro_expand(self._json)
 
-    def _macro_expand_json(self, data: dict) -> dict:
-
-        def lookup_macro_value(macro_name: str, data: dict) -> Optional[str]:
-            nonlocal self
-            if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
-                if Config._is_primitive_type(macro_value):
-                    return str(macro_value)
-                return None
-            data = self._get_parent(data)
-            while data:
-                if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
-                    if Config._is_primitive_type(macro_value):
-                        return str(macro_value)
-                    return None
-                data = self._get_parent(data)
-            return None
-
-        def macro_expand_value(value: str, data: dict) -> Optional[str]:
-            nonlocal self
-            expanding_macros = set()
-            missing_macro_found = False
-            while True:
-                if not (match := Config._MACRO_PATTERN.search(value)):
-                    break
-                if (macro_name := match.group(1)) and (macro_value := lookup_macro_value(macro_name, data)):
-                    if macro_name in expanding_macros:
-                        raise Exception(f"Circular macro definition found: {macro_name}")
-                    expanding_macros.add(macro_name)
-                    value = value.replace(f"${{{macro_name}}}", macro_value)
-                elif self._ignore_missing_macro:
-                    missing_macro_found = True
-                    value = value.replace(f"${{{macro_name}}}", f"@@@__[{macro_name}]__@@@")
-                else:
-                    raise Exception(f"Macro name not found: {macro_name}")
-            if missing_macro_found and self._ignore_missing_macro:
-                value = value.replace("@@@__[", "${")
-                value = value.replace("]__@@@", "}")
-            return value
-
+    def _macro_expand(self, data: dict) -> dict:
         for name in data:  # TODO: check for duplicate keys.
             if not ((name := name.strip()) and (not self._is_parent(name))):
                 continue
             if isinstance(data[name], dict):
                 self._set_parent(data[name], data)
-                data[name] = self._macro_expand_json(data[name])
+                data[name] = self._macro_expand(data[name])
             elif not Config._is_primitive_type(data[name]) and not self._stringize_non_primitive_types:
                 raise Exception(f"Non-primitive type found: {name}")
             else:
-                data[name] = macro_expand_value(str(data[name]), data)
+                data[name] = self._expand_macro_value(str(data[name]), data)
 
         return data
+
+    def _lookup_macro_value(self, macro_name: str, data: dict) -> Optional[str]:
+        if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
+            if Config._is_primitive_type(macro_value):
+                return str(macro_value)
+            return None
+        data = self._get_parent(data)
+        while data:
+            if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
+                if Config._is_primitive_type(macro_value):
+                    return str(macro_value)
+                return None
+            data = self._get_parent(data)
+        return None
+
+    def _expand_macro_value(self, value: str, data: dict) -> Optional[str]:
+        expanding_macros = set()
+        missing_macro_found = False
+        while True:
+            if not (match := Config._MACRO_PATTERN.search(value)):
+                break
+            if (macro_name := match.group(1)) and (macro_value := self._lookup_macro_value(macro_name, data)):
+                if macro_name in expanding_macros:
+                    raise Exception(f"Circular macro definition found: {macro_name}")
+                expanding_macros.add(macro_name)
+                value = value.replace(f"${{{macro_name}}}", macro_value)
+            elif self._ignore_missing_macro:
+                missing_macro_found = True
+                value = value.replace(f"${{{macro_name}}}", f"@@@__[{macro_name}]__@@@")
+            else:
+                raise Exception(f"Macro name not found: {macro_name}")
+        if missing_macro_found and self._ignore_missing_macro:
+            value = value.replace("@@@__[", "${")
+            value = value.replace("]__@@@", "}")
+        return value
 
     def _get_parent(self, item: dict) -> Optional[dict]:
         return self._imap.get(item.get(Config._PARENT))
