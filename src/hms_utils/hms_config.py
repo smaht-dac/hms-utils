@@ -438,6 +438,8 @@ class Config:
 
     _PARENT = "@@@__PARENT__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _MACRO_START = "${"
+    _MACRO_END = "}"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  path_separator: bool = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
@@ -471,12 +473,14 @@ class Config:
             if not (name_component := name_component.strip()):
                 continue
             if not (value := config.get(name_component)):
-                # If this is not called during macro expansion and if this
-                # is that last name_component then look straight UP the tree.
+                # If this is not called during macro expansion (i.e. rather during lookup), and if this
+                # is that last name_component, then look straight upwards/outwards in tree for a resolution.
                 if (not _macro_expansion) and (index == (len(name_components) - 1)):
                     if (value := lookup_upwards(name_component, config)) is not None:
-                        if "${" in value and "}" in value:  # TODO: contains_unexpanded_macros
+                        if Config._contains_macro(value):
+                            # And if the value contains a macro try resolving from this context.
                             if macro_expanded_value := self._expand_macro_value(value, config):
+                                # TODO: Maybe ore tricky stuff needed here.
                                 return macro_expanded_value
                         return value
                 return None
@@ -576,6 +580,17 @@ class Config:
 
     def _is_parent(self, name: str) -> None:
         return name == Config._PARENT
+
+    @staticmethod
+    def _is_macro(value: str) -> bool:
+        return value.startswith(Config._MACRO_START) and value.endswith(Config._MACRO_END)
+
+    @staticmethod
+    def _contains_macro(value: str) -> bool:
+        if (index := value.find(Config._MACRO_START)) >= 0:
+            if value[index + len(Config._MACRO_START):].find(Config._MACRO_END) > 0:
+                return True
+        return False
 
     @staticmethod
     def _is_primitive_type(value: Any) -> bool:  # noqa
