@@ -24,8 +24,8 @@ DIR=`realpath $(dirname $BASH_SOURCE)`
 #        AUTH0_SECRET:auth0/local/Auth0Secret \
 #        etc...
 #
+SCRIPT=hms-config
 function hms_config_exports() {
-    SCRIPT=hms-config
     TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
     $SCRIPT --export-file $TMPFILE $*
     hms_config_status=$?
@@ -38,7 +38,6 @@ function hms_config_export() {
     hms_config_exports
 }
 function hms_config() {
-    SCRIPT=hms-config
     $SCRIPT $*
     hms_config_status=$?
 }
