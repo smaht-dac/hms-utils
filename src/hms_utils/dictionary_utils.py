@@ -6,6 +6,7 @@ def print_dictionary_tree(data: dict,
                           indent: Optional[int] = None,
                           paths: bool = False,
                           path_separator: str = "/",
+                          leafs_first: bool = False,
                           key_modifier: Optional[Callable] = None,
                           value_modifier: Optional[Callable] = None,
                           value_annotator: Optional[Callable] = None,
@@ -109,10 +110,14 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
     return data
 
 
-def sort_dictionary(data: dict) -> dict:
+def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
     if not isinstance(data, dict):
         return data
     sorted_data = {}
-    for key in sorted(data.keys()):
+    leafs = {key: value for key, value in data.items() if not isinstance(value, dict)}
+    nonleafs = {key: value for key, value in data.items() if isinstance(value, dict)}
+    for key in sorted(leafs.keys()):
+        sorted_data[key] = sort_dictionary(data[key])
+    for key in sorted(nonleafs.keys()):
         sorted_data[key] = sort_dictionary(data[key])
     return sorted_data
