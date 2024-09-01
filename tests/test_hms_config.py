@@ -141,3 +141,24 @@ def test_hmsconfig_d():
     }
     config = Config(config)
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
+
+
+
+def test_hmsconfig_e():
+    config = {
+        "foursight": {
+            "SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
+            "SSH_TUNNEL_ELASTICSEARCH_NAME": "${SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX}_${SSH_TUNNEL_ELASTICSEARCH_ENV}_${SSH_TUNNEL_ELASTICSEARCH_PORT}",  # noqa
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}",
+            "smaht": {
+                "wolf": {
+                    "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}x",
+                    "SSH_TUNNEL_ELASTICSEARCH_PORT": 9209,
+                    "SSH_TUNNEL_ELASTICSEARCH_ENV": "smaht_wolf",
+                    "SSH_TUNNEL_ELASTICSEARCH_NAME": "${foursight/SSH_TUNNEL_ELASTICSEARCH_NAME}"
+                }
+            }
+        }
+    }
+    config = Config(config)
+    assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209x"
