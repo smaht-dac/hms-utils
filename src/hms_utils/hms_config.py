@@ -336,7 +336,9 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
             print(json.dumps(data, indent=4))
         else:
             if args.list:
-                print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
+                print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ",
+                                      key_modifier=tree_key_modifier,
+                                      value_modifier=tree_value_modifier)
             else:
                 print_dictionary_tree(
                     data, indent=1,
