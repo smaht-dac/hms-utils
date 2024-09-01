@@ -206,7 +206,7 @@ class AwsEcs:
         for cluster in self.clusters:
             # TODO
             # self._boto_ecs.describe_tasks(cluster=self.clusters[0].cluster_arn, tasks=['ONLY-ONE-IT_SEEMS'])
-            cluster_running_task = cluster.running_tasks
+            # cluster_running_task = cluster.running_tasks
             pass
 
     def format_name(self, value: str, versioned: bool = True, shortened: bool = False) -> str:
@@ -512,7 +512,8 @@ def main():
         for unassociated_task_definition_name in unassociated_task_definition_names:
             print(f"- {unassociated_task_definition_name}")
 
-    unassociated_running_tasks = ecs.unassociated_running_tasks
+    # unassociated_running_tasks = ecs.unassociated_running_tasks
+
 
 if __name__ == "__main__":
     main()
