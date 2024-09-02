@@ -1,5 +1,4 @@
 #!/bin/bash
-DIR=`realpath $(dirname $BASH_SOURCE)`
 
 # Wrapper script for the poetry script hms-config (which is implemented in hms_config.py), to
 # allow setting (export-ing) environment variables from the calling process. To use this from
@@ -24,20 +23,20 @@ DIR=`realpath $(dirname $BASH_SOURCE)`
 #        AUTH0_SECRET:auth0/local/Auth0Secret \
 #        etc...
 #
-SCRIPT=hms-config
+__HMS_CONFIG_SCRIPT=hms-config
 function hms_config_exports() {
-    TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
-    $SCRIPT --export-file $TMPFILE $*
+    __HMS_CONFIG_TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
+    $__HMS_CONFIG_SCRIPT --export-file $__HMS_CONFIG_TMPFILE $*
     hms_config_status=$?
-    if [ -f $TMPFILE ] ; then
-        source $TMPFILE
-        rm -f $TMPFILE
+    if [ -f $__HMS_CONFIG_TMPFILE ] ; then
+        source $__HMS_CONFIG_TMPFILE
+        rm -f $__HMS_CONFIG_TMPFILE
     fi
 }
 function hms_config_export() {
     hms_config_exports $*
 }
 function hms_config() {
-    $SCRIPT $*
+    $__HMS_CONFIG_SCRIPT $*
     hms_config_status=$?
 }
