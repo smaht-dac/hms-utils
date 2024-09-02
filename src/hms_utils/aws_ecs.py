@@ -3,29 +3,14 @@ from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
 import os
-import requests
 import sys
 from termcolor import colored
-from urllib.parse import urlparse
 from typing import List, Literal, Optional, Tuple, Union
 from hms_utils.chars import chars
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
 # Not literally swapping task-definitions between the two (blue/green) services,
 # like with smaht, but rather swapping the "Mirror" task-definitions in and out.
-
-# TODO:
-# Get ANAME/CNAME ... so we can definitively see which service is associated with data/staging.
-# From service (e.g. c4-ecs-blue-green-smaht-production-stack-SmahtgreenPortalService-aYgRm5cTsSu0),
-# get application load-balancer (EC2) target-group name (e.g. TargetGroupApplicationGreen), and then
-# the load-balancer name (e.g. smaht-productiongreen - though should be able to go directlry to LB?),
-# and there get, e.g.: DNS name Info: smaht-productiongreen-1114221794.us-east-1.elb.amazonaws.com (A Record).
-# service_info = boto_ecs.describe_services(cluster=CLUSER_NAME, services=[SERVICE_NAME])
-# load_balancers = service_info["services"][0].get("loadBalancers", [])
-# for load_balancer in load_balancers:
-#     if "loadBalancerName" in load_balancer::
-#         response = boto_elbv2.describe_load_balancers(Names=[lb["loadBalancerName"]])
-#         dns_name = response["LoadBalancers"][0]['DNSName']
 
 
 class AwsEcs:
@@ -126,7 +111,6 @@ class AwsEcs:
                 if annotation:
                     annotation += " | "
                 annotation = self.type.upper()
-            # xyzzy
             env = None
             dns_cname = self.dns_cname if dns and AwsEcs._is_portal(self.service_name) else None
             if dns_cname:
@@ -138,7 +122,6 @@ class AwsEcs:
                 if annotation:
                     annotation += " | "
                 annotation += env
-            # xyzzy
             if self.blue_or_green:
                 if annotation:
                     annotation += " | "
@@ -150,6 +133,11 @@ class AwsEcs:
             return f"{annotation}" if annotation else ""
         @property  # noqa
         def dns_aname(self) -> Optional[str]:
+            # Get ANAME/CNAME so we can definitively see which service is associated with data/staging.
+            # From service (e.g. c4-ecs-blue-green-smaht-production-stack-SmahtgreenPortalService-aYgRm5cTsSu0),
+            # get application load-balancer (EC2) target-group name (e.g. TargetGroupApplicationGreen), and then
+            # the load-balancer name (e.g. smaht-productiongreen - though should be able to go directlry to LB?),
+            # and there get, e.g.: DNS: smaht-productiongreen-1114221794.us-east-1.elb.amazonaws.com (A Record).
             if self._dns_aname:
                 return self._dns_aname
             try:
@@ -166,7 +154,21 @@ class AwsEcs:
                             if load_balancers := target_group.get("LoadBalancerArns"):
                                 if load_balancer := boto_elb.describe_load_balancers(
                                         LoadBalancerArns=load_balancers)["LoadBalancers"]:
-                                    self._dns_aname = load_balancer[0]["DNSName"]
+                                    load_balancer = load_balancer[0]
+                                    self._dns_aname = load_balancer.get("DNSName")
+                                    load_balancer_arn = load_balancer.get("LoadBalancerArn")
+                                    listeners = boto_elb.describe_listeners(
+                                        LoadBalancerArn=load_balancer_arn)["Listeners"]
+                                    for listener in listeners:
+                                        if listener.get("Port") == 443:
+                                            ssl_certificate_arn = listener['Certificates'][0]['CertificateArn']
+                                            boto_acm = BotoClient("acm")
+                                            certificate_info = boto_acm.describe_certificate(
+                                                CertificateArn=ssl_certificate_arn)
+                                            certificate = certificate_info.get("Certificate")
+                                            if certificate_names := certificate.get("SubjectAlternativeNames"):
+                                                self._dns_cname = certificate_names[0]
+                                            break
                                     return self._dns_aname
             except Exception:
                 return None
@@ -174,15 +176,9 @@ class AwsEcs:
         def dns_cname(self) -> Optional[str]:
             if self._dns_cname:
                 return self._dns_cname
-            if not (dns_aname := self.dns_aname):
+            if not self.dns_aname:
                 return None
-            try:
-                response = requests.get(f"http://{dns_aname}", allow_redirects=True)
-                url = urlparse(response.url)
-                self._dns_cname = url.netloc.split(':')[0]
-                return self._dns_cname
-            except Exception:
-                return None
+            return self._dns_cname
         def __str__(self) -> str:  # noqa
             annotation = self.get_annotation()
             return f"{self.service_name}{f' {annotation}' if annotation else ''}"
@@ -376,10 +372,10 @@ class AwsEcs:
                 cluster_line_index = len(lines) - 1
                 service_running_task_total_count = 0
                 for service in services:
-                    service_dns_aname = (service.dns_aname
-                                         if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
-                    service_dns_cname = (service.dns_cname
-                                         if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
+                    service_aname = (service.dns_aname
+                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
+                    service_cname = (service.dns_cname
+                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
                     service_running_task_count = len(service.running_tasks)
                     service_running_task_total_count += service_running_task_count
                     service_mirror_indicator = '□' if service.is_mirrored else '-'
@@ -392,9 +388,9 @@ class AwsEcs:
                     lines.append(
                           f"  {service_mirror_indicator} SERVICE: {service_name}"
                           f"{f' | {service_annotation}' if service_annotation else ''}")
-                    if service_dns_aname:
-                        lines.append(f"        DNS: {service_dns_aname}"
-                                     f"{f' {chars.rarrow} {service_dns_cname}' if service_dns_cname else ''}")
+                    if service_aname:
+                        lines.append(f"        DNS: {service_aname}"
+                                     f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
                     lines.append(
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
