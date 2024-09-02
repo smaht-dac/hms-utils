@@ -3,8 +3,10 @@ from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
 import os
+import requests
 import sys
 from termcolor import colored
+from urllib.parse import urlparse
 from typing import List, Literal, Optional, Tuple, Union
 from hms_utils.chars import chars
 
@@ -96,6 +98,8 @@ class AwsEcs:
             self.task_definition = (task_definition if isinstance(task_definition, AwsEcs.TaskDefinition)
                                     else (AwsEcs.TaskDefinition(task_definition, ecs=ecs)
                                           if isinstance(task_definition, str) else None))
+            self._dns_aname = None
+            self._dns_cname = None
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.service_name)
         @property  # noqa
@@ -116,13 +120,25 @@ class AwsEcs:
         @property  # noqa
         def is_mirrored(self) -> bool:
             return (self.is_blue and self.task_definition.is_green) or (self.is_green and self.task_definition.is_blue)
-        @property  # noqa
-        def annotation(self) -> str:
+        def get_annotation(self, dns: bool = False) -> str:  # noqa
             annotation = ""
             if self.type:
                 if annotation:
                     annotation += " | "
                 annotation = self.type.upper()
+            # xyzzy
+            env = None
+            dns_cname = self.dns_cname if dns and AwsEcs._is_portal(self.service_name) else None
+            if dns_cname:
+                if dns_cname.startswith("data."):
+                    env = "DATA"
+                elif dns_cname.startswith("staging."):
+                    env = "STAGING"
+            if env:
+                if annotation:
+                    annotation += " | "
+                annotation += env
+            # xyzzy
             if self.blue_or_green:
                 if annotation:
                     annotation += " | "
@@ -132,8 +148,43 @@ class AwsEcs:
                     annotation += " | "  # " ▶ "
                 annotation += "MIRROR"
             return f"{annotation}" if annotation else ""
+        @property  # noqa
+        def dns_aname(self) -> Optional[str]:
+            if self._dns_aname:
+                return self._dns_aname
+            try:
+                if not (services := self._ecs._describe_services(self.cluster.cluster_name, self.service_name)):
+                    return None
+                if not (load_balancers := services[0].get("loadBalancers")):
+                    return None
+                boto_elb = BotoClient("elbv2")
+                # For some reason have to get target-group name first and from there get the load-balancer info.
+                for load_balancer in load_balancers:
+                    if target_group_arn := load_balancer.get("targetGroupArn"):
+                        if ((target_groups := boto_elb.describe_target_groups(TargetGroupArns=[target_group_arn])) and
+                            (target_group := target_groups.get("TargetGroups")[0])):  # noqa
+                            if load_balancers := target_group.get("LoadBalancerArns"):
+                                if load_balancer := boto_elb.describe_load_balancers(
+                                        LoadBalancerArns=load_balancers)["LoadBalancers"]:
+                                    self._dns_aname = load_balancer[0]["DNSName"]
+                                    return self._dns_aname
+            except Exception:
+                return None
+        @property  # noqa
+        def dns_cname(self) -> Optional[str]:
+            if self._dns_cname:
+                return self._dns_cname
+            if not (dns_aname := self.dns_aname):
+                return None
+            try:
+                response = requests.get(f"http://{dns_aname}", allow_redirects=True)
+                url = urlparse(response.url)
+                self._dns_cname = url.netloc.split(':')[0]
+                return self._dns_cname
+            except Exception:
+                return None
         def __str__(self) -> str:  # noqa
-            annotation = self.annotation
+            annotation = self.get_annotation()
             return f"{self.service_name}{f' {annotation}' if annotation else ''}"
 
     class TaskDefinition:
@@ -312,7 +363,7 @@ class AwsEcs:
         else:
             return swaps, None
 
-    def print(self, shortened_names: bool = False, versioned_names: bool = False) -> AwsEcs:
+    def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False) -> AwsEcs:
         lines = []
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks)
@@ -325,19 +376,25 @@ class AwsEcs:
                 cluster_line_index = len(lines) - 1
                 service_running_task_total_count = 0
                 for service in services:
+                    service_dns_aname = (service.dns_aname
+                                         if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
+                    service_dns_cname = (service.dns_cname
+                                         if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
                     service_running_task_count = len(service.running_tasks)
                     service_running_task_total_count += service_running_task_count
                     service_mirror_indicator = '□' if service.is_mirrored else '-'
                     service_name = self.format_name(service.service_name,
                                                     shortened=shortened_names, versioned=versioned_names)
-                    service_annotation = service.annotation
+                    service_annotation = service.get_annotation(dns=not nodns)
                     task_definition_name = self.format_name(service.task_definition.task_definition_name,
                                                             shortened=shortened_names, versioned=versioned_names)
                     task_definition_annotation = service.task_definition.annotation
-                    # TODO: Instead of BLUE/GREEN for SERVICE show DATA/STAGING (but how) ...
                     lines.append(
                           f"  {service_mirror_indicator} SERVICE: {service_name}"
                           f"{f' | {service_annotation}' if service_annotation else ''}")
+                    if service_dns_aname:
+                        lines.append(f"        DNS: {service_dns_aname}"
+                                     f"{f' {chars.rarrow} {service_dns_cname}' if service_dns_cname else ''}")
                     lines.append(
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
@@ -374,6 +431,8 @@ class AwsEcs:
 
     def _describe_services(self, cluster_name: str, service_names: List[str]) -> List[str]:
         try:
+            if isinstance(service_names, str):
+                service_names = [service_names]
             return self._boto_ecs.describe_services(cluster=cluster_name, services=service_names)["services"]
         except Exception:
             return []
@@ -462,6 +521,7 @@ def main():
     shortened_names = False
     versioned_names = False
     identity_swap = False
+    nodns = False
     nocolor = False
 
     argi = 0
@@ -483,6 +543,8 @@ def main():
               (arg == "--swap") or (arg == "-swap") or (arg == "swap")):
             # Show identity swap plan.
             identity_swap = True
+        elif (arg == "--nodns") or (arg == "-nodns") or (arg == "nodns"):
+            nodns = True
         elif (arg == "--nocolor") or (arg == "-nocolor") or (arg == "nocolor"):
             nocolor = True
         elif (arg == "--aws") or (arg == "-aws") or (arg == "--env") or (arg == "-env"):
@@ -506,7 +568,7 @@ def main():
     print(f"Showing current ECS cluster info for AWS account: {ecs_account.account_number}"
           f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
 
-    ecs.print(shortened_names=shortened_names, versioned_names=versioned_names)
+    ecs.print(shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
@@ -518,7 +580,7 @@ def main():
         for swap in swaps:
             service_name = ecs.format_name(swap.service.service_name,
                                            versioned=versioned_names, shortened=shortened_names)
-            service_annotation = swap.service.annotation
+            service_annotation = swap.service.get_annotation()
             task_definition_name = ecs.format_name(swap.service.task_definition.task_definition_name,
                                                    versioned=versioned_names, shortened=shortened_names)
             task_definition_annotation = swap.service.task_definition.annotation
@@ -536,7 +598,7 @@ def main():
         if error:
             print(error)
             exit(1)
-        ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names)
+        ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns)
 
     if unassociated_task_definition_names := ecs.unassociated_task_definition_names:
         print("Task definitions unassociated with any service:\n")
