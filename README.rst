@@ -1,1 +1,1 @@
-Miscellaneous Python utilities from David Michaels @ HMS DBMI
+Miscellaneous Python utilities from HMS DBMI.
