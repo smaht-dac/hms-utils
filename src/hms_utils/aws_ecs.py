@@ -6,6 +6,24 @@ import os
 import sys
 from termcolor import colored
 from typing import List, Literal, Optional, Tuple, Union
+from hms_utils.chars import chars
+
+# TODO: Does not really work right for 4dn because of the "Mirror" setup.
+# Not literally swapping task-definitions between the two (blue/green) services,
+# like with smaht, but rather swapping the "Mirror" task-definitions in and out.
+
+# TODO:
+# Get ANAME/CNAME ... so we can definitively see which service is associated with data/staging.
+# From service (e.g. c4-ecs-blue-green-smaht-production-stack-SmahtgreenPortalService-aYgRm5cTsSu0),
+# get application load-balancer (EC2) target-group name (e.g. TargetGroupApplicationGreen), and then
+# the load-balancer name (e.g. smaht-productiongreen - though should be able to go directlry to LB?),
+# and there get, e.g.: DNS name Info: smaht-productiongreen-1114221794.us-east-1.elb.amazonaws.com (A Record).
+# service_info = boto_ecs.describe_services(cluster=CLUSER_NAME, services=[SERVICE_NAME])
+# load_balancers = service_info["services"][0].get("loadBalancers", [])
+# for load_balancer in load_balancers:
+#     if "loadBalancerName" in load_balancer::
+#         response = boto_elbv2.describe_load_balancers(Names=[lb["loadBalancerName"]])
+#         dns_name = response["LoadBalancers"][0]['DNSName']
 
 
 class AwsEcs:
@@ -295,15 +313,20 @@ class AwsEcs:
             return swaps, None
 
     def print(self, shortened_names: bool = False, versioned_names: bool = False) -> AwsEcs:
+        lines = []
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks)
             if services := cluster.services:
                 cluster_annotation = cluster.annotation
-                print(f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
+                lines.append(
+                      f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
                       f"{f' | {cluster_annotation}' if cluster_annotation else ''}"
                       f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}")  # noqa
+                cluster_line_index = len(lines) - 1
+                service_running_task_total_count = 0
                 for service in services:
                     service_running_task_count = len(service.running_tasks)
+                    service_running_task_total_count += service_running_task_count
                     service_mirror_indicator = '□' if service.is_mirrored else '-'
                     service_name = self.format_name(service.service_name,
                                                     shortened=shortened_names, versioned=versioned_names)
@@ -312,11 +335,19 @@ class AwsEcs:
                                                             shortened=shortened_names, versioned=versioned_names)
                     task_definition_annotation = service.task_definition.annotation
                     # TODO: Instead of BLUE/GREEN for SERVICE show DATA/STAGING (but how) ...
-                    print(f"  {service_mirror_indicator} SERVICE: {service_name}"
+                    lines.append(
+                          f"  {service_mirror_indicator} SERVICE: {service_name}"
                           f"{f' | {service_annotation}' if service_annotation else ''}")
-                    print(f"    -- TASK: {task_definition_name}"
-                          f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
-                          f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                    lines.append(
+                        f"    -- TASK: {task_definition_name}"
+                        f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
+                        f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                if cluster_running_task_count == service_running_task_total_count:
+                    lines[cluster_line_index] += f" {chars.check}"
+                else:
+                    lines[cluster_line_index] += f" {chars.xmark}"
+        for line in lines:
+            print(line)
         print("")
 
     def _list_clusters(self) -> List[str]:
