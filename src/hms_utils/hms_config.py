@@ -233,16 +233,16 @@ def parse_args(argv: List[str]) -> object:
     return args
 
 
-#def tree_key_modifier(secrets: Config, args: object, key_path: str, key: Optional[str] = None) -> Optional[str]:
-#    return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
-#            else color(key or key_path, "red", nocolor=args.nocolor))
+# def tree_key_modifier(secrets: Config, args: object, key_path: str, key: Optional[str] = None) -> Optional[str]:
+#     return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
+#             else color(key or key_path, "red", nocolor=args.nocolor))
 
 
-#def tree_value_modifier(secrets: Config, args: object, key_path: str, value: str) -> Optional[str]:
-#    if (not args.show_secrets) and secrets and secrets.contains(key_path):
-#        value = OBFUSCATED_VALUE
-#    return value if ((not secrets) or
-#                     (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
+# def tree_value_modifier(secrets: Config, args: object, key_path: str, value: str) -> Optional[str]:
+#     if (not args.show_secrets) and secrets and secrets.contains(key_path):
+#         value = OBFUSCATED_VALUE
+#     return value if ((not secrets) or
+#                      (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
 
 def print_config_and_secrets_merged(merged_config: Config, args: object) -> None:

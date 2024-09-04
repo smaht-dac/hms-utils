@@ -218,7 +218,7 @@ def test_hmsconfig_g():
     config = Config(config_file)
     secrets = Config(secrets_file)
     merged_config = config.merge_secrets(secrets)
-    return 
+    return
 
     # TODO
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
