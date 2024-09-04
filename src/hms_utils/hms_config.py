@@ -706,7 +706,7 @@ class Config:
             todelete = []
             for key in data:
                 if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
-                    key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX)):
+                    key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX)):  # noqa
                     todelete.append(key)
             for key in todelete:
                 del data[key]
