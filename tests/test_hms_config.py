@@ -1,4 +1,7 @@
+import os
 from hms_utils.hms_config import Config
+
+TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
 def test_hmsconfig_a():
@@ -75,18 +78,21 @@ def test_hmsconfig_c():
         "A": {
             "A1": "123",
             "A2": "${A1}_456_${B2}",
+            "A3": "${A1}_789_${B4}",
             "B": {
                 "B1": "${A1}",
                 "B2": "b2value_${A1}",
-                "B3": "b3value_${A2}"
+                "B3": "b3value_${A2}",
+                "B4": "b4value_${B1}"
             }
         }
     })
     assert config.lookup("A/B/B3") == "b3value_123_456_b2value_123"
-    # This one is even trickier; want to get A2 from A/B context like test_hmsconfig_b
-    # but then notice that is has unexpanded macros, i.e. 123_456_${B2}, and
-    # then evaluate the macros within the context of A/A.
+    # This one is even trickier; want to get A2 from A/B context like the above (test_hmsconfig_b)
+    # test but then here notice that it has unexpanded macros, i.e. ${B2} within 123_456_${B2},
+    # and then we want to evaluate the macros within the context of A/B.
     assert config.lookup("A/B/A2") == "123_456_b2value_123"
+    assert config.lookup("A/B/A3") == "123_789_b4value_123"
 
     config = Config({
         "A": {
@@ -203,3 +209,29 @@ def test_hmsconfig_f():
     assert config.lookup("foursight/4dn/dev/SSH_TUNNEL_ES_PORT") == "9201"
 
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
+
+
+def test_hmsconfig_g():
+
+    config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
+    secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_a.json")
+    config = Config(config_file)
+    secrets = Config(secrets_file)
+    merged_config = config.merge_secrets(secrets)
+    return 
+
+    # TODO
+    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == ""
+
+    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == ""
+
+    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == ""
+
+    value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == ""
+
+    value = config.lookup("foursight/4dn/dev/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == ""

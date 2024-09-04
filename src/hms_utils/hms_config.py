@@ -43,15 +43,13 @@ def main():
         except Exception as e:
             error(f"Cannot process secrets file: {args.secrets_file}", exception=e, trace=True)
 
-    # xyzzy
-    if False:  # TODO (too late at night now 2024-09-04 12:02am): Merge before expand.
-        merged, merged_secrets, unmerged_secrets = \
-            merge_config_and_secrets(config._json, secrets._json, path_separator=args.path_separator)
-        merged = Config(merged)
-    # xyzzy
+    merged_config = config.merge_secrets(secrets) if secrets else config
 
     if not args.names:
-        print_config_and_secrets(config, secrets, args)
+        if (not args.nomerge) and (not args.json) and (not args.yaml) and config and secrets:
+            print_config_and_secrets_merged(merged_config, args)
+        else:
+            print_config_and_secrets_unmerged(config, secrets, args)
         exit(0)
 
     status = 0
@@ -67,8 +65,7 @@ def main():
             else:
                 export_name = path_basename(name, args.path_separator)
             found = False ; found_dictionary = False  # noqa
-            if ((config and ((value := config.lookup(name, allow_dictionary=True)) is not None)) or
-                (secrets and ((value := secrets.lookup(name, allow_dictionary=True)) is not None))):  # noqa
+            if merged_config and ((value := merged_config.lookup(name, allow_dictionary=True)) is not None):
                 if isinstance(value, dict):
                     # Special case: If target name/path is a dictionary then
                     # generate exports for every (non-dictionary) key/value within.
@@ -100,8 +97,7 @@ def main():
                 print(export)
     else:
         for name in args.names:
-            if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
-                (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
+            if merged_config and ((value := merged_config.lookup(name, allow_dictionary=args.json)) is not None):
                 if args.json_formatted and isinstance(value, dict):
                     print(json.dumps(value, indent=4))
                 else:
@@ -237,18 +233,24 @@ def parse_args(argv: List[str]) -> object:
     return args
 
 
-def print_config_and_secrets(config: Config, secrets: Config, args: object) -> None:
-    if (not args.nomerge) and (not args.json) and (not args.yaml) and config and secrets:
-        print_config_and_secrets_merged(config, secrets, args)
-    else:
-        print_config_and_secrets_unmerged(config, secrets, args)
-        return
+#def tree_key_modifier(secrets: Config, args: object, key_path: str, key: Optional[str] = None) -> Optional[str]:
+#    return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
+#            else color(key or key_path, "red", nocolor=args.nocolor))
 
 
-def print_config_and_secrets_merged(config: Config, secrets: Config, args: object) -> None:
+#def tree_value_modifier(secrets: Config, args: object, key_path: str, value: str) -> Optional[str]:
+#    if (not args.show_secrets) and secrets and secrets.contains(key_path):
+#        value = OBFUSCATED_VALUE
+#    return value if ((not secrets) or
+#                     (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
-    merged_secrets = None
-    unmerged_secrets = None
+
+def print_config_and_secrets_merged(merged_config: Config, args: object) -> None:
+
+    merged_config_json = merged_config.json
+    secrets = merged_config.secrets if hasattr(merged_config, "secrets") else None
+    unmerged_secrets = merged_config.unmerged_secrets if hasattr(merged_config, "unmerged_secrets") else None
+    merged_secrets = merged_config.merged_secrets if hasattr(merged_config, "merged_secrets") else None
 
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
@@ -263,16 +265,16 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
                          (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
     def tree_value_annotator(key_path: str) -> Optional[str]:
-        nonlocal merged_secrets
-        if key_path in unmerged_secrets:
+        nonlocal unmerged_secrets
+        if unmerged_secrets and (key_path in unmerged_secrets):
             return f"{chars.rarrow} unmerged {chars.xmark}"
         return None
 
     def tree_value_annotator_secrets(key_path: str) -> Optional[str]:
         nonlocal merged_secrets, unmerged_secrets
-        if key_path in unmerged_secrets:
+        if unmerged_secrets and (key_path in unmerged_secrets):
             return f"{chars.rarrow} unmerged {chars.xmark}"
-        elif key_path in merged_secrets:
+        elif merged_secrets and (key_path in merged_secrets):
             return f"{chars.rarrow_hollow} merged {chars.check}"
         return None
 
@@ -280,21 +282,20 @@ def print_config_and_secrets_merged(config: Config, secrets: Config, args: objec
         nonlocal secrets
         return chars.rarrow_hollow if (secrets and (secrets.lookup(key_path) is not None)) else ""
 
-    if config and secrets:
-        merged, merged_secrets, unmerged_secrets = merge_config_and_secrets(config.json, secrets.json,
-                                                                            path_separator=args.path_separator)
+    if merged_config and secrets:
         if not args.nosort:
-            merged = sort_dictionary(merged)
-        print(f"\n{config.file}: [with {os.path.basename(args.secrets_file)}"
+            merged_config_json = sort_dictionary(merged_config_json)
+        print(f"\n{merged_config.file}: [with {os.path.basename(args.secrets_file)}"
               f"{' partially' if unmerged_secrets else ''} merged in]")
         if args.list:
-            print_dictionary_list(merged, path_separator=args.path_separator,
+            print_dictionary_list(merged_config_json, path_separator=args.path_separator,
                                   prefix=f" {chars.rarrow_hollow} ",
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier,
                                   value_annotator=tree_value_annotator)
         else:
-            print_dictionary_tree(merged, indent=1, paths=args.show_paths, path_separator=args.path_separator,
+            print_dictionary_tree(merged_config_json, indent=1, paths=args.show_paths,
+                                  path_separator=args.path_separator,
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier,
                                   value_annotator=tree_value_annotator,
@@ -429,26 +430,6 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return config_file, secrets_file
 
 
-def merge_config_and_secrets(config: dict, secrets: dict,
-                             path_separator: str = DEFAULT_PATH_SEPARATOR) -> Tuple[dict, list, list]:
-    if not (isinstance(config, dict) or isinstance(secrets, dict)):
-        return None, None
-    merged = deepcopy(config) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
-    def merge(config: dict, secrets: dict, path: str = "") -> None:  # noqa
-        nonlocal unmerged_secrets, path_separator
-        for key, value in secrets.items():
-            key_path = f"{path}{path_separator}{key}" if path else key
-            if key not in config:
-                config[key] = secrets[key]
-                merged_secrets.append(key_path)
-            elif isinstance(config[key], dict) and isinstance(secrets[key], dict):
-                merge(config[key], secrets[key], path=key_path)
-            else:
-                unmerged_secrets.append(key_path)
-    merge(merged, secrets)
-    return merged, merged_secrets, unmerged_secrets
-
-
 def path_basename(name: str, separator: str = DEFAULT_PATH_SEPARATOR) -> str:
     if (index := name.rfind(separator)) > 0:
         return name[index + 1:]
@@ -463,15 +444,28 @@ class Config:
     _MACRO_END = "}"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
-                 path_separator: bool = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
+                 path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
         self._json = None
         self._path_separator = path_separator
-        self._expand_macros = nomacros is not True
+        self._expand_macros = not nomacros
+        self.secrets = None
+        self.merged_secrets = None
+        self.unmerged_secrets = None
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._ignore_missing_macro = True
         self._stringize_non_primitive_types = True
         self._imap = {}
         self._load(file_or_dictionary)
+
+    def merge_secrets(self, secrets: Config) -> Config:
+        merged_config_json, merged_secretst, unmerged_secretst = (
+            Config._merge_config_and_secrets(self.json, secrets.json, path_separator=self._path_separator))
+        merged_config = Config(merged_config_json)
+        merged_config._file = self.file
+        merged_config.secrets = secrets
+        merged_config.merged_secrets = merged_secretst
+        merged_config.unmerged_secrets = unmerged_secretst
+        return merged_config
 
     def lookup(self, name: str, config: Optional[dict] = None,
                allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str, dict]:
@@ -532,6 +526,7 @@ class Config:
     def _load(self, file_or_dictionary: Union[str, dict]) -> None:
         if isinstance(file_or_dictionary, dict):
             self._json = file_or_dictionary
+            self._file = None
         else:
             self._file = file_or_dictionary
             with io.open(file_or_dictionary, "r") as f:
@@ -541,6 +536,26 @@ class Config:
                     self._json = json.load(f)
         if self._expand_macros:
             _ = self._macro_expand(self._json)
+
+    @staticmethod
+    def _merge_config_and_secrets(config: dict, secrets: dict,
+                                  path_separator: str = DEFAULT_PATH_SEPARATOR) -> Tuple[dict, list, list]:
+        if not (isinstance(config, dict) or isinstance(secrets, dict)):
+            return None, None
+        merged = deepcopy(config) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
+        def merge(config: dict, secrets: dict, path: str = "") -> None:  # noqa
+            nonlocal unmerged_secrets, path_separator
+            for key, value in secrets.items():
+                key_path = f"{path}{path_separator}{key}" if path else key
+                if key not in config:
+                    config[key] = secrets[key]
+                    merged_secrets.append(key_path)
+                elif isinstance(config[key], dict) and isinstance(secrets[key], dict):
+                    merge(config[key], secrets[key], path=key_path)
+                else:
+                    unmerged_secrets.append(key_path)
+        merge(merged, secrets)
+        return merged, merged_secrets, unmerged_secrets
 
     def _macro_expand(self, data: dict) -> dict:
         for name in data:  # TODO: check for duplicate keys.
