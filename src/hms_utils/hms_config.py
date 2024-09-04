@@ -59,12 +59,26 @@ def main():
                     continue
             else:
                 export_name = path_basename(name, args.path_separator)
-            if ((config and ((value := config.lookup(name, allow_dictionary=args.json)) is not None)) or
-                (secrets and ((value := secrets.lookup(name, allow_dictionary=args.json)) is not None))):  # noqa
-                exports.append(f"export {export_name}={value}")
-            else:
+            found = False ; found_dictionary = False  # noqa
+            if ((config and ((value := config.lookup(name, allow_dictionary=True)) is not None)) or
+                (secrets and ((value := secrets.lookup(name, allow_dictionary=True)) is not None))):  # noqa
+                if isinstance(value, dict):
+                    # Special case: If target name/path is a dictionary then
+                    # generate exports for every (non-dictionary) key/value within.
+                    found_dictionary = True
+                    for key in value:
+                        if not isinstance(value[key], dict):
+                            exports.append(f"export {key}={value[key]}")
+                            found = True
+                else:
+                    exports.append(f"export {export_name}={value}")
+                    found = True
+            if not found:
                 if args.verbose:
-                    warning(f"{chars.rarrow} Cannot find config name/path: {name}")
+                    if found_dictionary:
+                        warning(f"{chars.rarrow} Config name/path contains no direct values: {name}")
+                    else:
+                        warning(f"{chars.rarrow} Config name/path not found: {name}")
                 status = 1
         if args.export_file:
             if args.verbose:
@@ -175,7 +189,7 @@ def parse_args(argv: List[str]) -> object:
             args.nosort = True
         elif arg in ["--nomacros", "-nomacros", "--nomacro", "-nomacro"]:
             args.nomacros = True
-        elif arg in ["--export", "-export"]:
+        elif arg in ["--export", "-export", "--exports", "-exports"]:
             args.export = True
         elif arg in ["--export-file", "-export-file"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
@@ -389,7 +403,7 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                                                 file_explicit=args.config_file_explicit,
                                                 directory_explicit=args.config_dir_explicit)
         if (not config_file) and args.config_file_explicit:
-            error(f"Cannot find config file: {args.config_file}")
+            error(f"Config file not found: {args.config_file}")
 
     if secrets_file:
         if not (secrets_file := resolve_file_path(secrets_file, args.config_dir,
@@ -401,7 +415,7 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                                                  file_explicit=args.secrets_file_explicit,
                                                  directory_explicit=args.secrets_dir_explicit)
         if (not secrets_file) and args.secrets_file_explicit:
-            error(f"Cannot find secrets file: {args.config_file_explicit}")
+            error(f"Config secrets file not found: {args.config_file_explicit}")
         if not ensure_secrets_file_protected(secrets_file):
             warning(f"Your secrets file is not read protected from others: {secrets_file}")
 
