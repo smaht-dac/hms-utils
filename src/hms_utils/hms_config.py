@@ -438,12 +438,12 @@ def path_basename(name: str, separator: str = DEFAULT_PATH_SEPARATOR) -> str:
 
 class Config:
 
-    _PARENT = "@@@__PARENT__@@@"
-    _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _MACRO_START = "${"
     _MACRO_END = "}"
+    _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
+    _PARENT = "@@@__PARENT__@@@"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
@@ -633,12 +633,12 @@ class Config:
             elif self._ignore_missing_macro:
                 missing_macro_found = True
                 value = value.replace(f"{Config._MACRO_START}{macro_name}{Config._MACRO_END}",
-                                      f"@@@__[{macro_name}]__@@@")
+                                      f"{Config._MACRO_HIDE_START}{macro_name}{Config._MACRO_HIDE_END}")
             else:
                 raise Exception(f"Macro name not found: {macro_name}")
         if missing_macro_found and self._ignore_missing_macro:
-            value = value.replace("@@@__[", Config._MACRO_START)
-            value = value.replace("]__@@@", Config._MACRO_END)
+            value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
+            value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         if original_simple_macros_to_retain and self._contains_macro(value):
             for simple_macro in original_simple_macros_to_retain:
                 original_simple_macro = original_simple_macros_to_retain[simple_macro]
