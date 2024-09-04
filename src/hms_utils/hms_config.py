@@ -442,6 +442,8 @@ class Config:
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _MACRO_START = "${"
     _MACRO_END = "}"
+    _MACRO_HIDE_START = "@@@__["
+    _MACRO_HIDE_END = "]__@@@"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
@@ -596,9 +598,6 @@ class Config:
                 if Config._is_macro(macro_value):
                     original_simple_macros_to_retain[macro_value] = macro_name
                 #
-                # TODO: Notes from a failed attempt to support the below ... if not Config._is_macro(macro_value) ...
-                # Maybe this original_simple_macros_to_retain scheme will work ... more testing required ...
-                #
                 # Note the _is_macro call above is a bit of a special case; if the macro we are expanding resolves
                 # simply to another macro, then retain the original macro; this can be useful for this for example:
                 #
@@ -633,14 +632,13 @@ class Config:
                 value = value.replace(f"${{{macro_name}}}", macro_value)
             elif self._ignore_missing_macro:
                 missing_macro_found = True
-                # TODO: Use _MACRO_START/END ...
-                value = value.replace(f"${{{macro_name}}}", f"@@@__[{macro_name}]__@@@")
+                value = value.replace(f"{Config._MACRO_START}{macro_name}{Config._MACRO_END}",
+                                      f"@@@__[{macro_name}]__@@@")
             else:
                 raise Exception(f"Macro name not found: {macro_name}")
         if missing_macro_found and self._ignore_missing_macro:
-            # TODO: Use _MACRO_START/END ...
-            value = value.replace("@@@__[", "${")
-            value = value.replace("]__@@@", "}")
+            value = value.replace("@@@__[", Config._MACRO_START)
+            value = value.replace("]__@@@", Config._MACRO_END)
         if original_simple_macros_to_retain and self._contains_macro(value):
             for simple_macro in original_simple_macros_to_retain:
                 original_simple_macro = original_simple_macros_to_retain[simple_macro]
