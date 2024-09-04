@@ -6,7 +6,7 @@ hms-utils
 Change Log
 ----------
 
-1.1.51
+1.1.52
 ======
 
 * 2024-08-30/dmichaels
