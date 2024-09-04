@@ -444,10 +444,12 @@ class Config:
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
     _PARENT = "@@@__PARENT__@@@"
+    _IMPORTED_CONFIG_KEY_PREFIX = "@@@__CONFIG__:"
+    _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
-        self._json = None
+        self._json = {}
         self._path_separator = path_separator
         self._expand_macros = not nomacros
         self.secrets = None
@@ -470,7 +472,9 @@ class Config:
         return merged_config
 
     def lookup(self, name: str, config: Optional[dict] = None,
-               allow_dictionary: bool = False, _macro_expansion: bool = False) -> Optional[str, dict]:
+               allow_dictionary: bool = False,
+               _macro_expansion: bool = False,
+               _search_imported_docs: bool = True) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -486,7 +490,8 @@ class Config:
         value = None
         for index, name_component in enumerate(name_components := name.split(self._path_separator)):
             if value is not None:
-                return None
+                import pdb ; pdb.set_trace()  # noqa
+                return None  # TODO: Why was this here and what could it mean?
             if not (name_component := name_component.strip()):
                 continue
             if not (value := config.get(name_component)):
@@ -500,6 +505,12 @@ class Config:
                                 # TODO: Maybe ore tricky stuff needed here.
                                 return macro_expanded_value
                         return value
+                if _search_imported_docs and (docs := self._imported):
+                    for doc in docs:
+                        if (value := self.lookup(name, doc, _search_imported_docs=False)) is not None:
+                            if isinstance(value, dict) and (not allow_dictionary):
+                                return None
+                            return value
                 return None
             if isinstance(value, dict):
                 config = value
@@ -509,6 +520,23 @@ class Config:
         elif config and allow_dictionary:
             return self._cleanjson(config)
         return None
+
+    def import_config(self, config: dict, name: Optional[str] = None) -> None:
+        if isinstance(config, dict) and config:
+            self._json[f"{Config._IMPORTED_CONFIG_KEY_PREFIX}{name or ''}"] = config
+
+    def import_secrets(self, secrets: dict, name: Optional[str] = None) -> None:
+        if isinstance(secrets, dict) and secrets:
+            self._json[f"{Config._IMPORTED_SECRETS_KEY_PREFIX}{name or ''}"] = secrets
+
+    @property
+    def _imported(self) -> List[dict]:
+        docs = []
+        for key in self._json:
+            if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
+                key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX)) and isinstance(self._json[key], dict):  # noqa
+                docs.append(self._json[key])
+        return docs
 
     def contains(self, name: str) -> bool:
         return self.lookup(name) is not None
@@ -674,14 +702,23 @@ class Config:
     @staticmethod
     def _cleanjson(data: dict) -> dict:
         data = deepcopy(data)
-        def remove_parent_properties(data: dict) -> dict:  # noqa
+        def remove_imported_configs(data: dict) -> None:  # noqa
+            todelete = []
+            for key in data:
+                if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
+                    key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX)):
+                    todelete.append(key)
+            for key in todelete:
+                del data[key]
+        def remove_parent_properties(data: dict) -> None:  # noqa
             if isinstance(data, dict):
                 if Config._PARENT in data:
                     del data[Config._PARENT]
                 for key, value in list(data.items()):
                     remove_parent_properties(value)
-            return data
-        return remove_parent_properties(data)
+        remove_imported_configs(data)
+        remove_parent_properties(data)
+        return data
 
 
 def get_version(package_name: str = "hms-utils") -> str:
