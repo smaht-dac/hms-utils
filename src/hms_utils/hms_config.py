@@ -43,6 +43,13 @@ def main():
         except Exception as e:
             error(f"Cannot process secrets file: {args.secrets_file}", exception=e, trace=True)
 
+    # xyzzy
+    if False:  # TODO (too late at night now 2024-09-04 12:02am): Merge before expand.
+        merged, merged_secrets, unmerged_secrets = \
+            merge_config_and_secrets(config._json, secrets._json, path_separator=args.path_separator)
+        merged = Config(merged)
+    # xyzzy
+
     if not args.names:
         print_config_and_secrets(config, secrets, args)
         exit(0)
