@@ -595,7 +595,7 @@ class Config:
         docs = []
         for key in self._json:
             if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
-                key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX)) and isinstance(self._json[key], dict):  # noqa
+                key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX)) and isinstance(self._json[key], dict):  # noqa
                 docs.append(self._json[key])
         return docs
 
