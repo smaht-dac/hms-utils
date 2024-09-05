@@ -131,6 +131,7 @@ def parse_args(argv: List[str]) -> object:
         yaml = False
         json = False
         json_formatted = False
+        json_only = False
         raw = False
         show_secrets = False
         show_paths = False
@@ -178,6 +179,14 @@ def parse_args(argv: List[str]) -> object:
             args.secrets_file = arg
             args.secrets_file_explicit = True
             argi += 1
+        elif arg in ["--imports", "-imports", "--import", "-import"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                _usage()
+            if "secret" in args.lower():
+                args.import_secret_files.append(arg)
+            else:
+                args.import_config_files.append(arg)
+            argi += 1
         elif arg in ["--import-config", "-import-config", "--import-conf", "-import-conf",
                      "--iconfig", "-iconfig", "--iconf", "-iconf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
@@ -205,7 +214,10 @@ def parse_args(argv: List[str]) -> object:
             args.yaml = True
         elif arg in ["--json", "-json"]:
             args.json = True
-        elif arg in ["--jsonf", "-jsonf"]:
+        elif arg in ["--json-only", "-json-only", "--jsononly", "-jsononly"]:
+            args.json = True
+            args.json_only = True
+        elif arg in ["--jsonf", "-jsonf", "--json-formatted", "-json-formatted", "--json-format", "-json-format"]:
             args.json = True
             args.json_formatted = True
         elif arg in ["--raw", "-raw"]:
@@ -259,6 +271,8 @@ def parse_args(argv: List[str]) -> object:
 
     # TODO: Refactor with other file resolution code; and with yaml support etc.
     for import_config_file in args.import_config_files:
+        if import_config_file.lower() == "default":
+            import_config_file = args.config_file or DEFAULT_CONFIG_FILE_NAME
         import_config_file = resolve_file_path(import_config_file, args.config_dir, file_explicit=True,
                                                directory_explicit=args.config_dir_explicit)
         if not import_config_file:
@@ -274,6 +288,8 @@ def parse_args(argv: List[str]) -> object:
         args.config_imports.append(config_import_json)
 
     for import_secrets_file in args.import_secrets_files:
+        if import_secrets_file.lower() == "default":
+            import_secrets_file = args.secrets_file or DEFAULT_SECRETS_FILE_NAME
         import_secrets_file = resolve_file_path(import_secrets_file, args.config_dir, file_explicit=True,
                                                 directory_explicit=args.config_dir_explicit)
         if not os.path.exists(import_secrets_file):
@@ -394,7 +410,8 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                          (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
 
     if config:
-        print(f"\n{config.file}:")
+        if not args.json_only:
+            print(f"\n{config.file}:")
         data = config.json if not (args.debug or args.raw) else config.rawjson
         if not args.nosort:
             data = sort_dictionary(data)
@@ -409,7 +426,8 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                                   key_modifier=tree_key_modifier,
                                   value_modifier=tree_value_modifier)
     if secrets:
-        print(f"\n{secrets.file}:")
+        if not args.json_only:
+            print(f"\n{secrets.file}:")
         data = secrets.json if not (args.debug or args.raw) else secrets.rawjson
         if args.yaml:
             print(yaml.dump(data))
@@ -426,7 +444,8 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                     paths=args.show_paths, path_separator=args.path_separator,
                     key_modifier=tree_key_modifier,
                     value_modifier=tree_value_modifier)
-    print()
+    if not args.json_only:
+        print()
 
 
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
