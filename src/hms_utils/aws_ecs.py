@@ -60,6 +60,14 @@ class AwsEcs:
         def blue_or_green(self) -> str:
             return AwsEcs._blue_or_green(self.cluster_name)
         @property  # noqa
+        def is_mirrored(self) -> Optional[bool]:
+            if not self.blue_or_green:
+                return None
+            for service in self.services:
+                if not service.is_mirrored:
+                    return False
+            return True
+        @property  # noqa
         def annotation(self) -> str:
             if blue_or_green := self.blue_or_green:
                 return self._ecs._terminal_color(blue_or_green.upper(), blue_or_green)
@@ -187,6 +195,7 @@ class AwsEcs:
         def __init__(self, task_definition_arn: str, ecs: Optional[AwsEcs] = None) -> None:
             self.task_definition_arn = task_definition_arn or ""
             self.task_definition_name = AwsEcs._nonarn_name(task_definition_arn)
+            self.task_definition_name_unversioned = AwsEcs._unversioned_name(self.task_definition_name)
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.task_definition_name)
         @property  # noqa
@@ -199,8 +208,31 @@ class AwsEcs:
         def blue_or_green(self) -> str:
             return AwsEcs._blue_or_green(self.task_definition_arn)
         @property  # noqa
+        def is_mirror(self) -> bool:
+            # Fourfront only; for task defintion names like this:
+            # c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+            return self.blue_or_green and ("-Mirror-" in self.task_definition_name)
+        @property  # noqa
         def type(self) -> str:
             return AwsEcs._type(self.task_definition_name)
+        @property  # noqa
+        def container(self) -> dict:
+            try:
+                containers = self._ecs._boto_ecs.describe_task_definition(
+                    taskDefinition=self.task_definition_name)["taskDefinition"].get("containerDefinitions")
+            except Exception:
+                return {}
+            result = []
+            for container in containers:
+                container_name = container.get("name")
+                container_identity = None
+                if envs := container.get("environment"):
+                    for env in envs:
+                        if env.get("name") == "IDENTITY":
+                            container_identity = env.get("value")
+                            break
+                result.append({"name": container_name, "identity": container_identity})
+            return result[0] if result else {}  # TODO: We just return one - that is all we normally have.
         @property  # noqa
         def annotation(self) -> str:
             annotation = ""
@@ -226,6 +258,7 @@ class AwsEcs:
         self._boto_ecs = BotoClient("ecs") if not isinstance(boto_ecs, BotoEcs) else boto_ecs
         self._blue_green = blue_green is True
         self._clusters = None
+        self._task_definitions = None
         self._nocolor = nocolor is True
         self._names = []
 
@@ -253,6 +286,26 @@ class AwsEcs:
         return None
 
     @property
+    def task_definitions(self) -> List[TaskDefinition]:
+        if self._task_definitions is None:
+            try:
+                task_definitions = []
+                if task_definition_arns := self._boto_ecs.list_task_definitions().get("taskDefinitionArns"):
+                    for task_definition_arn in task_definition_arns:
+                        task_definitions.append(AwsEcs.TaskDefinition(task_definition_arn))
+            except Exception:
+                pass
+            task_definitions_latest = []
+            last_task_definition = None
+            for task_definition in sorted(task_definitions, key=lambda item: item.task_definition_arn, reverse=True):
+                if last_task_definition and (task_definition.task_definition_name_unversioned ==
+                                             last_task_definition.task_definition_name_unversioned):
+                    continue
+                task_definitions_latest.append(task_definition)
+                last_task_definition = task_definition
+            self._task_definitions = task_definitions_latest
+        return self._task_definitions
+
     def unassociated_task_definition_names(self) -> List[str]:
         try:
             unassociated_task_definition_names = []
@@ -265,14 +318,6 @@ class AwsEcs:
         except Exception:
             pass
         return sorted(unassociated_task_definition_names)
-
-    @property
-    def unassociated_running_tasks(self) -> List[str]:
-        for cluster in self.clusters:
-            # TODO
-            # self._boto_ecs.describe_tasks(cluster=self.clusters[0].cluster_arn, tasks=['ONLY-ONE-IT_SEEMS'])
-            # cluster_running_task = cluster.running_tasks
-            pass
 
     def format_name(self, value: str, versioned: bool = True, shortened: bool = False) -> str:
         if versioned is False:
@@ -312,6 +357,9 @@ class AwsEcs:
     def _identity_swap(self, swap: bool = False) -> Tuple[Optional[Union[List[AwsEcs.TaskDefinitionSwap],
                                                                          AwsEcs]], Optional[str]]:
 
+        if self._is_fourfront:
+            return self._identity_swap_fourfront(swap)
+
         # Get the blue cluster.
         if not (blue_cluster := [cluster for cluster in self.clusters if cluster.is_blue]):
             return None, "Blue cluster not found."
@@ -331,6 +379,10 @@ class AwsEcs:
         # Sanity check service count.
         if len(blue_services) != len(green_services):
             return None, f"Different number of blue ({len(blue_services)}) and green ({len(green_services)}) services."
+
+        # Sanity check that both blue/green cluster are in the same mirrored or normal state.
+        if blue_cluster.is_mirrored != green_cluster.is_mirrored:
+            return None, "Blue and green clusters are in an inconsistent mirrored state."
 
         if swap is not True:
             swaps = []
@@ -359,19 +411,87 @@ class AwsEcs:
         else:
             return swaps, None
 
+    def _identity_swap_fourfront(self, swap: bool = False) -> Tuple[Optional[Union[List[AwsEcs.TaskDefinitionSwap],
+                                                                                   AwsEcs]], Optional[str]]:
+        # Get the blue cluster.
+        if not (blue_cluster := [cluster for cluster in self.clusters if cluster.is_blue]):
+            return None, "Blue cluster not found."
+        elif len(blue_cluster) > 1:
+            return None, f"Mutliple ({len(blue_cluster)}) blue clusters not found: TODO"
+        blue_cluster = blue_cluster[0]
+        blue_services = blue_cluster.services
+
+        # Get the green cluster.
+        if not (green_cluster := [cluster for cluster in self.clusters if cluster.is_green]):
+            return None, "Green cluster not found."
+        elif len(green_cluster) > 1:
+            return None, f"Mutliple ({len(green_cluster)}) green clusters not found: TODO"
+        green_cluster = green_cluster[0]
+        green_services = green_cluster.services
+
+        # Sanity check service count.
+        if len(blue_services) != len(green_services):
+            return None, f"Different number of blue ({len(blue_services)}) and green ({len(green_services)}) services."
+
+        # Sanity check that both blue/green cluster are in the same mirrored or normal state.
+        if (is_mirrored := blue_cluster.is_mirrored) != green_cluster.is_mirrored:
+            return None, "Blue and green clusters are in an inconsistent mirrored state."
+
+        task_definitions = self.task_definitions
+
+        # for task_definition in task_definitions: # xyzzy
+        #     if task_definition.blue_or_green and (task_definition.type == AwsEcs.PORTAL):
+        #         print(task_definition.task_definition_name)
+
+        if swap is not True:
+            swaps = []
+        if is_mirrored:
+            # Currently in mirrored state; change service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+            # to the corresponding service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontbluePortalService-gzKt8KiHZxlp
+            for blue_service in blue_services:
+                if not blue_service.task_definition:
+                    continue  # Should not happen
+                for task_definition in task_definitions:
+                    if ((task_definition.is_mirror is False) and
+                        (task_definition.type == blue_service.task_definition.type)):  # noqa
+                        if swap is True:
+                            # This is the actual swap (of the data - not actually in AWS of course) right here:
+                            blue_service.task_definition = task_definition
+                        else:
+                            # Record the proposed swap in list of TaskDefinitionSwap objects.
+                            swaps.append(AwsEcs.TaskDefinitionSwap(blue_service, task_definition))
+                            # TODO
+                        break
+        else:
+            # Currently in normal state; change service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontbluePortalService-gzKt8KiHZxlp
+            # to the corresponding service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+            pass
+
+        if swap is True:
+            return self, None
+        else:
+            return swaps, None
+
     def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False) -> AwsEcs:
         lines = []
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks)
+            cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
                 cluster_annotation = cluster.annotation
                 lines.append(
                       f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
-                      f"{f' | {cluster_annotation}' if cluster_annotation else ''}"
+                      f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__"
                       f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}")  # noqa
                 cluster_line_index = len(lines) - 1
                 service_running_task_total_count = 0
                 for service in services:
+                    if cluster.blue_or_green and (not service.is_mirrored):
+                        cluster_is_mirrored_state = False
                     service_aname = (service.dns_aname
                                      if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
                     service_cname = (service.dns_cname
@@ -395,6 +515,17 @@ class AwsEcs:
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
                         f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                    if True and (container := service.task_definition.container):
+                        lines.append(
+                                f"             CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
+                        )
+
+                if cluster_is_mirrored_state is True:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
+                elif cluster_is_mirrored_state is False:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | NORMAL")
+                else:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", "")
                 if cluster_running_task_count == service_running_task_total_count:
                     lines[cluster_line_index] += f" {chars.check}"
                 else:
@@ -461,6 +592,13 @@ class AwsEcs:
     @staticmethod
     def _is_ingester(value: str) -> bool:
         return AwsEcs._type(value) == AwsEcs.INGESTER
+
+    @property
+    def _is_fourfront(self) -> bool:
+        for cluster in self.clusters:
+            if "fourfront" not in cluster.cluster_name.lower():
+                return False
+        return True
 
     @staticmethod
     def _type(value: str) -> Optional[Literal[AwsEcs.TYPES]]:
@@ -581,10 +719,10 @@ def main():
                                            versioned=versioned_names, shortened=shortened_names)
             service_annotation = swap.service.get_annotation()
             task_definition_name = ecs.format_name(swap.service.task_definition.task_definition_name,
-                                                   versioned=versioned_names, shortened=shortened_names)
+                                                   versioned=True, shortened=shortened_names)
             task_definition_annotation = swap.service.task_definition.annotation
             new_task_definition_name = ecs.format_name(swap.new_task_definition.task_definition_name,
-                                                       versioned=versioned_names, shortened=shortened_names)
+                                                       versioned=True, shortened=shortened_names)
             new_task_definition_annotation = swap.new_task_definition.annotation
             print(f"\n- SERVICE: {service_name}{f' {service_annotation}' if service_annotation else ''}")
             print(f"  - CURRENT TASK: {task_definition_name}"
@@ -604,8 +742,6 @@ def main():
             print("Task definitions unassociated with any service:\n")
             for unassociated_task_definition_name in unassociated_task_definition_names:
                 print(f"- {unassociated_task_definition_name}")
-
-    # unassociated_running_tasks = ecs.unassociated_running_tasks
 
 
 if __name__ == "__main__":
