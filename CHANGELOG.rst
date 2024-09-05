@@ -6,7 +6,7 @@ hms-utils
 Change Log
 ----------
 
-1.2.0
+1.2.1
 =====
 * 2024-09-04/dmichaels
   - Hooks to "import" additional/multiple config/secrets documents (JSON) into Config;

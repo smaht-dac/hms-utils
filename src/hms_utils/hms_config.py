@@ -32,7 +32,10 @@ def main():
     config = None
     if args.config_file:
         try:
-            config = Config(args.config_file, path_separator=args.path_separator, nomacros=args.nomacros)
+            config = Config(args.config_file,
+                            config_imports=args.config_imports,
+                            secrets_imports=args.secrets_imports,
+                            path_separator=args.path_separator, nomacros=args.nomacros)
         except Exception as e:
             error(f"Cannot process config file: {args.config_file}", exception=e, trace=True)
 
@@ -112,11 +115,15 @@ def parse_args(argv: List[str]) -> object:
 
     class Args:
         config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
-        config_file = DEFAULT_CONFIG_FILE_NAME
-        secrets_file = DEFAULT_SECRETS_FILE_NAME
-        config_file_explicit = False
-        secrets_file_explicit = False
         config_dir_explicit = False
+        config_file = DEFAULT_CONFIG_FILE_NAME
+        config_file_explicit = False
+        config_imports = []
+        import_config_files = []
+        secrets_file = DEFAULT_SECRETS_FILE_NAME
+        secrets_file_explicit = False
+        secrets_imports = []
+        import_secrets_files = []
         path_separator = DEFAULT_PATH_SEPARATOR
         name = None
         names = []
@@ -124,6 +131,7 @@ def parse_args(argv: List[str]) -> object:
         yaml = False
         json = False
         json_formatted = False
+        raw = False
         show_secrets = False
         show_paths = False
         nocolor = False
@@ -160,12 +168,22 @@ def parse_args(argv: List[str]) -> object:
         elif arg in ["--config", "-config", "--conf", "-conf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
-            args.config_file = arg ; args.config_file_explicit = True ; argi += 1  # noqa
+            if not args.config_file_explicit:
+                args.config_file = arg
+                args.config_file_explicit = True
+            else:
+                args.import_config_files.append(arg)
+            argi += 1
         elif arg in ["--secrets-config", "-secrets-config", "--secrets-conf", "-secrets-conf", "--secret-config",
                      "-secret-config", "--secret-conf", "-secret-conf", "--secrets", "-secrets", "--secret", "-secret"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
-            args.secrets_file = arg ; args.secrets_file_explicit = True ; argi += 1  # noqa
+            if not args.secrets_file_explicit:
+                args.secrets_file = arg
+                args.secrets_file_explicit = True
+            else:
+                args.import_secrets_files.append(arg)
+            argi += 1
         elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
@@ -184,6 +202,8 @@ def parse_args(argv: List[str]) -> object:
         elif arg in ["--jsonf", "-jsonf"]:
             args.json = True
             args.json_formatted = True
+        elif arg in ["--raw", "-raw"]:
+            args.raw = True
         elif arg in ["--nocolor", "-nocolor"]:
             args.nocolor = True
         elif arg in ["--nomerge", "-nomerge"]:
@@ -230,6 +250,31 @@ def parse_args(argv: List[str]) -> object:
         error("No config or secrets file found.", usage=True)
     args.config_file = config_file
     args.secrets_file = secrets_file
+
+    for import_config_file in args.import_config_files:
+        # TODO: Refactor with other file resolution code; and with yaml support etc.
+        if not os.path.exists(import_config_file):
+            error(f"Cannot open (import) config file: {import_config_file}")
+        try:
+            with io.open(import_config_file) as f:
+                if not (config_import_json := json.load(f)):
+                    error(f"Cannot load (import) config file: {import_config_file}")
+        except Exception:
+            error(f"Cannot load (import) config file: {import_config_file}")
+        args.config_imports.append(config_import_json)
+
+    for import_secrets_file in args.import_secrets_files:
+        # TODO: Refactor with other file resolution code; and with yaml support etc.
+        if not os.path.exists(import_secrets_file):
+            error(f"Cannot open (import) secrets file: {import_secrets_file}")
+        try:
+            with io.open(import_secrets_file) as f:
+                if not (secrets_import_json := json.load(f)):
+                    error(f"Cannot load (import) secrets file: {import_secrets_file}")
+        except Exception:
+            error(f"Cannot load (import) secrets file: {import_secrets_file}")
+        args.secrets_imports.append(secrets_import_json)
+
     return args
 
 
@@ -337,7 +382,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
 
     if config:
         print(f"\n{config.file}:")
-        data = config.json if not args.debug else config.rawjson
+        data = config.json if not (args.debug or args.raw) else config.rawjson
         if not args.nosort:
             data = sort_dictionary(data)
         if args.yaml:
@@ -352,7 +397,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
                                   value_modifier=tree_value_modifier)
     if secrets:
         print(f"\n{secrets.file}:")
-        data = secrets.json if not args.debug else secrets.rawjson
+        data = secrets.json if not (args.debug or args.raw) else secrets.rawjson
         if args.yaml:
             print(yaml.dump(data))
         elif args.json:
@@ -448,6 +493,7 @@ class Config:
     _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
+                 config_imports: List[dict] = [], secrets_imports: List[dict] = [],
                  path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
         self._json = {}
         self._path_separator = path_separator
@@ -455,6 +501,8 @@ class Config:
         self.secrets = None
         self.merged_secrets = None
         self.unmerged_secrets = None
+        self._config_imports = config_imports
+        self._secrets_imports = secrets_imports
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._ignore_missing_macro = True
         self._stringize_non_primitive_types = True
@@ -474,7 +522,7 @@ class Config:
     def lookup(self, name: str, config: Optional[dict] = None,
                allow_dictionary: bool = False,
                _macro_expansion: bool = False,
-               _search_imported_docs: bool = True) -> Optional[str, dict]:
+               _search_imports: bool = True) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -490,7 +538,6 @@ class Config:
         value = None
         for index, name_component in enumerate(name_components := name.split(self._path_separator)):
             if value is not None:
-                import pdb ; pdb.set_trace()  # noqa
                 return None  # TODO: Why was this here and what could it mean?
             if not (name_component := name_component.strip()):
                 continue
@@ -505,9 +552,9 @@ class Config:
                                 # TODO: Maybe ore tricky stuff needed here.
                                 return macro_expanded_value
                         return value
-                if _search_imported_docs and (docs := self._imported):
+                if _search_imports and (docs := self._imports):
                     for doc in docs:
-                        if (value := self.lookup(name, doc, _search_imported_docs=False)) is not None:
+                        if (value := self.lookup(name, doc, _search_imports=False)) is not None:
                             if isinstance(value, dict) and (not allow_dictionary):
                                 return None
                             return value
@@ -521,16 +568,16 @@ class Config:
             return self._cleanjson(config)
         return None
 
-    def import_config(self, config: dict, name: Optional[str] = None) -> None:
+    def _import_config(self, config: dict, name: Optional[str] = None) -> None:
         if isinstance(config, dict) and config:
             self._json[f"{Config._IMPORTED_CONFIG_KEY_PREFIX}{name or ''}"] = config
 
-    def import_secrets(self, secrets: dict, name: Optional[str] = None) -> None:
+    def _import_secrets(self, secrets: dict, name: Optional[str] = None) -> None:
         if isinstance(secrets, dict) and secrets:
             self._json[f"{Config._IMPORTED_SECRETS_KEY_PREFIX}{name or ''}"] = secrets
 
     @property
-    def _imported(self) -> List[dict]:
+    def _imports(self) -> List[dict]:
         docs = []
         for key in self._json:
             if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
@@ -564,6 +611,10 @@ class Config:
                     self._json = yaml.safe_load(f)
                 else:
                     self._json = json.load(f)
+        for config_import in self._config_imports:
+            self._import_config(config_import)
+        for secrets_import in self._secrets_imports:
+            self._import_secrets(secrets_import)
         if self._expand_macros:
             _ = self._macro_expand(self._json)
 
