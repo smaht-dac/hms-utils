@@ -168,21 +168,27 @@ def parse_args(argv: List[str]) -> object:
         elif arg in ["--config", "-config", "--conf", "-conf"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
-            if not args.config_file_explicit:
-                args.config_file = arg
-                args.config_file_explicit = True
-            else:
-                args.import_config_files.append(arg)
+            args.config_file = arg
+            args.config_file_explicit = True
             argi += 1
         elif arg in ["--secrets-config", "-secrets-config", "--secrets-conf", "-secrets-conf", "--secret-config",
                      "-secret-config", "--secret-conf", "-secret-conf", "--secrets", "-secrets", "--secret", "-secret"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
-            if not args.secrets_file_explicit:
-                args.secrets_file = arg
-                args.secrets_file_explicit = True
-            else:
-                args.import_secrets_files.append(arg)
+            args.secrets_file = arg
+            args.secrets_file_explicit = True
+            argi += 1
+        elif arg in ["--import-config", "-import-config", "--import-conf", "-import-conf",
+                     "--iconfig", "-iconfig", "--iconf", "-iconf"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                _usage()
+            args.import_config_files.append(arg)
+            argi += 1
+        elif arg in ["--import-secrets", "-import-secrets", "--import-secret", "-import-secret",
+                     "--isecrets", "-isecrets", "--isecret", "-isecret"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                _usage()
+            args.import_secrets_files.append(arg)
             argi += 1
         elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
@@ -251,26 +257,33 @@ def parse_args(argv: List[str]) -> object:
     args.config_file = config_file
     args.secrets_file = secrets_file
 
+    # TODO: Refactor with other file resolution code; and with yaml support etc.
     for import_config_file in args.import_config_files:
-        # TODO: Refactor with other file resolution code; and with yaml support etc.
-        if not os.path.exists(import_config_file):
+        import_config_file = resolve_file_path(import_config_file, args.config_dir, file_explicit=True,
+                                               directory_explicit=args.config_dir_explicit)
+        if not import_config_file:
             error(f"Cannot open (import) config file: {import_config_file}")
         try:
             with io.open(import_config_file) as f:
-                if not (config_import_json := json.load(f)):
-                    error(f"Cannot load (import) config file: {import_config_file}")
+                if import_config_file.startswith(".yaml") or import_config_file.startswith(".yml"):
+                    config_import_json = yaml.safe_load(f)
+                else:
+                    config_import_json = json.load(f)
         except Exception:
             error(f"Cannot load (import) config file: {import_config_file}")
         args.config_imports.append(config_import_json)
 
     for import_secrets_file in args.import_secrets_files:
-        # TODO: Refactor with other file resolution code; and with yaml support etc.
+        import_secrets_file = resolve_file_path(import_secrets_file, args.config_dir, file_explicit=True,
+                                                directory_explicit=args.config_dir_explicit)
         if not os.path.exists(import_secrets_file):
             error(f"Cannot open (import) secrets file: {import_secrets_file}")
         try:
             with io.open(import_secrets_file) as f:
-                if not (secrets_import_json := json.load(f)):
-                    error(f"Cannot load (import) secrets file: {import_secrets_file}")
+                if import_secrets_file.startswith(".yaml") or import_secrets_file.startswith(".yml"):
+                    secrets_import_json = yaml.safe_load(f)
+                else:
+                    secrets_import_json = json.load(f)
         except Exception:
             error(f"Cannot load (import) secrets file: {import_secrets_file}")
         args.secrets_imports.append(secrets_import_json)
@@ -418,25 +431,6 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
 
 def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
 
-    def resolve_file_path(file: str, directory: Optional[str] = None,
-                          file_explicit: bool = False, directory_explicit: bool = False) -> Optional[str]:
-        if os.path.isabs(file := os.path.normpath(file or "")):
-            if not os.path.exists(file):
-                return None
-            return file
-        elif file_explicit and os.path.exists(file) and (not os.path.isdir(file)) and (not directory_explicit):
-            if not os.path.isabs(file):
-                file = os.path.join(os.path.abspath(os.curdir), file)
-            return file
-        elif os.path.isabs(directory := os.path.normpath(directory or "")):
-            if not os.path.isdir(directory):
-                return None
-        if not os.path.isdir(directory := os.path.normpath(os.path.join(os.path.abspath(os.curdir), directory))):
-            return None
-        elif not os.path.exists(file := os.path.join(directory, file)):
-            return None
-        return file
-
     def ensure_secrets_file_protected(file: str) -> bool:
         try:
             return stat.S_IMODE(os.stat(file).st_mode) in (0o600, 0o400)
@@ -466,13 +460,33 @@ def resolve_files(args: List[str]) -> Tuple[Optional[str], Optional[str]]:
                 secrets_file = args.secrets_file[:-5] + ".yaml"
                 secrets_file = resolve_file_path(secrets_file, args.config_dir,
                                                  file_explicit=args.secrets_file_explicit,
-                                                 directory_explicit=args.secrets_dir_explicit)
+                                                 directory_explicit=args.config_dir_explicit)
         if (not secrets_file) and args.secrets_file_explicit:
             error(f"Config secrets file not found: {args.config_file_explicit}")
         if not ensure_secrets_file_protected(secrets_file):
             warning(f"Your secrets file is not read protected from others: {secrets_file}")
 
     return config_file, secrets_file
+
+
+def resolve_file_path(file: str, directory: Optional[str] = None,
+                      file_explicit: bool = False, directory_explicit: bool = False) -> Optional[str]:
+    if os.path.isabs(file := os.path.normpath(file or "")):
+        if not os.path.exists(file):
+            return None
+        return file
+    elif file_explicit and os.path.exists(file) and (not os.path.isdir(file)) and (not directory_explicit):
+        if not os.path.isabs(file):
+            file = os.path.join(os.path.abspath(os.curdir), file)
+        return file
+    elif os.path.isabs(directory := os.path.normpath(directory or "")):
+        if not os.path.isdir(directory):
+            return None
+    if not os.path.isdir(directory := os.path.normpath(os.path.join(os.path.abspath(os.curdir), directory))):
+        return None
+    elif not os.path.exists(file := os.path.join(directory, file)):
+        return None
+    return file
 
 
 def path_basename(name: str, separator: str = DEFAULT_PATH_SEPARATOR) -> str:
