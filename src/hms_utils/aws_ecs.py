@@ -517,6 +517,7 @@ def main():
     shortened_names = False
     versioned_names = False
     identity_swap = False
+    show_unassociated_task_definitions = False
     nodns = False
     nocolor = False
 
@@ -543,6 +544,8 @@ def main():
             nodns = True
         elif (arg == "--nocolor") or (arg == "-nocolor") or (arg == "nocolor"):
             nocolor = True
+        elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
+            show_unassociated_task_definitions = True
         elif (arg == "--aws") or (arg == "-aws") or (arg == "--env") or (arg == "-env"):
             # Profile name from ~/.aws/config file.
             if ((argi := argi + 1) >= len(argv)) or (aws_profile := argv[argi]).startswith("-"):
@@ -596,10 +599,11 @@ def main():
             exit(1)
         ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns)
 
-    if unassociated_task_definition_names := ecs.unassociated_task_definition_names:
-        print("Task definitions unassociated with any service:\n")
-        for unassociated_task_definition_name in unassociated_task_definition_names:
-            print(f"- {unassociated_task_definition_name}")
+    if show_unassociated_task_definitions:
+        if unassociated_task_definition_names := ecs.unassociated_task_definition_names:
+            print("Task definitions unassociated with any service:\n")
+            for unassociated_task_definition_name in unassociated_task_definition_names:
+                print(f"- {unassociated_task_definition_name}")
 
     # unassociated_running_tasks = ecs.unassociated_running_tasks
 
