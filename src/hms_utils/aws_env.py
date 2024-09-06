@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from typing import List, Optional, Tuple
+from hms_utils.version_utils import get_version
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Convenience utility to view/manage SSO/Okta-based AWS credentials, defined in the ~/.aws/config file.
@@ -381,6 +382,9 @@ def main() -> None:
             current_export_file = args[argi]
         elif (arg == "--post-current-export-file"):  # to support aws_env.sh script
             post_current_export_file = args[argi]
+        elif arg in ["--version", "-version"]:
+            print(f"hms-utils version: {get_version()}")
+            exit(0)
         elif arg.startswith("-"):
             usage(1)
         elif profile_name_pattern:

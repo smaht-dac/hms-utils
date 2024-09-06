@@ -11,8 +11,9 @@ from typing import List, Literal, Optional, Tuple, Union
 from dcicutils.datetime_utils import format_datetime
 from dcicutils.misc_utils import format_size
 from dcicutils.secrets_utils import get_identity_secrets
-from hms_utils.chars import chars
 from hms_utils.aws.codebuild.utils import get_build_info
+from hms_utils.chars import chars
+from hms_utils.version_utils import get_version
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
 # Not literally swapping task-definitions between the two (blue/green) services,
@@ -843,42 +844,45 @@ def main():
                    "-greenblue", "greenblue", "--bg", "-bg", "bg", "--gb", "-gb", "gb"]:
             # Show only blue/green clusters/services/task-definitions.
             blue_green = True
-        elif (arg == "--short") or (arg == "-short") or (arg == "short"):
+        elif arg ["--short", "-short", "short"]:
             # Display shortened names for easier viewing if possible; removes longest common prefix.
             shortened_names = True
-        elif (arg == "--versioned") or (arg == "-versioned") or (arg == "versioned"):
+        elif arg in ["--versioned", "-versioned", "versioned"]:
             # Dot not lop off the ":n" from the end of task definition names.
             versioned_names = True
-        elif ((arg == "--identity-swap") or (arg == "-identity-swap") or (arg == "identity-swap") or
-              (arg == "--swap") or (arg == "-swap") or (arg == "swap")):
-            # Show identity swap plan.
+        elif arg in ["--identity-swap", "-identity-swap", "identity-swap", "--swap", "-swap", "swap"]:
+            # Show identity swap plan - not able to actually do anything. 
             identity_swap = True
-        elif (arg == "--nodns") or (arg == "-nodns") or (arg == "nodns"):
+        elif arg in ["--nodns", "-nodns", "nodns"]:
             nodns = True
             nohealth = True
         elif arg in ["--nocontainer", "-nocontainer", "nocontainer"]:
             nocontainer = True
         elif arg in ["--quick", "-quick", "quick", "--q", "-q"]:
             nocontainer = True
-        elif (arg == "--noimage") or (arg == "-noimage") or (arg == "noimage"):
+            nodns = True
+        elif arg in ["--noimage", "-noimage", "noimage"]:
             noimage = True
-        elif (arg == "--nogit") or (arg == "-nogit") or (arg == "nogit"):
+        elif arg in ["--nogit", "-nogit", "nogit"]:
             nogit = True
         elif arg in ["--notasks", "-notasks", "--notask", "-notask"]:
             notasks = True
         elif arg in ["--nohealth", "-nohealth"]:
             nohealth = True
-        elif (arg == "--nocolor") or (arg == "-nocolor") or (arg == "nocolor"):
+        elif arg in ["--nocolor", "-nocolor", "nocolor"]:
             nocolor = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
             show_unassociated_task_definitions = True
         elif arg in ["--verbose", "-verbose", "--verbose", "-verbose", "--v", "-v"]:
             verbose = True
-        elif (arg == "--aws") or (arg == "-aws") or (arg == "--env") or (arg == "-env"):
+        elif arg in ["--aws", "-aws", "--env", "-env"]:
             # Profile name from ~/.aws/config file.
             if ((argi := argi + 1) >= len(argv)) or (aws_profile := argv[argi]).startswith("-"):
                 usage()
             os.environ["AWS_PROFILE"] = aws_profile
+        elif arg in ["--version", "-version"]:
+            print(f"hms-utils version: {get_version()}")
+            exit(0)
         else:
             usage()
         argi += 1
@@ -935,7 +939,9 @@ def main():
         if error:
             print(error)
             exit(1)
-        ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns)
+        ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names,
+                          nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
+                          notasks=notasks, nohealth=nohealth, verbose=verbose)
 
     if show_unassociated_task_definitions:
         if unassociated_task_definition_names := ecs.unassociated_task_definition_names:

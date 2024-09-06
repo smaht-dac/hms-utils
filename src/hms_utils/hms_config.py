@@ -4,7 +4,6 @@ import io
 import json
 import os
 import re
-from importlib.metadata import version as get_package_version
 import stat
 import sys
 import traceback
@@ -15,6 +14,7 @@ from hms_utils.dictionary_utils import (
     delete_paths_from_dictionary, print_dictionary_list,
     print_dictionary_tree, sort_dictionary
 )
+from hms_utils.version_utils import get_version
 from hms_utils.terminal_utils import terminal_color as color
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
@@ -243,7 +243,7 @@ def parse_args(argv: List[str]) -> object:
             args.verbose = True
         elif arg in ["--version", "-version"]:
             print(f"hms-utils version: {get_version()}")
-            _usage()
+            exit(0)
         elif (arg in ["--help", "-help"]) or arg.startswith("-"):
             _usage()
         else:
@@ -803,13 +803,6 @@ class Config:
         remove_imported_configs(data)
         remove_parent_properties(data)
         return data
-
-
-def get_version(package_name: str = "hms-utils") -> str:
-    try:
-        return get_package_version(package_name)
-    except Exception:
-        return ""
 
 
 def warning(message: str) -> None:
