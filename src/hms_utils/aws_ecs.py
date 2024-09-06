@@ -511,10 +511,11 @@ class AwsEcs:
             # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
             # so that we will thenn end up in normal (non-mirrored state).
             for blue_service in blue_services:
+                blue_service_task_definition = blue_service.task_definition
                 for task_definition in task_definitions:
-                    if ((task_definition.type == blue_service.task_definition.type) and
-                        (task_definition.is_green is True) and
-                        (task_definition.is_mirror is True)):  # noqa
+                    if ((task_definition.type == blue_service_task_definition.type) and
+                        (task_definition.blue_or_green != blue_service_task_definition.blue_or_green) and
+                        (task_definition.is_mirror is False)):  # noqa
                         if swap is True:
                             # This is the actual swap (of the data here - not actually in AWS of course) right here:
                             blue_service.task_definition = task_definition
@@ -523,10 +524,11 @@ class AwsEcs:
                             swaps.append(AwsEcs.TaskDefinitionSwap(blue_service, task_definition))
                         break
             for green_service in green_services:
+                green_service_task_definition = green_service.task_definition
                 for task_definition in task_definitions:
-                    if ((task_definition.type == green_service.task_definition.type) and
-                        (task_definition.is_blue is True) and
-                        (task_definition.is_mirror is True)):  # noqa
+                    if ((task_definition.type == green_service_task_definition.type) and
+                        (task_definition.blue_or_green != green_service_task_definition.blue_or_green) and
+                        (task_definition.is_mirror is False)):  # noqa
                         if swap is True:
                             # This is the actual swap (of the data here - not actually in AWS of course) right here:
                             green_service.task_definition = task_definition
