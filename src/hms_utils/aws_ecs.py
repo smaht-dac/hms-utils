@@ -6,6 +6,7 @@ import os
 import sys
 from termcolor import colored
 from typing import List, Literal, Optional, Tuple, Union
+from dcicutils.secrets_utils import get_identity_secrets
 from hms_utils.chars import chars
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
@@ -226,12 +227,16 @@ class AwsEcs:
             for container in containers:
                 container_name = container.get("name")
                 container_identity = None
+                elasticsearch_server = None
                 if envs := container.get("environment"):
                     for env in envs:
                         if env.get("name") == "IDENTITY":
-                            container_identity = env.get("value")
+                            if container_identity := env.get("value"):
+                                elasticsearch_server = self._ecs._get_elasticsearch_server(container_identity)
                             break
-                result.append({"name": container_name, "identity": container_identity})
+                result.append({"name": container_name,
+                               "identity": container_identity,
+                               "elasticsearch": elasticsearch_server})
             return result[0] if result else {}  # TODO: We just return one - that is all we normally have.
         @property  # noqa
         def annotation(self) -> str:
@@ -446,29 +451,45 @@ class AwsEcs:
         if swap is not True:
             swaps = []
         if is_mirrored:
-            # Currently in mirrored state; change service tasks named like this:
+            # We are in mirrored state; for example, for a service named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
+            # we have service tasks named like this:
             # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
-            # to the corresponding service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontbluePortalService-gzKt8KiHZxlp
+            # so for the identity-swap we will repoint the service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
+            # so that we will thenn end up in normal (non-mirrored state).
             for blue_service in blue_services:
-                if not blue_service.task_definition:
-                    continue  # Should not happen
                 for task_definition in task_definitions:
-                    if ((task_definition.is_mirror is False) and
-                        (task_definition.type == blue_service.task_definition.type)):  # noqa
+                    if ((task_definition.type == blue_service.task_definition.type) and
+                        (task_definition.is_green is True) and
+                        (task_definition.is_mirror is True)):  # noqa
                         if swap is True:
-                            # This is the actual swap (of the data - not actually in AWS of course) right here:
+                            # This is the actual swap (of the data here - not actually in AWS of course) right here:
                             blue_service.task_definition = task_definition
                         else:
                             # Record the proposed swap in list of TaskDefinitionSwap objects.
                             swaps.append(AwsEcs.TaskDefinitionSwap(blue_service, task_definition))
-                            # TODO
+                        break
+            for green_service in green_services:
+                for task_definition in task_definitions:
+                    if ((task_definition.type == green_service.task_definition.type) and
+                        (task_definition.is_blue is True) and
+                        (task_definition.is_mirror is True)):  # noqa
+                        if swap is True:
+                            # This is the actual swap (of the data here - not actually in AWS of course) right here:
+                            green_service.task_definition = task_definition
+                        else:
+                            # Record the proposed swap in list of TaskDefinitionSwap objects.
+                            swaps.append(AwsEcs.TaskDefinitionSwap(green_service, task_definition))
                         break
         else:
-            # Currently in normal state; change service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontbluePortalService-gzKt8KiHZxlp
-            # to the corresponding service tasks named like this:
+            # We are in normal (non-mirrored) state; for example, for a service named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
+            # we have service tasks named like this:
+            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
+            # so for the identity-swap we will repoint the service tasks named like this:
             # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+            # so that we will end up in mirrored-state.
             pass
 
         if swap is True:
@@ -515,11 +536,14 @@ class AwsEcs:
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
                         f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
-                    if True and (container := service.task_definition.container):
+                    if container := service.task_definition.container:
                         lines.append(
                                 f"             CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
                         )
-
+                        if elasticsearch_server := container.get("elasticsearch"):
+                            lines.append(
+                                    f"             ELASTIC SEARCH: {self._unversioned_name(elasticsearch_server)}"
+                            )
                 if cluster_is_mirrored_state is True:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
                 elif cluster_is_mirrored_state is False:
@@ -563,6 +587,15 @@ class AwsEcs:
             return self._boto_ecs.describe_services(cluster=cluster_name, services=service_names)["services"]
         except Exception:
             return []
+
+    def _get_elasticsearch_server(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("ENCODED_ES_SERVER")
+
+    def _get_identity_secrets(self, identity: str) -> dict:
+        try:
+            return get_identity_secrets(identity_name=identity)
+        except Exception:
+            return {}
 
     @staticmethod
     def _is_blue(value: str) -> bool:

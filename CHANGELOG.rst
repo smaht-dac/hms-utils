@@ -1,16 +1,17 @@
-=========
-hms-utils
-=========
+======================
+hms-utils : CHANGE LOG
+======================
 
-----------
-Change Log
-----------
+1.2.5
+=====
+* 2024-09-05/dmichaels
+  - Improvements with more info to hms-aws-env.
 
 1.2.2
 =====
 * 2024-09-04/dmichaels
-  - Hooks to "import" additional/multiple config/secrets documents (JSON) into Config;
-    may eventually just replace special handling of (single) secrets.
+  - Hooks to "import" for hms-config additional/multiple config/secrets documents
+    into Config; may eventually just replace special handling of (single) secrets.
 
 1.1.56
 ======
