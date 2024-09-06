@@ -2,12 +2,15 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
+from functools import lru_cache
 import os
 import sys
 from termcolor import colored
 from typing import List, Literal, Optional, Tuple, Union
+from dcicutils.datetime_utils import format_datetime
 from dcicutils.secrets_utils import get_identity_secrets
 from hms_utils.chars import chars
+from hms_utils.aws.codebuild.utils import get_build_info
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
 # Not literally swapping task-definitions between the two (blue/green) services,
@@ -170,7 +173,7 @@ class AwsEcs:
                                         LoadBalancerArn=load_balancer_arn)["Listeners"]
                                     for listener in listeners:
                                         if listener.get("Port") == 443:
-                                            ssl_certificate_arn = listener['Certificates'][0]['CertificateArn']
+                                            ssl_certificate_arn = listener["Certificates"][0]["CertificateArn"]
                                             boto_acm = BotoClient("acm")
                                             certificate_info = boto_acm.describe_certificate(
                                                 CertificateArn=ssl_certificate_arn)
@@ -216,28 +219,73 @@ class AwsEcs:
         @property  # noqa
         def type(self) -> str:
             return AwsEcs._type(self.task_definition_name)
-        @property  # noqa
-        def container(self) -> dict:
+
+        def get_container(self, noimage: bool = False, nogit: bool = False) -> dict:
+
             try:
                 containers = self._ecs._boto_ecs.describe_task_definition(
                     taskDefinition=self.task_definition_name)["taskDefinition"].get("containerDefinitions")
             except Exception:
                 return {}
             result = []
+
+            @lru_cache
+            def get_image_build_info(image_repo: str, image_tag: str, image_digest: str) -> Optional[dict]:
+                if ((build_info := get_build_info(image_repo, image_tag)) and
+                    (build_info := build_info.get("latest")) and
+                    (build_digest := build_info.get("digest")) and
+                    (build_digest == image_digest)):  # noqa
+                    if git_repo := build_info.get("github"):
+                        return {
+                           "repo": git_repo.replace("https://github.com/", ""),
+                           "commit": build_info.get("commit"),
+                           "branch": build_info.get("branch")
+                        }
+                return None
+
             for container in containers:
                 container_name = container.get("name")
                 container_identity = None
                 elasticsearch_server = None
+                image = None ; image_size = None ; image_pushed_at = None ; image_digest = None  # noqa
+                git_commit = None ; git_branch = None ; git_repo = None  # noqa
                 if envs := container.get("environment"):
+                    # Get the IDENTITY associated with thie task-definition/container.
                     for env in envs:
                         if env.get("name") == "IDENTITY":
                             if container_identity := env.get("value"):
                                 elasticsearch_server = self._ecs._get_elasticsearch_server(container_identity)
                             break
+                # Get the ECR image associated with this container; looks like this:
+                # 643366669028.dkr.ecr.us-east-1.amazonaws.com/fourfront-production
+                if (not noimage) and (image := container.get("image")):
+                    image_info = self._ecs._get_ecr_image_info(image)
+                    image = image_info["name"]
+                    image_repo = image_info["repo"]
+                    image_tag = image_info["tag"]
+                    image_size = image_info["size"]
+                    image_pushed_at = format_datetime(image_info["pushed"])
+                    image_digest = image_info["digest"]
+                    if (not nogit) and (build_info := get_image_build_info(image_repo, image_tag, image_digest)):
+                        git_repo = build_info.get("repo")
+                        git_commit = build_info.get("commit")
+                        git_branch = build_info.get("branch")
                 result.append({"name": container_name,
                                "identity": container_identity,
+                               "image": image,
+                               "image_repo": image_repo,
+                               "image_tag": image_tag,
+                               "image_size": image_size,
+                               "image_pushed_at": image_pushed_at,
+                               "image_digest": image_digest,
+                               "git_repo": git_repo,
+                               "git_commit": git_commit,
+                               "git_branch": git_branch,
                                "elasticsearch": elasticsearch_server})
-            return result[0] if result else {}  # TODO: We just return one - that is all we normally have.
+
+            # We just return one - that is all we normally have. TODO: Ask if this is for us alway true.
+            return result[0] if result else {}
+
         @property  # noqa
         def annotation(self) -> str:
             annotation = ""
@@ -497,7 +545,10 @@ class AwsEcs:
         else:
             return swaps, None
 
-    def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False) -> AwsEcs:
+    def print(self, shortened_names: bool = False, versioned_names: bool = False,
+              nodns: bool = False, nocontainer: bool = False,
+              noimage: bool = False, nogit: bool = False,
+              verbose: bool = False) -> AwsEcs:
         lines = []
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks)
@@ -536,10 +587,23 @@ class AwsEcs:
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
                         f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
-                    if container := service.task_definition.container:
+                    if ((not nocontainer) and
+                        (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
                         lines.append(
                                 f"             CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
                         )
+                        if image := container.get("image"):
+                            image_pushed_at = container.get("image_pushed_at")
+                            image_size = container.get("size")
+                            lines.append(
+                                    f"             IMAGE: {image} ({image_size}) | PUSHED: {image_pushed_at}"
+                            )
+                            if git_repo := container.get("git_repo"):
+                                git_branch = container.get("git_branch")
+                                git_commit = container.get("git_commit")
+                                lines.append(
+                                        f"             GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}"
+                                )
                         if elasticsearch_server := container.get("elasticsearch"):
                             lines.append(
                                     f"             ELASTIC SEARCH: {self._unversioned_name(elasticsearch_server)}"
@@ -588,12 +652,33 @@ class AwsEcs:
         except Exception:
             return []
 
+    @lru_cache
     def _get_elasticsearch_server(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("ENCODED_ES_SERVER")
 
+    @lru_cache
     def _get_identity_secrets(self, identity: str) -> dict:
         try:
             return get_identity_secrets(identity_name=identity)
+        except Exception:
+            return {}
+
+    @lru_cache
+    def _get_ecr_image_info(self, image_name: str) -> dict:
+        try:
+            account_id, repo_with_tag = image_name.split(".")[0], image_name.split("/")[-1]
+            repo_name, image_tag = repo_with_tag.split(":")
+            ecr = BotoClient("ecr")
+            response = ecr.describe_images(repositoryName=repo_name,
+                                           imageIds=[{"imageTag": image_tag}], registryId=account_id)["imageDetails"][0]
+            return {
+                "name": os.path.basename(image_name),
+                "repo": repo_name,
+                "tag": image_tag,
+                "size": response["imageSizeInBytes"],
+                "pushed": response["imagePushedAt"],
+                "digest": response["imageDigest"]
+            }
         except Exception:
             return {}
 
@@ -690,7 +775,11 @@ def main():
     identity_swap = False
     show_unassociated_task_definitions = False
     nodns = False
+    nocontainer = False
+    noimage = False
+    nogit = False
     nocolor = False
+    verbose = False
 
     argi = 0
     while argi < len(argv := sys.argv[1:]):
@@ -713,10 +802,18 @@ def main():
             identity_swap = True
         elif (arg == "--nodns") or (arg == "-nodns") or (arg == "nodns"):
             nodns = True
+        elif (arg == "--nocontainer") or (arg == "-nocontainer") or (arg == "nocontainer"):
+            nocontainer = True
+        elif (arg == "--noimage") or (arg == "-noimage") or (arg == "noimage"):
+            noimage = True
+        elif (arg == "--nogit") or (arg == "-nogit") or (arg == "nogit"):
+            nogit = True
         elif (arg == "--nocolor") or (arg == "-nocolor") or (arg == "nocolor"):
             nocolor = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
             show_unassociated_task_definitions = True
+        elif arg in ["--verbose", "-verbose", "--verbose", "-verbose", "--v", "-v"]:
+            verbose = True
         elif (arg == "--aws") or (arg == "-aws") or (arg == "--env") or (arg == "-env"):
             # Profile name from ~/.aws/config file.
             if ((argi := argi + 1) >= len(argv)) or (aws_profile := argv[argi]).startswith("-"):
@@ -738,7 +835,8 @@ def main():
     print(f"Showing current ECS cluster info for AWS account: {ecs_account.account_number}"
           f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
 
-    ecs.print(shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns)
+    ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
+              nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit, verbose=verbose)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
