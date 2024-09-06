@@ -758,11 +758,11 @@ class AwsEcs:
     @staticmethod
     def _type(value: str) -> Optional[Literal[AwsEcs.TYPES]]:
         if isinstance(value, str):
-            if AwsEcs.PORTAL in value:
+            if AwsEcs.PORTAL.lower() in value.lower():
                 return AwsEcs.PORTAL
-            elif AwsEcs.INDEXER in value:
+            elif AwsEcs.INDEXER.lower() in value.lower():
                 return AwsEcs.INDEXER
-            elif AwsEcs.INGESTER in value:
+            elif AwsEcs.INGESTER.lower() in value.lower():
                 return AwsEcs.INGESTER
         return None
 

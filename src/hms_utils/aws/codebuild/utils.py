@@ -153,13 +153,14 @@ def get_aws_codebuild_digest(log_group: str, log_stream: str, image_tag: Optiona
     logs = BotoClient("logs")
     sha256_pattern = re.compile(r"sha256:([0-9a-f]{64})")
     # For some reason this (rarely-ish) intermittently fails with no error;
-    # the results just do not contain the digest; don't know why so try a few times.
-    ntries = 7
-    while ntries > 0:
-        if ntries > 1:
-            time.sleep(0.2)
-        log_events = logs.get_log_events(logGroupName=log_group,
-                                         logStreamName=log_stream, startFromHead=False)["events"]
+    # the results just do not contain the digest; don't know why so try a few (4) times.
+    for n in range(4):
+        if n > 1:
+            time.sleep(0.05)
+        if not (log_events := logs.get_log_events(logGroupName=log_group,
+                                                  logStreamName=log_stream, startFromHead=False)["events"]):
+            log_events = logs.get_log_events(logGroupName=log_group,
+                                             logStreamName=log_stream, startFromHead=True)["events"]
         for log_event in log_events:
             msg = log_event.get("message")
             # The entrypoint_deployment.bash script at least partially
@@ -169,5 +170,4 @@ def get_aws_codebuild_digest(log_group: str, log_stream: str, image_tag: Optiona
                 match = sha256_pattern.search(msg)
                 if match:
                     return "sha256:" + match.group(1)
-        ntries -= 1
     return None
