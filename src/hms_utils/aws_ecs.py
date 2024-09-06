@@ -414,6 +414,13 @@ class AwsEcs:
     def _identity_swap(self, swap: bool = False) -> Tuple[Optional[Union[List[AwsEcs.TaskDefinitionSwap],
                                                                          AwsEcs]], Optional[str]]:
 
+        # Sanity check that all clusters are in the same normal/mirrored state.
+        last_cluster = None
+        for cluster in self.clusters:
+            if (last_cluster is not None) and (last_cluster.is_mirrored != cluster.is_mirrored):
+                return None, "Not all clusters are in the same normal/mirrored state; something is wrong."
+            last_cluster = cluster
+
         if self._is_fourfront:
             return self._identity_swap_fourfront(swap)
 
@@ -496,55 +503,38 @@ class AwsEcs:
 
         task_definitions = self.task_definitions
 
-        # for task_definition in task_definitions: # xyzzy
-        #     if task_definition.blue_or_green and (task_definition.type == AwsEcs.PORTAL):
-        #         print(task_definition.task_definition_name)
-
         if swap is not True:
             swaps = []
-        if is_mirrored:
-            # We are in mirrored state; for example, for a service named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
-            # we have service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
-            # so for the identity-swap we will repoint the service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
-            # so that we will thenn end up in normal (non-mirrored state).
-            for blue_service in blue_services:
-                blue_service_task_definition = blue_service.task_definition
+
+        # When we are in a mirrored state; for example, for a service named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
+        # we have service tasks named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+        # so for the identity-swap we will repoint the service tasks named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
+        # so that we will then end up in a normal state.
+
+        # When we are in a normal state; for example, for a service named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
+        # we have service tasks named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
+        # so for the identity-swap we will repoint the service tasks named like this:
+        # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
+        # so that we will then end up in a mirrored state.
+
+        for cluster in self.clusters:
+            for service in cluster.services:
                 for task_definition in task_definitions:
-                    if ((task_definition.type == blue_service_task_definition.type) and
-                        (task_definition.blue_or_green != blue_service_task_definition.blue_or_green) and
-                        (task_definition.is_mirror is False)):  # noqa
+                    if ((task_definition.type == service.task_definition.type) and
+                        (task_definition.blue_or_green != service.task_definition.blue_or_green) and
+                        (task_definition.is_mirror == (not is_mirrored))):  # noqa
                         if swap is True:
                             # This is the actual swap (of the data here - not actually in AWS of course) right here:
-                            blue_service.task_definition = task_definition
+                            service.task_definition = task_definition
                         else:
                             # Record the proposed swap in list of TaskDefinitionSwap objects.
-                            swaps.append(AwsEcs.TaskDefinitionSwap(blue_service, task_definition))
+                            swaps.append(AwsEcs.TaskDefinitionSwap(service, task_definition))
                         break
-            for green_service in green_services:
-                green_service_task_definition = green_service.task_definition
-                for task_definition in task_definitions:
-                    if ((task_definition.type == green_service_task_definition.type) and
-                        (task_definition.blue_or_green != green_service_task_definition.blue_or_green) and
-                        (task_definition.is_mirror is False)):  # noqa
-                        if swap is True:
-                            # This is the actual swap (of the data here - not actually in AWS of course) right here:
-                            green_service.task_definition = task_definition
-                        else:
-                            # Record the proposed swap in list of TaskDefinitionSwap objects.
-                            swaps.append(AwsEcs.TaskDefinitionSwap(green_service, task_definition))
-                        break
-        else:
-            # We are in normal (non-mirrored) state; for example, for a service named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortalService-3fSt8wKOVlzF
-            # we have service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontgreenPortal-72ALIPiA0sNC
-            # so for the identity-swap we will repoint the service tasks named like this:
-            # - c4-ecs-fourfront-production-stack-FourfrontbluePortal-Mirror-puoq5pF2shUR
-            # so that we will end up in mirrored-state.
-            pass
 
         if swap is True:
             return self, None
@@ -915,8 +905,15 @@ def main():
         if error:
             print(error)
             exit(1)
+        if ecs.clusters[0].is_mirrored:
+            source_state = "MIRRORED"
+            target_state = "NORMAL"
+        else:
+            source_state = "NORMAL"
+            target_state = "MIRRORED"
         print(f"Showing proposed ECS identity swap plan for AWS account: {ecs_account.account_number}"
-              f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
+              f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''}"
+              f" | {source_state} {chars.rarrow} {target_state}")
         for swap in swaps:
             service_name = ecs.format_name(swap.service.service_name,
                                            versioned=versioned_names, shortened=shortened_names)
@@ -933,7 +930,7 @@ def main():
             print(f"     ▶▶ NEW TASK: {new_task_definition_name}"
                   f"{f' | {new_task_definition_annotation}' if new_task_definition_annotation else ''}")
         print()
-        print("It would look like this after the swap:")
+        print(f"It would look like this after the swap: {target_state}")
         ecs_swapped, error = ecs.identity_swap()
         if error:
             print(error)
