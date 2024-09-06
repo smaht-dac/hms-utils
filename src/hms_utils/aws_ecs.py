@@ -247,7 +247,8 @@ class AwsEcs:
                 container_name = container.get("name")
                 container_identity = None
                 elasticsearch_server = None
-                image = None ; image_size = None ; image_pushed_at = None ; image_digest = None  # noqa
+                image = None ; image_repo = None ; image_tag = None  # noqa
+                image_size = None ; image_pushed_at = None ; image_digest = None  # noqa
                 git_commit = None ; git_branch = None ; git_repo = None  # noqa
                 if envs := container.get("environment"):
                     # Get the IDENTITY associated with thie task-definition/container.
