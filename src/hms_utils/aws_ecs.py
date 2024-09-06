@@ -844,14 +844,14 @@ def main():
                    "-greenblue", "greenblue", "--bg", "-bg", "bg", "--gb", "-gb", "gb"]:
             # Show only blue/green clusters/services/task-definitions.
             blue_green = True
-        elif arg ["--short", "-short", "short"]:
+        elif arg in ["--short", "-short", "short"]:
             # Display shortened names for easier viewing if possible; removes longest common prefix.
             shortened_names = True
         elif arg in ["--versioned", "-versioned", "versioned"]:
             # Dot not lop off the ":n" from the end of task definition names.
             versioned_names = True
         elif arg in ["--identity-swap", "-identity-swap", "identity-swap", "--swap", "-swap", "swap"]:
-            # Show identity swap plan - not able to actually do anything. 
+            # Show identity swap plan - not able to actually do anything.
             identity_swap = True
         elif arg in ["--nodns", "-nodns", "nodns"]:
             nodns = True
