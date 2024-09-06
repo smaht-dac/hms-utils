@@ -796,10 +796,8 @@ def main():
     argi = 0
     while argi < len(argv := sys.argv[1:]):
         arg = argv[argi]
-        if ((arg == "--bluegreen") or (arg == "-bluegreen") or (arg == "bluegreen") or
-            (arg == "--greenblue") or (arg == "-greenblue") or (arg == "greenblue") or
-            (arg == "--bg") or (arg == "-bg") or (arg == "bg") or
-            (arg == "--gb") or (arg == "-gb") or (arg == "gb")):  # noqa
+        if arg in ["--bluegreen", "-bluegreen", "bluegreen", "--greenblue",
+                   "-greenblue", "greenblue", "--bg", "-bg", "bg", "--gb", "-gb", "gb"]:
             # Show only blue/green clusters/services/task-definitions.
             blue_green = True
         elif (arg == "--short") or (arg == "-short") or (arg == "short"):
@@ -814,7 +812,9 @@ def main():
             identity_swap = True
         elif (arg == "--nodns") or (arg == "-nodns") or (arg == "nodns"):
             nodns = True
-        elif (arg == "--nocontainer") or (arg == "-nocontainer") or (arg == "nocontainer"):
+        elif arg in ["--nocontainer", "-nocontainer", "nocontainer"]:
+            nocontainer = True
+        elif arg in ["--quick", "-quick", "quick", "--q", "-q"]:
             nocontainer = True
         elif (arg == "--noimage") or (arg == "-noimage") or (arg == "noimage"):
             noimage = True
@@ -844,7 +844,8 @@ def main():
         print("AWS credentials do not appear to be working.")
         exit(1)
 
-    print(f"Showing current ECS cluster info for AWS account: {ecs_account.account_number}"
+    print(f"Showing current ECS{' blue/green' if blue_green else ''} cluster info"
+          f" for AWS account: {ecs_account.account_number}"
           f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
 
     ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
