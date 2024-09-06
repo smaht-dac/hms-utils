@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.10
+1.2.11
 ======
 * 2024-09-05/dmichaels
   - Improvements with more info to hms-aws-env.
