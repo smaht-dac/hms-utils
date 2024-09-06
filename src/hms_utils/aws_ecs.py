@@ -4,10 +4,12 @@ from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
 from functools import lru_cache
 import os
+import requests
 import sys
 from termcolor import colored
 from typing import List, Literal, Optional, Tuple, Union
 from dcicutils.datetime_utils import format_datetime
+from dcicutils.misc_utils import format_size
 from dcicutils.secrets_utils import get_identity_secrets
 from hms_utils.chars import chars
 from hms_utils.aws.codebuild.utils import get_build_info
@@ -549,19 +551,21 @@ class AwsEcs:
 
     def print(self, shortened_names: bool = False, versioned_names: bool = False,
               nodns: bool = False, nocontainer: bool = False,
-              noimage: bool = False, nogit: bool = False,
-              verbose: bool = False) -> AwsEcs:
+              noimage: bool = False, nogit: bool = False, notasks: bool = False,
+              nohealth: bool = False, verbose: bool = False) -> AwsEcs:
         for cluster in self.clusters:
-            cluster_running_task_count = len(cluster.running_tasks)
+            cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
             lines = []
             cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
                 cluster_annotation = cluster.annotation
-                lines.append(
+                line = (
                       f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
                       f"__REPLACE_STAGING_DATA__"
-                      f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__"
-                      f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}")  # noqa
+                      f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__")  # noqa
+                if not notasks:
+                    line += f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}"
+                lines.append(line)
                 cluster_line_index = len(lines) - 1
                 service_running_task_total_count = 0
                 for service in services:
@@ -571,13 +575,17 @@ class AwsEcs:
                                      if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
                     service_cname = (service.dns_cname
                                      if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
-                    service_running_task_count = len(service.running_tasks)
+                    if (not nohealth) and service_aname:
+                        health = AwsEcs._get_health_page(service_cname or service_aname)
+                    else:
+                        health = None
+                    service_running_task_count = len(service.running_tasks) if (not notasks) else 0
                     service_running_task_total_count += service_running_task_count
                     service_mirror_indicator = '□' if service.is_mirrored else '-'
                     service_name = self.format_name(service.service_name,
                                                     shortened=shortened_names, versioned=versioned_names)
                     service_annotation = service.get_annotation(dns=not nodns)
-                    # TODO: Hack.
+                    # TODO: Hacky
                     if " STAGING " in service_annotation:
                         lines[cluster_line_index] = \
                             lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | STAGING")
@@ -594,32 +602,47 @@ class AwsEcs:
                           f"  {service_mirror_indicator} SERVICE: {service_name}"
                           f"{f' | {service_annotation}' if service_annotation else ''}")
                     if service_aname:
-                        lines.append(f"        DNS: {service_aname}"
-                                     f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
-                    lines.append(
+                        line = (f"        DNS: {service_aname}"
+                                f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
+                        if health:
+                            line += f" {chars.check if health else chars.xmark}"
+                            if health_blue_or_green := AwsEcs._get_blue_or_green_from_health(health):
+                                if ((cluster_is_mirrored_state and (cluster.blue_or_green != health_blue_or_green)) or
+                                    ((not cluster_is_mirrored_state) and
+                                     (cluster.blue_or_green == health_blue_or_green))):
+                                    line += chars.check
+                                else:
+                                    line += chars.xmark
+                                line += f" ({health_blue_or_green})"
+                        lines.append(line)
+                    line = (
                         f"    -- TASK: {task_definition_name}"
-                        f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}"
-                        f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                        f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
+                    if not notasks:
+                        line += (
+                            f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                    lines.append(line)
                     if ((not nocontainer) and
                         (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
+                        spaces = " " * 13
                         lines.append(
-                                f"             CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
+                                f"{spaces}CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
                         )
                         if image := container.get("image"):
                             image_pushed_at = container.get("image_pushed_at")
-                            image_size = container.get("size")
+                            image_size = container.get("image_size")
                             lines.append(
-                                    f"             IMAGE: {image} ({image_size}) | PUSHED: {image_pushed_at}"
+                                    f"{spaces}IMAGE: {image} ({format_size(image_size)}) | PUSHED: {image_pushed_at}"
                             )
                             if git_repo := container.get("git_repo"):
                                 git_branch = container.get("git_branch")
                                 git_commit = container.get("git_commit")
                                 lines.append(
-                                        f"             GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}"
+                                        f"{spaces}GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}"
                                 )
                         if elasticsearch_server := container.get("elasticsearch"):
                             lines.append(
-                                    f"             ELASTIC SEARCH: {self._unversioned_name(elasticsearch_server)}"
+                                    f"{spaces}ES: {self._unversioned_name(elasticsearch_server)}"
                             )
                 if cluster_is_mirrored_state is True:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
@@ -627,10 +650,11 @@ class AwsEcs:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | NORMAL")
                 else:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", "")
-                if cluster_running_task_count == service_running_task_total_count:
-                    lines[cluster_line_index] += f" {chars.check}"
-                else:
-                    lines[cluster_line_index] += f" {chars.xmark}"
+                if not notasks:
+                    if cluster_running_task_count == service_running_task_total_count:
+                        lines[cluster_line_index] += f" {chars.check}"
+                    else:
+                        lines[cluster_line_index] += f" {chars.xmark}"
             for line in lines:
                 print(line)
         print("")
@@ -704,7 +728,7 @@ class AwsEcs:
         return AwsEcs._blue_or_green(value) == AwsEcs.GREEN
 
     @staticmethod
-    def _blue_or_green(value: str) -> Literal[AwsEcs.BLUE_OR_GREEN]:
+    def _blue_or_green(value: str) -> Optional[Literal[AwsEcs.BLUE_OR_GREEN]]:
         if isinstance(value, str) and (value := value.lower()):
             blues = value.count(AwsEcs.BLUE)
             greens = value.count(AwsEcs.GREEN)
@@ -769,6 +793,30 @@ class AwsEcs:
                     return ""
         return prefix
 
+    @staticmethod
+    def _get_blue_or_green_from_health(health: Optional[dict]) -> Optional[Literal[AwsEcs.BLUE_OR_GREEN]]:
+        if isinstance(health, dict):
+            return AwsEcs._blue_or_green(health.get("beanstalk_env"))
+        return None
+
+    @staticmethod
+    def _get_health_page(url: str) -> Optional[dict]:
+        if isinstance(url, str):
+            if not (url := url.lower()).startswith("http"):
+                url = f"https://{url}"
+            url = f"{url}/health?format=json"
+            try:
+                return requests.get(url).json()
+            except Exception:
+                if url.startswith("https://"):
+                    url = url.replace(url, "https://", "http://")
+                else:
+                    url = url.replace(url, "http://", "https://")
+                try:
+                    return requests.get(url).json()
+                except Exception:
+                    return None
+
     def _terminal_color(self, value: str, color: str) -> str:
         if self._nocolor:
             return value
@@ -791,6 +839,8 @@ def main():
     nocontainer = False
     noimage = False
     nogit = False
+    notasks = False
+    nohealth = False
     nocolor = False
     verbose = False
 
@@ -813,6 +863,7 @@ def main():
             identity_swap = True
         elif (arg == "--nodns") or (arg == "-nodns") or (arg == "nodns"):
             nodns = True
+            nohealth = True
         elif arg in ["--nocontainer", "-nocontainer", "nocontainer"]:
             nocontainer = True
         elif arg in ["--quick", "-quick", "quick", "--q", "-q"]:
@@ -821,6 +872,10 @@ def main():
             noimage = True
         elif (arg == "--nogit") or (arg == "-nogit") or (arg == "nogit"):
             nogit = True
+        elif arg in ["--notasks", "-notasks", "--notask", "-notask"]:
+            notasks = True
+        elif arg in ["--nohealth", "-nohealth"]:
+            nohealth = True
         elif (arg == "--nocolor") or (arg == "-nocolor") or (arg == "nocolor"):
             nocolor = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
@@ -850,7 +905,8 @@ def main():
           f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
 
     ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
-              nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit, verbose=verbose)
+              nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
+              notasks=notasks, nohealth=nohealth, verbose=verbose)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
