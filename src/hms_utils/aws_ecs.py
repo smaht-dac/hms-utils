@@ -808,10 +808,12 @@ class AwsEcs:
             try:
                 return requests.get(url).json()
             except Exception:
+                import pdb ; pdb.set_trace()  # noqa
+                pass
                 if url.startswith("https://"):
-                    url = url.replace(url, "https://", "http://")
+                    url = url.replace("https://", "http://")
                 else:
-                    url = url.replace(url, "http://", "https://")
+                    url = url.replace("http://", "https://")
                 try:
                     return requests.get(url).json()
                 except Exception:
