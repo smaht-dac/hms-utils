@@ -360,6 +360,7 @@ class AwsEcs:
             self._task_definitions = task_definitions_latest
         return self._task_definitions
 
+    @property
     def unassociated_task_definition_names(self) -> List[str]:
         try:
             unassociated_task_definition_names = []
@@ -550,9 +551,9 @@ class AwsEcs:
               nodns: bool = False, nocontainer: bool = False,
               noimage: bool = False, nogit: bool = False,
               verbose: bool = False) -> AwsEcs:
-        lines = []
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks)
+            lines = []
             cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
                 cluster_annotation = cluster.annotation
@@ -630,8 +631,8 @@ class AwsEcs:
                     lines[cluster_line_index] += f" {chars.check}"
                 else:
                     lines[cluster_line_index] += f" {chars.xmark}"
-        for line in lines:
-            print(line)
+            for line in lines:
+                print(line)
         print("")
 
     def _list_clusters(self) -> List[str]:
