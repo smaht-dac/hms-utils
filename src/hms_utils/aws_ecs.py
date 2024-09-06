@@ -558,6 +558,7 @@ class AwsEcs:
                 cluster_annotation = cluster.annotation
                 lines.append(
                       f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
+                      f"__REPLACE_STAGING_DATA__"
                       f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__"
                       f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}")  # noqa
                 cluster_line_index = len(lines) - 1
@@ -575,6 +576,16 @@ class AwsEcs:
                     service_name = self.format_name(service.service_name,
                                                     shortened=shortened_names, versioned=versioned_names)
                     service_annotation = service.get_annotation(dns=not nodns)
+                    # TODO: Hack.
+                    if " STAGING " in service_annotation:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | STAGING")
+                    elif " DATA " in service_annotation:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | DATA")
+                    else:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", "")
                     task_definition_name = self.format_name(service.task_definition.task_definition_name,
                                                             shortened=shortened_names, versioned=versioned_names)
                     task_definition_annotation = service.task_definition.annotation
