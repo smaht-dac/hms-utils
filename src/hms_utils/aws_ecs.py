@@ -141,7 +141,8 @@ class AwsEcs:
             if self.blue_or_green:
                 if annotation:
                     annotation += " | "
-                annotation += self._ecs._terminal_color(self.blue_or_green.upper(), self.blue_or_green)
+                annotation += self._ecs._terminal_color(self.blue_or_green.upper(),
+                                                        self.blue_or_green, bold=False, underline=False)
             if self.is_mirrored and False:
                 if annotation:
                     annotation += " | "  # " ▶ "
@@ -596,6 +597,9 @@ class AwsEcs:
                     lines.append(f"  {service_mirror_indicator} SERVICE: {service_name}"
                                  f"{f' | {service_annotation}' if service_annotation else ''}")
                     if service_aname:
+                        if service_cname and cluster.blue_or_green:
+                            service_cname = self._terminal_color(service_cname,
+                                                                 service.task_definition.blue_or_green, underline=False)
                         line = (f"        DNS: {service_aname}"
                                 f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
                         if health:
@@ -817,10 +821,18 @@ class AwsEcs:
                 except Exception:
                     return None
 
-    def _terminal_color(self, value: str, color: str) -> str:
+    def _terminal_color(self, value: str, color: str,
+                        bold: bool = True, underline: bool = True, dark: bool = False) -> str:
         if self._nocolor:
             return value
-        return colored(value, color.lower(), attrs=["dark", "bold", "underline"])
+        attributes = []
+        if bold:
+            attributes.append("bold")
+        if underline:
+            attributes.append("underline")
+        if dark:
+            attributes.append("dark")
+        return colored(value, color.lower(), attrs=attributes)
 
 
 def usage() -> None:
