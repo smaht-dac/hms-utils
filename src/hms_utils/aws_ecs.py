@@ -2,6 +2,7 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
+from copy import deepcopy
 from functools import lru_cache
 import os
 import requests
@@ -259,6 +260,7 @@ class AwsEcs:
                         if env.get("name") == "IDENTITY":
                             if container_identity := env.get("value"):
                                 elasticsearch_server = self._ecs._get_elasticsearch_server(container_identity)
+                                database_server = self._ecs._get_database_server(container_identity)
                             break
                 # Get the ECR image associated with this container; looks like this:
                 # 643366669028.dkr.ecr.us-east-1.amazonaws.com/fourfront-production
@@ -285,7 +287,8 @@ class AwsEcs:
                                "git_repo": git_repo,
                                "git_commit": git_commit,
                                "git_branch": git_branch,
-                               "elasticsearch": elasticsearch_server})
+                               "elasticsearch": elasticsearch_server,
+                               "database": database_server})
 
             # We just return one - that is all we normally have. TODO: Ask if this is for us alway true.
             return result[0] if result else {}
@@ -548,14 +551,13 @@ class AwsEcs:
               nohealth: bool = False, verbose: bool = False) -> AwsEcs:
         for cluster in self.clusters:
             cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
-            lines = []
+            lines = [] ; container_lines_previous = None  # noqa
             cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
                 cluster_annotation = cluster.annotation
-                line = (
-                      f"\n- CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
-                      f"__REPLACE_STAGING_DATA__"
-                      f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__")  # noqa
+                line = (f"\n{chars.rarrow} CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
+                        f"__REPLACE_STAGING_DATA__"
+                        f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__")  # noqa
                 if not notasks:
                     line += f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}"
                 lines.append(line)
@@ -591,9 +593,8 @@ class AwsEcs:
                     task_definition_name = self.format_name(service.task_definition.task_definition_name,
                                                             shortened=shortened_names, versioned=versioned_names)
                     task_definition_annotation = service.task_definition.annotation
-                    lines.append(
-                          f"  {service_mirror_indicator} SERVICE: {service_name}"
-                          f"{f' | {service_annotation}' if service_annotation else ''}")
+                    lines.append(f"  {service_mirror_indicator} SERVICE: {service_name}"
+                                 f"{f' | {service_annotation}' if service_annotation else ''}")
                     if service_aname:
                         line = (f"        DNS: {service_aname}"
                                 f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
@@ -612,31 +613,8 @@ class AwsEcs:
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
                     if not notasks:
-                        line += (
-                            f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}")
+                        line += f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}"
                     lines.append(line)
-                    if ((not nocontainer) and
-                        (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
-                        spaces = " " * 13
-                        lines.append(
-                                f"{spaces}CONTAINER: {container['name']} | IDENTITY: {container['identity']}"
-                        )
-                        if image := container.get("image"):
-                            image_pushed_at = container.get("image_pushed_at")
-                            image_size = container.get("image_size")
-                            lines.append(
-                                    f"{spaces}IMAGE: {image} ({format_size(image_size)}) | PUSHED: {image_pushed_at}"
-                            )
-                            if git_repo := container.get("git_repo"):
-                                git_branch = container.get("git_branch")
-                                git_commit = container.get("git_commit")
-                                lines.append(
-                                        f"{spaces}GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}"
-                                )
-                        if elasticsearch_server := container.get("elasticsearch"):
-                            lines.append(
-                                    f"{spaces}ES: {self._unversioned_name(elasticsearch_server)}"
-                            )
                 if cluster_is_mirrored_state is True:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
                 elif cluster_is_mirrored_state is False:
@@ -648,6 +626,31 @@ class AwsEcs:
                         lines[cluster_line_index] += f" {chars.check}"
                     else:
                         lines[cluster_line_index] += f" {chars.xmark}"
+            for service in services:
+                if ((not nocontainer) and
+                    (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
+                    # The container info (for our purposes) is virtually always the same across services,
+                    # i.e. portal, indexer, and ingester, within the clustser; so we only show this once
+                    # per cluster, if all the info is exactly the same; we don't print container["name"] here
+                    # because that actually is not unique and that would mess this up for our common case.
+                    container_lines = [] 
+                    container_lines.append(f"   IDENTITY: {container['identity']}")
+                    if image := container.get("image"):
+                        image_pushed_at = container.get("image_pushed_at")
+                        image_size = container.get("image_size")
+                        container_lines.append(f"      IMAGE: {image}"
+                                     f" ({format_size(image_size)}) | PUSHED: {image_pushed_at}")
+                        if git_repo := container.get("git_repo"):
+                            git_branch = container.get("git_branch")
+                            git_commit = container.get("git_commit")
+                            container_lines.append( f"        GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}")
+                    if elasticsearch_server := container.get("elasticsearch"):
+                        container_lines.append(f"         ES: {self._unversioned_name(elasticsearch_server)}")
+                    if database_server := container.get("database"):
+                        container_lines.append(f"        RDS: {database_server}")
+                    if container_lines != container_lines_previous:
+                        lines += container_lines
+                    container_lines_previous = container_lines
             for line in lines:
                 print(line)
         print("")
@@ -685,6 +688,10 @@ class AwsEcs:
     @lru_cache
     def _get_elasticsearch_server(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("ENCODED_ES_SERVER")
+
+    @lru_cache
+    def _get_database_server(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("RDS_HOSTNAME")
 
     @lru_cache
     def _get_identity_secrets(self, identity: str) -> dict:

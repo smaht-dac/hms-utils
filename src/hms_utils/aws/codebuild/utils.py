@@ -1,5 +1,6 @@
 from __future__ import annotations
 from boto3 import client as BotoClient
+from functools import lru_cache
 import re
 import time
 from typing import Dict, Generator, List, Optional, Tuple
@@ -139,17 +140,18 @@ def _get_image_repo_and_tag(image_arn: str) -> Tuple[Optional[str], Optional[str
     return (parts[0], parts[1]) if len(parts) == 2 else (None, None)
 
 
+@lru_cache
 def get_build_info(image_repo: str, image_tag: str) -> Optional[Dict]:
     # Cache this result within the enclosing function; for the below services loop.
     build = get_aws_ecr_build_info(image_repo, image_tag)  # TODO , previous_builds=previous_builds)
     if True:  # include_build_digest:
         log_group = build.get("latest", {}).get("log_group")
         log_stream = build.get("latest", {}).get("log_stream")
-        build["latest"]["digest"] = get_aws_codebuild_digest(log_group, log_stream, image_tag)
+        build["latest"]["digest"] = _get_aws_codebuild_digest(log_group, log_stream, image_tag)
     return build
 
 
-def get_aws_codebuild_digest(log_group: str, log_stream: str, image_tag: Optional[str] = None) -> Optional[str]:
+def _get_aws_codebuild_digest(log_group: str, log_stream: str, image_tag: Optional[str] = None) -> Optional[str]:
     logs = BotoClient("logs")
     sha256_pattern = re.compile(r"sha256:([0-9a-f]{64})")
     # For some reason this (rarely-ish) intermittently fails with no error;
