@@ -1,5 +1,9 @@
+# Convenience utility to many JSON based configuration properties.
+
 from __future__ import annotations
+from boto3 import client as BotoClient
 from copy import deepcopy
+from functools import lru_cache
 import io
 import json
 import os
@@ -28,6 +32,10 @@ OBFUSCATED_VALUE = "********"
 def main():
 
     args = parse_args(sys.argv[1:])
+
+    # TODO
+    # After implementing the "import" thing I realized it could be generalized
+    # such that secrets couild be treate like this rather than treating them specially.
 
     config = None
     if args.config_file:
@@ -521,6 +529,12 @@ class Config:
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
+    _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _AWS_SECRET_MACRO_NAME_PREFIX = "aws-secret:"
+    _AWS_SECRET_MACRO_START = f"{_MACRO_START}{_AWS_SECRET_MACRO_NAME_PREFIX}"
+    _AWS_SECRET_MACRO_END = _MACRO_END
+    _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
+    _AWS_SECRET_NAME_NAME = "IDENTITY"
     _PARENT = "@@@__PARENT__@@@"
     _IMPORTED_CONFIG_KEY_PREFIX = "@@@__CONFIG__:"
     _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
@@ -596,18 +610,14 @@ class Config:
                 config = value
                 value = None
         if value is not None:
+            if not _macro_expansion:
+                # if self._is_aws_secret_macro(value):
+                if self._contains_aws_secret_macro(value):
+                    return self._expand_aws_secret_macros(value, context_name=name)
             return value
         elif config and allow_dictionary:
             return self._cleanjson(config)
         return None
-
-    def _import_config(self, config: dict, name: Optional[str] = None) -> None:
-        if isinstance(config, dict) and config:
-            self._json[f"{Config._IMPORTED_CONFIG_KEY_PREFIX}{name or ''}"] = config
-
-    def _import_secrets(self, secrets: dict, name: Optional[str] = None) -> None:
-        if isinstance(secrets, dict) and secrets:
-            self._json[f"{Config._IMPORTED_SECRETS_KEY_PREFIX}{name or ''}"] = secrets
 
     @property
     def _imports(self) -> List[dict]:
@@ -707,7 +717,7 @@ class Config:
             if not (match := Config._MACRO_PATTERN.search(value)):
                 break
             if (macro_name := match.group(1)) and (macro_value := self._lookup_macro_value(macro_name, data)):
-                if Config._is_macro(macro_value):
+                if Config._is_macro(macro_value) and (not self._is_aws_secret_macro(macro_value)):
                     original_simple_macros_to_retain[macro_value] = macro_name
                 #
                 # Note the _is_macro call above is a bit of a special case; if the macro we are expanding resolves
@@ -757,17 +767,6 @@ class Config:
                 value = value.replace(simple_macro, f"{Config._MACRO_START}{original_simple_macro}{Config._MACRO_END}")
         return value
 
-    def _get_parent(self, item: dict) -> Optional[dict]:
-        return self._imap.get(item.get(Config._PARENT))
-
-    def _set_parent(self, item: dict, parent: dict) -> None:
-        parent_id = id(parent)
-        self._imap[parent_id] = parent
-        item[Config._PARENT] = parent_id
-
-    def _is_parent(self, name: str) -> None:
-        return name == Config._PARENT
-
     @staticmethod
     def _is_macro(value: str) -> bool:
         return value.startswith(Config._MACRO_START) and value.endswith(Config._MACRO_END)
@@ -780,8 +779,85 @@ class Config:
         return False
 
     @staticmethod
+    def _is_aws_secret_macro_name(macro_name: str) -> bool:
+        return macro_name.startswith(Config._AWS_SECRET_MACRO_NAME_PREFIX)
+
+    @staticmethod
+    def _is_aws_secret_macro(macro: str) -> bool:
+        return (macro.startswith(Config._AWS_SECRET_MACRO_START) and
+                macro.endswith(Config._AWS_SECRET_MACRO_END))
+
+    @staticmethod
+    def _contains_aws_secret_macro(value: str) -> bool:
+        if (index := value.find(Config._AWS_SECRET_MACRO_START)) >= 0:
+            if value[index + len(Config._AWS_SECRET_MACRO_START):].find(Config._AWS_SECRET_MACRO_END) > 0:
+                return True
+        return False
+
+    def _expand_aws_secret_macros(self, value: str, context_name: str) -> Optional[str]:
+        while ((match := Config._AWS_SECRET_MACRO_PATTERN.search(value)) and
+               (secret_specifier := match.group(1))):
+            if macro_value := self._expand_aws_secret_macro(secret_specifier, context_name):
+                macro = f"{Config._AWS_SECRET_MACRO_START}{secret_specifier}{Config._AWS_SECRET_MACRO_END}"
+                value = value.replace(macro, macro_value)
+        return value
+
+    def _expand_aws_secret_macro(self, secret_specifier: str, context_name: str) -> Optional[str]:
+        if (index := secret_specifier.find(self._path_separator)) > 0:
+            secret_name = secret_specifier[index + 1:]
+            secrets_name = secret_specifier[0:index]
+        else:
+            secret_name = secret_specifier
+            secrets_name = None
+            if (index := context_name.rfind(self._path_separator)) > 0:
+                context_path = context_name[:index]
+                secrets_name_path = f"{context_path}/{Config._AWS_SECRET_NAME_NAME}"
+                secrets_name = self.lookup(secrets_name_path)
+        if secrets_name and secret_name:
+            return Config._lookup_aws_secret(secrets_name, secret_name)
+            try:
+                boto_secrets = BotoClient("secretsmanager")
+                if ((secrets := boto_secrets.get_secret_value(SecretId=secrets_name)) and
+                    (secrets := json.loads(secrets.get("SecretString")))):  # noqa
+                    return secrets.get(secret_name)
+            except Exception:
+                pass
+        return secret_specifier
+
+    @staticmethod
+    @lru_cache(maxsize=64)
+    def _lookup_aws_secret(secrets_name: str, secret_name: str) -> Optional[str]:
+        try:
+            boto_secrets = BotoClient("secretsmanager")
+            if secrets := boto_secrets.get_secret_value(SecretId=secrets_name):
+                if secrets := json.loads(secrets.get("SecretString")):
+                    return secrets.get(secret_name)
+        except Exception:
+            import pdb ; pdb.set_trace()  # noqa
+            return None
+
+    def _import_config(self, config: dict, name: Optional[str] = None) -> None:
+        if isinstance(config, dict) and config:
+            self._json[f"{Config._IMPORTED_CONFIG_KEY_PREFIX}{name or ''}"] = config
+
+    def _import_secrets(self, secrets: dict, name: Optional[str] = None) -> None:
+        if isinstance(secrets, dict) and secrets:
+            self._json[f"{Config._IMPORTED_SECRETS_KEY_PREFIX}{name or ''}"] = secrets
+
+    @staticmethod
     def _is_primitive_type(value: Any) -> bool:  # noqa
         return isinstance(value, (int, float, str, bool))
+
+    def _get_parent(self, item: dict) -> Optional[dict]:
+        return self._imap.get(item.get(Config._PARENT))
+
+    def _set_parent(self, item: dict, parent: dict) -> None:
+        parent_id = id(parent)
+        self._imap[parent_id] = parent
+        item[Config._PARENT] = parent_id
+
+    def _is_parent(self, name: str) -> None:
+        return name == Config._PARENT
 
     @staticmethod
     def _cleanjson(data: dict) -> dict:
