@@ -513,7 +513,7 @@ def main() -> None:
             nonlocal aws_profile_results
             aws_profile_results[aws_profile] = verify_aws_account(aws_profile)
         run_concurrently([lambda item=item: function(item) for item in aws_profiles_selected], nthreads=12)
-        for aws_profile in aws_profile_results:
+        for aws_profile in sorted(aws_profile_results, key=lambda item: item.name):
             print_aws_profile_line(aws_profile, nocheck=nocheck, current=current, login=login, verbose=verbose,
                                    verified_result=aws_profile_results[aws_profile])
     else:
