@@ -26,6 +26,7 @@ DEFAULT_CONFIG_FILE_NAME = "config.json"
 DEFAULT_SECRETS_FILE_NAME = "secrets.json"
 DEFAULT_PATH_SEPARATOR = "/"
 DEFAULT_EXPORT_NAME_SEPARATOR = ":"
+AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
 OBFUSCATED_VALUE = "********"
 
 
@@ -77,6 +78,10 @@ def main():
                 export_name = path_basename(name, args.path_separator)
             found = False ; found_dictionary = False  # noqa
             if merged_config and ((value := merged_config.lookup(name, allow_dictionary=True)) is not None):
+                if (export_name == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                    # Special case to handle list of paths the first of which specifies AWS_PROFILE,
+                    # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
+                    os.environ[AWS_PROFILE_ENV_NAME] = value
                 if isinstance(value, dict):
                     # Special case: If target name/path is a dictionary then
                     # generate exports for every (non-dictionary) key/value within.
