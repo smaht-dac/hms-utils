@@ -676,11 +676,11 @@ class AwsEcs:
                 noimage=noimage, nogit=nogit, notasks=notasks, nohealth=nohealth, verbose=verbose, noprint=True)
             cluster_results[cluster] = cluster_lines
         if noasync is not True:
-            functions = []
-            for cluster in self.clusters:
-                functions.append(lambda cluster=cluster: print_cluster(cluster))
+            functions = [lambda cluster=cluster: print_cluster(cluster) for cluster in self.clusters]
             run_concurrently(functions, nthreads=8)
-            for cluster in cluster_results:  # TODO: Sort by cluster - (not item.blue_or_green, item.cluster_name)
+            cluster_results = dict(sorted(cluster_results.items(),
+                                          key=lambda cluster: (not cluster[0].blue_or_green, cluster[0].cluster_name)))
+            for cluster in cluster_results:
                 cluster_lines = cluster_results[cluster]
                 for cluster_line in cluster_lines:
                     print(cluster_line)
