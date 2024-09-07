@@ -193,8 +193,8 @@ class AwsEcs:
                         if git_repo := container.get("git_repo"):
                             git_branch = container.get("git_branch")
                             git_commit = container.get("git_commit")
-                            container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} BRANCH: {git_branch}"
-                                                   f" {chars.dot_hollow} COMMIT: ({git_commit})")
+                            container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} {git_branch}"
+                                                   f" {chars.dot_hollow} {git_commit}")
                     if elasticsearch_server := container.get("elasticsearch"):
                         container_lines.append(f"         ES: {self._ecs._unversioned_name(elasticsearch_server)}")
                     if database_server := container.get("database"):
