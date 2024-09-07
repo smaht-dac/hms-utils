@@ -1,7 +1,11 @@
 class chars:
     check = "✓"
     xmark = "✗"
+    dot = "•"
+    dot_hollow = "◦"
+    diamond = "❖"
     rarrow = "▶"
     larrow = "◀"
     rarrow_hollow = "▷"
     larrow_hollow = "◁"
+    square_hollow = "□"

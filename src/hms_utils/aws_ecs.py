@@ -576,7 +576,7 @@ class AwsEcs:
                         health = None
                     service_running_task_count = len(service.running_tasks) if (not notasks) else 0
                     service_running_task_total_count += service_running_task_count
-                    service_mirror_indicator = '□' if service.is_mirrored else '-'
+                    service_mirror_indicator = chars.square_hollow if service.is_mirrored else '-'
                     service_name = self.format_name(service.service_name,
                                                     shortened=shortened_names, versioned=versioned_names)
                     service_annotation = service.get_annotation(dns=not nodns)
@@ -642,12 +642,12 @@ class AwsEcs:
                         image_pushed_at = container.get("image_pushed_at")
                         image_size = container.get("image_size")
                         container_lines.append(f"      IMAGE: {image}"
-                                               f" ({format_size(image_size)}) | PUSHED: {image_pushed_at}")
+                                               f" ({format_size(image_size)}) {chars.dot_hollow} {image_pushed_at}")
                         if git_repo := container.get("git_repo"):
                             git_branch = container.get("git_branch")
                             git_commit = container.get("git_commit")
-                            container_lines.append(
-                                f"        GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}")
+                            container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} BRANCH: {git_branch}"
+                                                   f" {chars.dot_hollow} COMMIT: ({git_commit})")
                     if elasticsearch_server := container.get("elasticsearch"):
                         container_lines.append(f"         ES: {self._unversioned_name(elasticsearch_server)}")
                     if database_server := container.get("database"):
@@ -947,7 +947,7 @@ def main():
             new_task_definition_name = ecs.format_name(swap.new_task_definition.task_definition_name,
                                                        versioned=True, shortened=shortened_names)
             new_task_definition_annotation = swap.new_task_definition.annotation
-            print(f"\n- SERVICE: {service_name}{f' {service_annotation}' if service_annotation else ''}")
+            print(f"\n- SERVICE: {service_name}{f' | {service_annotation}' if service_annotation else ''}")
             print(f"  - CURRENT TASK: {task_definition_name}"
                   f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
             print(f"     ▶▶ NEW TASK: {new_task_definition_name}"
