@@ -2,7 +2,6 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
-from copy import deepcopy
 from functools import lru_cache
 import os
 import requests
@@ -142,7 +141,7 @@ class AwsEcs:
                 if annotation:
                     annotation += " | "
                 annotation += self._ecs._terminal_color(self.blue_or_green.upper(),
-                                                        self.blue_or_green, bold=False, underline=False)
+                                                        self.blue_or_green, underline=False)
             if self.is_mirrored and False:
                 if annotation:
                     annotation += " | "  # " ▶ "
@@ -611,7 +610,7 @@ class AwsEcs:
                                     line += chars.check
                                 else:
                                     line += chars.xmark
-                                line += f" ({health_blue_or_green})"
+                                # line += f" ({health_blue_or_green})"
                         lines.append(line)
                     line = (
                         f"    -- TASK: {task_definition_name}"
@@ -637,17 +636,18 @@ class AwsEcs:
                     # i.e. portal, indexer, and ingester, within the clustser; so we only show this once
                     # per cluster, if all the info is exactly the same; we don't print container["name"] here
                     # because that actually is not unique and that would mess this up for our common case.
-                    container_lines = [] 
+                    container_lines = []
                     container_lines.append(f"   IDENTITY: {container['identity']}")
                     if image := container.get("image"):
                         image_pushed_at = container.get("image_pushed_at")
                         image_size = container.get("image_size")
                         container_lines.append(f"      IMAGE: {image}"
-                                     f" ({format_size(image_size)}) | PUSHED: {image_pushed_at}")
+                                               f" ({format_size(image_size)}) | PUSHED: {image_pushed_at}")
                         if git_repo := container.get("git_repo"):
                             git_branch = container.get("git_branch")
                             git_commit = container.get("git_commit")
-                            container_lines.append( f"        GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}")
+                            container_lines.append(
+                                f"        GIT: {git_repo} | BRANCH: {git_branch} | COMMIT: {git_commit}")
                     if elasticsearch_server := container.get("elasticsearch"):
                         container_lines.append(f"         ES: {self._unversioned_name(elasticsearch_server)}")
                     if database_server := container.get("database"):
