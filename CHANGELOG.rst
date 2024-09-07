@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.24
+1.2.25
 ======
 * 2024-09-07/dmichaels
   - Added async capability to hms-aws-env for a bit faster response.
