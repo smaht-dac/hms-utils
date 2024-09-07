@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.14
+1.2.16
 ======
 * 2024-09-06/dmichaels
   - Got identity-swap preview working for 4dn style swapping in hms-aws-env.
