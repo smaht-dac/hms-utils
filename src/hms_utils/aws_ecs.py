@@ -13,6 +13,7 @@ from dcicutils.misc_utils import format_size
 from dcicutils.secrets_utils import get_identity_secrets
 from hms_utils.aws.codebuild.utils import get_build_info
 from hms_utils.chars import chars
+from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
@@ -87,6 +88,124 @@ class AwsEcs:
                     if service.type == service_type:
                         sorted_services.append(service)
             return sorted_services
+
+        def print_cluster(self, shortened_names: bool = False, versioned_names: bool = False,
+                          nodns: bool = False, nocontainer: bool = False,
+                          noimage: bool = False, nogit: bool = False, notasks: bool = False,
+                          nohealth: bool = False, verbose: bool = False, noprint: bool = False) -> Optional[str]:
+
+            cluster = self
+            cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
+            lines = [] ; container_lines_previous = None  # noqa
+            cluster_is_mirrored_state = True if cluster.blue_or_green else None
+            if services := cluster.services:
+                cluster_annotation = cluster.annotation
+                line = (f"\n{chars.rarrow} CLUSTER:"
+                        f" {self._ecs.format_name(cluster.cluster_name, shortened=shortened_names)}"
+                        f"__REPLACE_STAGING_DATA__"
+                        f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__")  # noqa
+                if not notasks:
+                    line += f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}"
+                lines.append(line)
+                cluster_line_index = len(lines) - 1
+                service_running_task_total_count = 0
+                for service in services:
+                    if cluster.blue_or_green and (not service.is_mirrored):
+                        cluster_is_mirrored_state = False
+                    service_aname = (service.dns_aname
+                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
+                    service_cname = (service.dns_cname
+                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
+                    if (not nohealth) and service_aname:
+                        health = AwsEcs._get_health_page(service_cname or service_aname)
+                    else:
+                        health = None
+                    service_running_task_count = len(service.running_tasks) if (not notasks) else 0
+                    service_running_task_total_count += service_running_task_count
+                    service_mirror_indicator = chars.square_hollow if service.is_mirrored else '-'
+                    service_name = self._ecs.format_name(service.service_name,
+                                                         shortened=shortened_names, versioned=versioned_names)
+                    service_annotation = service.get_annotation(dns=not nodns)
+                    # TODO: Hacky
+                    if " STAGING " in service_annotation:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | STAGING")
+                    elif " DATA " in service_annotation:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | DATA")
+                    else:
+                        lines[cluster_line_index] = \
+                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", "")
+                    task_definition_name = self._ecs.format_name(service.task_definition.task_definition_name,
+                                                                 shortened=shortened_names, versioned=versioned_names)
+                    task_definition_annotation = service.task_definition.annotation
+                    lines.append(f"  {service_mirror_indicator} SERVICE: {service_name}"
+                                 f"{f' | {service_annotation}' if service_annotation else ''}")
+                    if service_aname:
+                        if service_cname and cluster.blue_or_green:
+                            service_cname = self._ecs._terminal_color(service_cname,
+                                                                      service.task_definition.blue_or_green,
+                                                                      underline=False)
+                        line = (f"        DNS: {service_aname}"
+                                f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
+                        if health:
+                            line += f" {chars.check if health else chars.xmark}"
+                            if health_blue_or_green := AwsEcs._get_blue_or_green_from_health(health):
+                                if ((cluster_is_mirrored_state and (cluster.blue_or_green != health_blue_or_green)) or
+                                    ((not cluster_is_mirrored_state) and
+                                     (cluster.blue_or_green == health_blue_or_green))):
+                                    line += chars.check
+                                else:
+                                    line += chars.xmark
+                                # line += f" ({health_blue_or_green})"
+                        lines.append(line)
+                    line = (
+                        f"    -- TASK: {task_definition_name}"
+                        f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
+                    if not notasks:
+                        line += f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}"
+                    lines.append(line)
+                if cluster_is_mirrored_state is True:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
+                elif cluster_is_mirrored_state is False:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | NORMAL")
+                else:
+                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", "")
+                if not notasks:
+                    if cluster_running_task_count == service_running_task_total_count:
+                        lines[cluster_line_index] += f" {chars.check}"
+                    else:
+                        lines[cluster_line_index] += f" {chars.xmark}"
+            for service in services:
+                if ((not nocontainer) and
+                    (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
+                    # The container info (for our purposes) is virtually always the same across services,
+                    # i.e. portal, indexer, and ingester, within the clustser; so we only show this once
+                    # per cluster, if all the info is exactly the same; we don't print container["name"] here
+                    # because that actually is not unique and that would mess this up for our common case.
+                    container_lines = []
+                    container_lines.append(f"   IDENTITY: {container['identity']}")
+                    if image := container.get("image"):
+                        image_pushed_at = container.get("image_pushed_at")
+                        image_size = container.get("image_size")
+                        container_lines.append(f"      IMAGE: {image}"
+                                               f" ({format_size(image_size)}) {chars.dot_hollow} {image_pushed_at}")
+                        if git_repo := container.get("git_repo"):
+                            git_branch = container.get("git_branch")
+                            git_commit = container.get("git_commit")
+                            container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} BRANCH: {git_branch}"
+                                                   f" {chars.dot_hollow} COMMIT: ({git_commit})")
+                    if elasticsearch_server := container.get("elasticsearch"):
+                        container_lines.append(f"         ES: {self._ecs._unversioned_name(elasticsearch_server)}")
+                    if database_server := container.get("database"):
+                        container_lines.append(f"        RDS: {database_server}")
+                    if container_lines != container_lines_previous:
+                        lines += container_lines
+                    container_lines_previous = container_lines
+            if noprint is not True:
+                for line in lines:
+                    print(line)
+            return None if (noprint is not True) else lines
 
     class Service:
         def __init__(self, cluster: AwsEcs.Cluster, service_name: str, service_arn: str,
@@ -545,118 +664,29 @@ class AwsEcs:
         else:
             return swaps, None
 
-    def print(self, shortened_names: bool = False, versioned_names: bool = False,
-              nodns: bool = False, nocontainer: bool = False,
-              noimage: bool = False, nogit: bool = False, notasks: bool = False,
-              nohealth: bool = False, verbose: bool = False) -> AwsEcs:
-        for cluster in self.clusters:
-            cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
-            lines = [] ; container_lines_previous = None  # noqa
-            cluster_is_mirrored_state = True if cluster.blue_or_green else None
-            if services := cluster.services:
-                cluster_annotation = cluster.annotation
-                line = (f"\n{chars.rarrow} CLUSTER: {self.format_name(cluster.cluster_name, shortened=shortened_names)}"
-                        f"__REPLACE_STAGING_DATA__"
-                        f"{f' | {cluster_annotation}' if cluster_annotation else ''}__REPLACEBELOW__")  # noqa
-                if not notasks:
-                    line += f"{f' | ({cluster_running_task_count})' if cluster_running_task_count > 0 else ''}"
-                lines.append(line)
-                cluster_line_index = len(lines) - 1
-                service_running_task_total_count = 0
-                for service in services:
-                    if cluster.blue_or_green and (not service.is_mirrored):
-                        cluster_is_mirrored_state = False
-                    service_aname = (service.dns_aname
-                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
-                    service_cname = (service.dns_cname
-                                     if (not nodns) and AwsEcs._is_portal(service.service_name) else None)
-                    if (not nohealth) and service_aname:
-                        health = AwsEcs._get_health_page(service_cname or service_aname)
-                    else:
-                        health = None
-                    service_running_task_count = len(service.running_tasks) if (not notasks) else 0
-                    service_running_task_total_count += service_running_task_count
-                    service_mirror_indicator = chars.square_hollow if service.is_mirrored else '-'
-                    service_name = self.format_name(service.service_name,
-                                                    shortened=shortened_names, versioned=versioned_names)
-                    service_annotation = service.get_annotation(dns=not nodns)
-                    # TODO: Hacky
-                    if " STAGING " in service_annotation:
-                        lines[cluster_line_index] = \
-                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | STAGING")
-                    elif " DATA " in service_annotation:
-                        lines[cluster_line_index] = \
-                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | DATA")
-                    else:
-                        lines[cluster_line_index] = \
-                            lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", "")
-                    task_definition_name = self.format_name(service.task_definition.task_definition_name,
-                                                            shortened=shortened_names, versioned=versioned_names)
-                    task_definition_annotation = service.task_definition.annotation
-                    lines.append(f"  {service_mirror_indicator} SERVICE: {service_name}"
-                                 f"{f' | {service_annotation}' if service_annotation else ''}")
-                    if service_aname:
-                        if service_cname and cluster.blue_or_green:
-                            service_cname = self._terminal_color(service_cname,
-                                                                 service.task_definition.blue_or_green, underline=False)
-                        line = (f"        DNS: {service_aname}"
-                                f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
-                        if health:
-                            line += f" {chars.check if health else chars.xmark}"
-                            if health_blue_or_green := AwsEcs._get_blue_or_green_from_health(health):
-                                if ((cluster_is_mirrored_state and (cluster.blue_or_green != health_blue_or_green)) or
-                                    ((not cluster_is_mirrored_state) and
-                                     (cluster.blue_or_green == health_blue_or_green))):
-                                    line += chars.check
-                                else:
-                                    line += chars.xmark
-                                # line += f" ({health_blue_or_green})"
-                        lines.append(line)
-                    line = (
-                        f"    -- TASK: {task_definition_name}"
-                        f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
-                    if not notasks:
-                        line += f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}"
-                    lines.append(line)
-                if cluster_is_mirrored_state is True:
-                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
-                elif cluster_is_mirrored_state is False:
-                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | NORMAL")
-                else:
-                    lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", "")
-                if not notasks:
-                    if cluster_running_task_count == service_running_task_total_count:
-                        lines[cluster_line_index] += f" {chars.check}"
-                    else:
-                        lines[cluster_line_index] += f" {chars.xmark}"
-            for service in services:
-                if ((not nocontainer) and
-                    (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
-                    # The container info (for our purposes) is virtually always the same across services,
-                    # i.e. portal, indexer, and ingester, within the clustser; so we only show this once
-                    # per cluster, if all the info is exactly the same; we don't print container["name"] here
-                    # because that actually is not unique and that would mess this up for our common case.
-                    container_lines = []
-                    container_lines.append(f"   IDENTITY: {container['identity']}")
-                    if image := container.get("image"):
-                        image_pushed_at = container.get("image_pushed_at")
-                        image_size = container.get("image_size")
-                        container_lines.append(f"      IMAGE: {image}"
-                                               f" ({format_size(image_size)}) {chars.dot_hollow} {image_pushed_at}")
-                        if git_repo := container.get("git_repo"):
-                            git_branch = container.get("git_branch")
-                            git_commit = container.get("git_commit")
-                            container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} BRANCH: {git_branch}"
-                                                   f" {chars.dot_hollow} COMMIT: ({git_commit})")
-                    if elasticsearch_server := container.get("elasticsearch"):
-                        container_lines.append(f"         ES: {self._unversioned_name(elasticsearch_server)}")
-                    if database_server := container.get("database"):
-                        container_lines.append(f"        RDS: {database_server}")
-                    if container_lines != container_lines_previous:
-                        lines += container_lines
-                    container_lines_previous = container_lines
-            for line in lines:
-                print(line)
+    def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False,
+              nocontainer: bool = False, noimage: bool = False, nogit: bool = False, notasks: bool = False,
+              nohealth: bool = False, noasync: bool = False, verbose: bool = False) -> AwsEcs:
+        cluster_results = {}
+        def print_cluster(cluster: AwsEcs.Cluster):  # noqa
+            nonlocal shortened_names, versioned_names, nodns
+            nonlocal nocontainer, noimage, nogit, notasks, nohealth, verbose
+            cluster_lines = cluster.print_cluster(
+                shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns, nocontainer=nocontainer,
+                noimage=noimage, nogit=nogit, notasks=notasks, nohealth=nohealth, verbose=verbose, noprint=True)
+            cluster_results[cluster] = cluster_lines
+        if noasync is not True:
+            functions = []
+            for cluster in self.clusters:
+                functions.append(lambda cluster=cluster: print_cluster(cluster))
+            run_concurrently(functions, nthreads=8)
+            for cluster in cluster_results:  # TODO: Sort by cluster - (not item.blue_or_green, item.cluster_name)
+                cluster_lines = cluster_results[cluster]
+                for cluster_line in cluster_lines:
+                    print(cluster_line)
+        else:
+            for cluster in self.clusters:
+                cluster.print_cluster()
         print("")
 
     def _list_clusters(self) -> List[str]:
@@ -854,6 +884,7 @@ def main():
     notasks = False
     nohealth = False
     nocolor = False
+    noasync = False
     verbose = False
 
     argi = 0
@@ -892,6 +923,8 @@ def main():
             nocolor = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
             show_unassociated_task_definitions = True
+        elif arg in ["--noasync", "-noasync", "noasync"]:
+            noasync = True
         elif arg in ["--verbose", "-verbose", "--verbose", "-verbose", "--v", "-v"]:
             verbose = True
         elif arg in ["--aws", "-aws", "--env", "-env"]:
@@ -921,7 +954,7 @@ def main():
 
     ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
               nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-              notasks=notasks, nohealth=nohealth, verbose=verbose)
+              notasks=notasks, nohealth=nohealth, noasync=noasync, verbose=verbose)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
