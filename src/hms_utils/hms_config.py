@@ -800,6 +800,13 @@ class Config:
             if macro_value := self._expand_aws_secret_macro(secret_specifier, context_name):
                 macro = f"{Config._AWS_SECRET_MACRO_START}{secret_specifier}{Config._AWS_SECRET_MACRO_END}"
                 value = value.replace(macro, macro_value)
+            else:
+                # Hide the macro temporarily for this loop.
+                value = value.replace(f"{Config._AWS_SECRET_MACRO_START}{secret_specifier}{Config._MACRO_END}",
+                                      f"{Config._MACRO_HIDE_START}{secret_specifier}{Config._MACRO_HIDE_END}")
+        # Unhide unfound macros.
+        value = value.replace(Config._MACRO_HIDE_START, Config._AWS_SECRET_MACRO_START)
+        value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
     def _expand_aws_secret_macro(self, secret_specifier: str, context_name: str) -> Optional[str]:
@@ -814,15 +821,9 @@ class Config:
                 secrets_name_path = f"{context_path}/{Config._AWS_SECRET_NAME_NAME}"
                 secrets_name = self.lookup(secrets_name_path)
         if secrets_name and secret_name:
-            return Config._lookup_aws_secret(secrets_name, secret_name)
-            try:
-                boto_secrets = BotoClient("secretsmanager")
-                if ((secrets := boto_secrets.get_secret_value(SecretId=secrets_name)) and
-                    (secrets := json.loads(secrets.get("SecretString")))):  # noqa
-                    return secrets.get(secret_name)
-            except Exception:
-                pass
-        return secret_specifier
+            if secret_value := Config._lookup_aws_secret(secrets_name, secret_name):
+                return secret_value
+        return None
 
     @staticmethod
     @lru_cache(maxsize=64)
@@ -833,7 +834,7 @@ class Config:
                 if secrets := json.loads(secrets.get("SecretString")):
                     return secrets.get(secret_name)
         except Exception:
-            import pdb ; pdb.set_trace()  # noqa
+            warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
             return None
 
     def _import_config(self, config: dict, name: Optional[str] = None) -> None:

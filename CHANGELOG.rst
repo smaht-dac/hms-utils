@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.27
+1.2.28
 ======
 * 2024-09-07/dmichaels
   - Support for ${aws-secret:SECRET_NAME} in hms-config.
