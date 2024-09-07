@@ -9,7 +9,7 @@ update: config
 	make build
 
 lint:
-	flake8
+	flake8 --exclude tmp --exclude .tmp
 
 test:
 	poetry run pytest -vv

@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from typing import List, Optional, Tuple
+from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -177,10 +178,10 @@ def perform_login(aws_profile_name: str, verbose: bool = False) -> None:
             print(f"EXCEPTION: {str(e)}")
 
 
-def print_aws_profile_line(aws_profile: object, nocheck: bool = False,
+def print_aws_profile_line(aws_profile: object, verified_result: Optional[tuple] = None, nocheck: bool = False,
                            current: Optional[str] = None, login: bool = False, verbose: bool = False) -> bool:
     global AWS_DEFAULT_SECTION_NAME
-    verified = False
+    verified = False if not verified_result else verified_result[0]
     if login:
         perform_login(aws_profile.name, verbose=verbose)
     aws_profile_name_current = get_current_aws_profile_name()
@@ -196,7 +197,10 @@ def print_aws_profile_line(aws_profile: object, nocheck: bool = False,
     else:
         line += "<no account number>"
     if not nocheck:
-        verified, access_key_id, expiration_time, valid_duration = verify_aws_account(aws_profile)
+        if verified_result:
+            verified, access_key_id, expiration_time, valid_duration = verified_result
+        else:
+            verified, access_key_id, expiration_time, valid_duration = verify_aws_account(aws_profile)
         if verified:
             line += f" {CHAR.check}"
             if access_key_id and verbose:
@@ -312,6 +316,7 @@ def main() -> None:
     nodefault = False
     current = False
     nocurrent = False
+    noasync = False
     login = False
     yes = False
     profile_name_pattern = None
@@ -370,6 +375,8 @@ def main() -> None:
             default = True
         elif (arg == "--nodefault") or (arg == "-nodefault") or (arg == "nodefault"):
             nodefault = True
+        elif arg in ["--noasync", "-noasync", "noasync"]:
+            noasync = True
         elif (arg == "--yes") or (arg == "-yes") or (arg == "yes") or (arg == "--y") or (arg == "-y"):
             yes = True
         elif (arg == "--verbose") or (arg == "-verbose") or (arg == "verbose") or (arg == "--v") or (arg == "-v"):
@@ -500,11 +507,22 @@ def main() -> None:
             print(profile_name_pattern, end="")
             print("'", end="")
         print(f" in config: {AWS_CONFIG_FILE_PATH}")
-    for aws_profile in aws_profiles_selected:
-        verified = print_aws_profile_line(aws_profile, nocheck=nocheck, current=current, login=login, verbose=verbose)
-        if len(aws_profiles_selected) == 1:
-            # If only a single profile selected then make the exit status correspond to its verified state.
-            sys.exit(0 if verified or nocheck else 1)
+    if (noasync is not True) and (len(aws_profiles_selected) > 1):
+        aws_profile_results = {}
+        def function(aws_profile: object):  # noqa
+            nonlocal aws_profile_results
+            aws_profile_results[aws_profile] = verify_aws_account(aws_profile)
+        run_concurrently([lambda item=item: function(item) for item in aws_profiles_selected], nthreads=12)
+        for aws_profile in aws_profile_results:
+            print_aws_profile_line(aws_profile, nocheck=nocheck, current=current, login=login, verbose=verbose,
+                                   verified_result=aws_profile_results[aws_profile])
+    else:
+        for aws_profile in aws_profiles_selected:
+            verified = print_aws_profile_line(aws_profile, nocheck=nocheck,
+                                              current=current, login=login, verbose=verbose)
+            if len(aws_profiles_selected) == 1:
+                # If only a single profile selected then make the exit status correspond to its verified state.
+                sys.exit(0 if verified or nocheck else 1)
 
     sys.exit(0)
 
