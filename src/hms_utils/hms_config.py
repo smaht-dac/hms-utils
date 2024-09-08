@@ -29,14 +29,16 @@ DEFAULT_EXPORT_NAME_SEPARATOR = ":"
 AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
 OBFUSCATED_VALUE = "********"
 
+SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
+
 
 def main():
 
     args = parse_args(sys.argv[1:])
 
     # TODO
-    # After implementing the "import" thing I realized it could be generalized
-    # such that secrets couild be treate like this rather than treating them specially.
+    # After implementing the "import" thing I realized i *thjink* it could be generalized
+    # such that secrets couild be treated like this rather than as treating them specially.
 
     config = None
     if args.config_file:
@@ -334,6 +336,8 @@ def parse_args(argv: List[str]) -> object:
 
 def print_config_and_secrets_merged(merged_config: Config, args: object) -> None:
 
+    global SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING
+    SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = True
     merged_config_json = merged_config.json
     secrets = merged_config.secrets if hasattr(merged_config, "secrets") else None
     unmerged_secrets = merged_config.unmerged_secrets if hasattr(merged_config, "unmerged_secrets") else None
@@ -406,6 +410,7 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
                 print("\nMerged from secrets:") ; [print(f"- {item}") for item in merged_secrets]  # noqa
                 print("\nUnmerged from secrets") ; [print(f"- {item}") for item in unmerged_secrets]  # noqa
         print()
+    SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False
 
 
 def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: object) -> None:
@@ -829,20 +834,21 @@ class Config:
                 secrets_name_path = f"{aws_secret_context_path}/{Config._AWS_SECRET_NAME_NAME}"
                 secrets_name = self.lookup(secrets_name_path)
         if secrets_name and secret_name:
-            if secret_value := Config._lookup_aws_secret(secrets_name, secret_name):
+            if secret_value := self._lookup_aws_secret(secrets_name, secret_name):
                 return secret_value
         return None
 
-    @staticmethod
     @lru_cache(maxsize=64)
-    def _lookup_aws_secret(secrets_name: str, secret_name: str) -> Optional[str]:
+    def _lookup_aws_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
         try:
             boto_secrets = BotoClient("secretsmanager")
             if secrets := boto_secrets.get_secret_value(SecretId=secrets_name):
                 if secrets := json.loads(secrets.get("SecretString")):
                     return secrets.get(secret_name)
         except Exception:
-            warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
+            global SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING
+            if not SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING:
+                warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
             return None
 
     def _import_config(self, config: dict, name: Optional[str] = None) -> None:
