@@ -90,9 +90,9 @@ class AwsEcs:
             return sorted_services
 
         def print_cluster(self, shortened_names: bool = False, versioned_names: bool = False,
-                          nodns: bool = False, nocontainer: bool = False,
-                          noimage: bool = False, nogit: bool = False, notasks: bool = False,
-                          nohealth: bool = False, verbose: bool = False, noprint: bool = False) -> Optional[str]:
+                          nodns: bool = False, nocontainer: bool = False, noimage: bool = False,
+                          nogit: bool = False, notasks: bool = False, nohealth: bool = False,
+                          show: bool = False, verbose: bool = False, noprint: bool = False) -> Optional[str]:
 
             cluster = self
             cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
@@ -199,6 +199,18 @@ class AwsEcs:
                         container_lines.append(f"         ES: {self._ecs._unversioned_name(elasticsearch_server)}")
                     if database_server := container.get("database"):
                         container_lines.append(f"        RDS: {database_server}")
+                    if global_env_bucket := container.get("global_env_bucket"):
+                        container_lines.append(f"        GEB: {global_env_bucket}")
+                    if s3_encrypt_key := container.get("s3_encrypt_key"):
+                        if show:
+                            container_lines.append(f"        SEK: {s3_encrypt_key}")
+                        else:
+                            container_lines.append(f"        SEK: {s3_encrypt_key[:2]}******")
+                        if s3_encrypt_key_id := container.get("s3_encrypt_key_id"):
+                            container_lines[len(container_lines) - 1] += (
+                                f" {chars.dot_hollow} ID: {s3_encrypt_key_id}")
+                    elif s3_encrypt_key_id := container.get("s3_encrypt_key_id"):
+                        container_lines.append(f"      SEKID: {s3_encrypt_key_id}")
                     if container_lines != container_lines_previous:
                         lines += container_lines
                     container_lines_previous = container_lines
@@ -380,6 +392,9 @@ class AwsEcs:
                             if container_identity := env.get("value"):
                                 elasticsearch_server = self._ecs._get_elasticsearch_server(container_identity)
                                 database_server = self._ecs._get_database_server(container_identity)
+                                global_env_bucket = self._ecs._get_global_env_bucket(container_identity)
+                                s3_encrypt_key = self._ecs._get_s3_encrypt_key(container_identity)
+                                s3_encrypt_key_id = self._ecs._get_s3_encrypt_key_id(container_identity)
                             break
                 # Get the ECR image associated with this container; looks like this:
                 # 643366669028.dkr.ecr.us-east-1.amazonaws.com/fourfront-production
@@ -407,7 +422,10 @@ class AwsEcs:
                                "git_commit": git_commit,
                                "git_branch": git_branch,
                                "elasticsearch": elasticsearch_server,
-                               "database": database_server})
+                               "database": database_server,
+                               "global_env_bucket": global_env_bucket,
+                               "s3_encrypt_key": s3_encrypt_key,
+                               "s3_encrypt_key_id": s3_encrypt_key_id})
 
             # We just return one - that is all we normally have. TODO: Ask if this is for us alway true.
             return result[0] if result else {}
@@ -670,14 +688,15 @@ class AwsEcs:
 
     def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False,
               nocontainer: bool = False, noimage: bool = False, nogit: bool = False, notasks: bool = False,
-              nohealth: bool = False, noasync: bool = False, verbose: bool = False) -> AwsEcs:
+              nohealth: bool = False, noasync: bool = False, show: bool = False, verbose: bool = False) -> AwsEcs:
         cluster_results = {}
         def print_cluster(cluster: AwsEcs.Cluster):  # noqa
             nonlocal shortened_names, versioned_names, nodns
-            nonlocal nocontainer, noimage, nogit, notasks, nohealth, verbose
+            nonlocal nocontainer, noimage, nogit, notasks, nohealth, show, verbose
             cluster_lines = cluster.print_cluster(
-                shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns, nocontainer=nocontainer,
-                noimage=noimage, nogit=nogit, notasks=notasks, nohealth=nohealth, verbose=verbose, noprint=True)
+                shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns,
+                nocontainer=nocontainer, noimage=noimage, nogit=nogit, notasks=notasks,
+                nohealth=nohealth, show=show, verbose=verbose, noprint=True)
             cluster_results[cluster] = cluster_lines
         if noasync is not True:
             functions = [lambda cluster=cluster: print_cluster(cluster) for cluster in self.clusters]
@@ -730,6 +749,18 @@ class AwsEcs:
     @lru_cache
     def _get_database_server(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("RDS_HOSTNAME")
+
+    @lru_cache
+    def _get_global_env_bucket(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("GLOBAL_ENV_BUCKET")
+
+    @lru_cache
+    def _get_s3_encrypt_key(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("S3_ENCRYPT_KEY")
+
+    @lru_cache
+    def _get_s3_encrypt_key_id(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("ENCODED_S3_ENCRYPT_KEY_ID")
 
     @lru_cache
     def _get_identity_secrets(self, identity: str) -> dict:
@@ -889,6 +920,7 @@ def main():
     nohealth = False
     nocolor = False
     noasync = False
+    show = False
     verbose = False
 
     argi = 0
@@ -931,6 +963,8 @@ def main():
             nohealth = True
         elif arg in ["--nocolor", "-nocolor", "nocolor"]:
             nocolor = True
+        elif arg in ["--show", "-show", "show"]:
+            show = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
             show_unassociated_task_definitions = True
         elif arg in ["--noasync", "-noasync", "noasync"]:
@@ -965,7 +999,7 @@ def main():
 
     ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
               nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-              notasks=notasks, nohealth=nohealth, noasync=noasync, verbose=verbose)
+              notasks=notasks, nohealth=nohealth, show=show, noasync=noasync, verbose=verbose)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
@@ -1004,7 +1038,7 @@ def main():
             exit(1)
         ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names,
                           nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-                          notasks=notasks, nohealth=nohealth, verbose=verbose)
+                          notasks=notasks, nohealth=nohealth, show=show, verbose=verbose)
 
     if show_unassociated_task_definitions:
         if unassociated_task_definition_names := ecs.unassociated_task_definition_names:

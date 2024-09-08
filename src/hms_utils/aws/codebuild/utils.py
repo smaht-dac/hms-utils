@@ -147,7 +147,10 @@ def get_build_info(image_repo: str, image_tag: str) -> Optional[Dict]:
     if True:  # include_build_digest:
         log_group = build.get("latest", {}).get("log_group")
         log_stream = build.get("latest", {}).get("log_stream")
-        build["latest"]["digest"] = _get_aws_codebuild_digest(log_group, log_stream, image_tag)
+        if log_group and log_stream:
+            if not build.get("latest"):
+                build["latest"] = {}
+            build["latest"]["digest"] = _get_aws_codebuild_digest(log_group, log_stream, image_tag)
     return build
 
 
