@@ -559,7 +559,9 @@ class Config:
         self._ignore_missing_macro = True
         self._stringize_non_primitive_types = True
         self._imap = {}
+        self._loading = True
         self._load(file_or_dictionary)
+        self._loading = False
 
     def merge_secrets(self, secrets: Config) -> Config:
         merged_config_json, merged_secretst, unmerged_secretst = (
@@ -596,12 +598,15 @@ class Config:
             if not (value := config.get(name_component)):
                 # If this is not called during macro expansion (i.e. rather during lookup), and if this
                 # is that last name_component, then look straight upwards/outwards in tree for a resolution.
-                if (not _macro_expansion) and (index == (len(name_components) - 1)):
+                if (not self._loading) and (index == (len(name_components) - 1)):
                     if (value := lookup_upwards(name_component, config)) is not None:
                         if Config._contains_macro(value):
                             # And if the value contains a macro try resolving from this context.
                             if macro_expanded_value := self._expand_macro_value(value, config):
                                 # TODO: Maybe ore tricky stuff needed here.
+                                if self._contains_aws_secret_macro(value):
+                                    return self._expand_aws_secret_macros(macro_expanded_value,
+                                                                          aws_secret_context_path=name)
                                 return macro_expanded_value
                         return value
                 if _search_imports and (docs := self._imports):
@@ -615,10 +620,10 @@ class Config:
                 config = value
                 value = None
         if value is not None:
-            if not _macro_expansion:
+            if not self._loading:
                 # if self._is_aws_secret_macro(value):
                 if self._contains_aws_secret_macro(value):
-                    return self._expand_aws_secret_macros(value, context_name=name)
+                    return self._expand_aws_secret_macros(value, aws_secret_context_path=name)
             return value
         elif config and allow_dictionary:
             return self._cleanjson(config)
@@ -799,10 +804,10 @@ class Config:
                 return True
         return False
 
-    def _expand_aws_secret_macros(self, value: str, context_name: str) -> Optional[str]:
+    def _expand_aws_secret_macros(self, value: str, aws_secret_context_path: str) -> Optional[str]:
         while ((match := Config._AWS_SECRET_MACRO_PATTERN.search(value)) and
                (secret_specifier := match.group(1))):
-            if macro_value := self._expand_aws_secret_macro(secret_specifier, context_name):
+            if macro_value := self._expand_aws_secret_macro(secret_specifier, aws_secret_context_path):
                 macro = f"{Config._AWS_SECRET_MACRO_START}{secret_specifier}{Config._AWS_SECRET_MACRO_END}"
                 value = value.replace(macro, macro_value)
             else:
@@ -814,16 +819,16 @@ class Config:
         value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
-    def _expand_aws_secret_macro(self, secret_specifier: str, context_name: str) -> Optional[str]:
+    def _expand_aws_secret_macro(self, secret_specifier: str, aws_secret_context_path: str) -> Optional[str]:
         if (index := secret_specifier.find(self._path_separator)) > 0:
             secret_name = secret_specifier[index + 1:]
             secrets_name = secret_specifier[0:index]
         else:
             secret_name = secret_specifier
             secrets_name = None
-            if (index := context_name.rfind(self._path_separator)) > 0:
-                context_path = context_name[:index]
-                secrets_name_path = f"{context_path}/{Config._AWS_SECRET_NAME_NAME}"
+            if (index := aws_secret_context_path.rfind(self._path_separator)) > 0:
+                aws_secret_context_path = aws_secret_context_path[:index]
+                secrets_name_path = f"{aws_secret_context_path}/{Config._AWS_SECRET_NAME_NAME}"
                 secrets_name = self.lookup(secrets_name_path)
         if secrets_name and secret_name:
             if secret_value := Config._lookup_aws_secret(secrets_name, secret_name):
