@@ -574,9 +574,7 @@ class Config:
         return merged_config
 
     def lookup(self, name: str, config: Optional[dict] = None,
-               allow_dictionary: bool = False,
-               _macro_expansion: bool = False,
-               _search_imports: bool = True) -> Optional[str, dict]:
+               allow_dictionary: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -706,13 +704,13 @@ class Config:
         return data
 
     def _lookup_macro_value(self, macro_name: str, data: dict) -> Optional[str]:
-        if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
+        if (macro_value := self.lookup(macro_name, data)) is not None:
             if Config._is_primitive_type(macro_value):
                 return str(macro_value)
             return None
         data = self._get_parent(data)
         while data:
-            if (macro_value := self.lookup(macro_name, data, _macro_expansion=True)) is not None:
+            if (macro_value := self.lookup(macro_name, data)) is not None:
                 if Config._is_primitive_type(macro_value):
                     return str(macro_value)
                 return None
