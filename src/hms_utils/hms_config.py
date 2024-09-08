@@ -449,6 +449,11 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         if args.yaml:
             print(yaml.dump(data))
         elif args.json:
+            if True:  # TODO: This seem very dicey; added for 4dn-cloud-infra secrets.json generation.
+                for key in data:
+                    if Config._is_primitive_type(value := data[key]) and config._contains_aws_secret_macro(value):
+                        if (value := config._expand_aws_secret_macros(value, aws_secret_context_path=None)) is not None:
+                            data[key] = value
             print(json.dumps(data, indent=4))
         elif args.list:
             print_dictionary_list(data, path_separator=args.path_separator, prefix=f" {chars.rarrow_hollow} ")
