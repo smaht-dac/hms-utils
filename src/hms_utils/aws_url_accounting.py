@@ -111,24 +111,24 @@ for aws_profile in aws_profiles:
     if urls := list_elb_dns(aws_profile.name):
         _print(f"  - LOAD BALANCER: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ ping_suffix(url)}")
+            _print(f"    - {url}{ping_suffix(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ ping_suffix(rurl)}")
+                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
     if urls := list_api_gateway_urls(aws_profile.name):
         _print(f"  - API GATEWAY: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ ping_suffix(url)}")
+            _print(f"    - {url}{ping_suffix(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ ping_suffix(rurl)}")
+                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
     if urls := list_route53_urls(aws_profile.name):
         _print(f"  - ROUTE 53: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ ping_suffix(url)}")
+            _print(f"    - {url}{ping_suffix(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ ping_suffix(rurl)}")
+                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
     if urls := list_cloudfront_urls(aws_profile.name):
         _print(f"  - CLOUD FRONT: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ ping_suffix(url)}")
+            _print(f"    - {url}{ping_suffix(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ ping_suffix(rurl)}")
+                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
