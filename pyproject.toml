@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.2.33"
+version = "1.2.34"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -34,6 +34,8 @@ pytest-runner = ">=5.1"
 hms-aws-ecs = "hms_utils.aws_ecs:main"
 hms-aws-env = "hms_utils.aws_env:main"
 hms-config = "hms_utils.hms_config:main"
+hms-config-export = "hms_utils.hms_config:main"
+hms-config-exports = "hms_utils.hms_config:main"
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 
 [build-system]
