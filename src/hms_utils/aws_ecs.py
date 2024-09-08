@@ -196,7 +196,13 @@ class AwsEcs:
                             container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} {git_branch}"
                                                    f" {chars.dot_hollow} {git_commit}")
                     if elasticsearch_server := container.get("elasticsearch"):
-                        container_lines.append(f"         ES: {self._ecs._unversioned_name(elasticsearch_server)}")
+                        elasticsearch_server = self._ecs._unversioned_name(elasticsearch_server)
+                        if (cluster.blue_or_green and
+                            (elasticsearch_blue_or_green := self._ecs._blue_or_green(elasticsearch_server))):  # noqa
+                            elasticsearch_server = self._ecs._terminal_color(elasticsearch_server,
+                                                                             elasticsearch_blue_or_green,
+                                                                             underline=False)
+                        container_lines.append(f"         ES: {elasticsearch_server}")
                     if database_server := container.get("database"):
                         container_lines.append(f"        RDS: {database_server}")
                     if global_env_bucket := container.get("global_env_bucket"):

@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.38
+1.2.39
 ======
 * 2024-09-08/dmichaels
   - More info output for hms-aws-ecs.
