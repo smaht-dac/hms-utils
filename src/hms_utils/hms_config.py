@@ -134,6 +134,11 @@ def main():
     sys.exit(status)
 
 
+def main_show_script_path():
+    sys.argv = ["hms-config", "--functions"]
+    main()
+
+
 def parse_args(argv: List[str]) -> object:
 
     class Args:
