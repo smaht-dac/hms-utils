@@ -90,6 +90,9 @@ def main():
                     found_dictionary = True
                     for key in value:
                         if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
+                            if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                                # Same special case as above for (direct) items within a dictionary.
+                                os.environ[AWS_PROFILE_ENV_NAME] = single_value
                             if merged_config._contains_aws_secret_macro(single_value):
                                 # Note the trailing separator/slash on the context.
                                 aws_secret_context_path = f"{name}{args.path_separator}"
