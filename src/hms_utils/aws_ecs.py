@@ -433,9 +433,10 @@ class AwsEcs:
             self.service = service
             self.new_task_definition = new_task_definition
 
-    def __init__(self, blue_green: bool = False, nocolor: bool = False, boto_ecs: Optional[BotoEcs] = None) -> None:
+    def __init__(self, blue_green: Optional[Union[Literal[AwsEcs.BLUE_OR_GREEN], bool]] = False,
+                 nocolor: bool = False, boto_ecs: Optional[BotoEcs] = None) -> None:
         self._boto_ecs = BotoClient("ecs") if not isinstance(boto_ecs, BotoEcs) else boto_ecs
-        self._blue_green = blue_green is True
+        self._blue_green = blue_green
         self._clusters = None
         self._task_definitions = None
         self._nocolor = nocolor is True
@@ -446,8 +447,11 @@ class AwsEcs:
         if self._clusters is None:
             self._clusters = []
             for cluster_arn in self._list_clusters():
-                if (not self._blue_green) or AwsEcs._blue_or_green(cluster_arn):
-                    self._clusters.append(AwsEcs.Cluster(cluster_arn, ecs=self))
+                if (((self._blue_green == AwsEcs.BLUE) and (not AwsEcs._is_blue(cluster_arn))) or
+                    ((self._blue_green == AwsEcs.GREEN) and (not AwsEcs._is_green(cluster_arn))) or
+                    ((self._blue_green is True) and (not AwsEcs._blue_or_green(cluster_arn)))):  # noqa
+                    continue
+                self._clusters.append(AwsEcs.Cluster(cluster_arn, ecs=self))
             self._clusters = sorted(self._clusters, key=lambda item: (not item.blue_or_green, item.cluster_name))
         return self._clusters
 
@@ -894,6 +898,12 @@ def main():
                    "-greenblue", "greenblue", "--bg", "-bg", "bg", "--gb", "-gb", "gb"]:
             # Show only blue/green clusters/services/task-definitions.
             blue_green = True
+        elif arg in ["--blue", "-blue", "blue", "--blue"]:
+            # Show only blue clusters/services/task-definitions.
+            blue_green = AwsEcs.BLUE
+        elif arg in ["--green", "-green", "green", "--green"]:
+            # Show only green clusters/services/task-definitions.
+            blue_green = AwsEcs.GREEN
         elif arg in ["--short", "-short", "short"]:
             # Display shortened names for easier viewing if possible; removes longest common prefix.
             shortened_names = True
@@ -948,7 +958,8 @@ def main():
         print("AWS credentials do not appear to be working.")
         exit(1)
 
-    print(f"Showing current ECS{' blue/green' if blue_green else ''} cluster info"
+    print(f"Showing current ECS"
+          f"{' blue/green' if (blue_green is True) else (f' {blue_green}' if blue_green else '')} cluster info"
           f" for AWS account: {ecs_account.account_number}"
           f"{f' ({ecs_account.account_alias})' if ecs_account.account_alias else ''} ...")
 

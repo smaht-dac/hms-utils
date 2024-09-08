@@ -1,4 +1,4 @@
-# Convenience utility to many JSON based configuration properties.
+# Convenience utility to maintain JSON based configuration properties.
 
 from __future__ import annotations
 from boto3 import client as BotoClient
