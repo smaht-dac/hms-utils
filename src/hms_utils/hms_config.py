@@ -79,18 +79,23 @@ def main():
             else:
                 export_name = path_basename(name, args.path_separator)
             found = False ; found_dictionary = False  # noqa
-            if merged_config and ((value := merged_config.lookup(name, allow_dictionary=True)) is not None):
+            if (value := merged_config.lookup(name, allow_dictionary=True)) is not None:
                 if (export_name == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
                     # Special case to handle list of paths the first of which specifies AWS_PROFILE,
                     # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
                     os.environ[AWS_PROFILE_ENV_NAME] = value
                 if isinstance(value, dict):
-                    # Special case: If target name/path is a dictionary then
-                    # generate exports for every (non-dictionary) key/value within.
+                    # Special case: If target name/path is a dictionary then generate
+                    # exports for every direct (non-dictionary) key/value within it.
                     found_dictionary = True
                     for key in value:
-                        if not isinstance(value[key], dict):
-                            exports.append(f"export {key}={value[key]}")
+                        if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
+                            if merged_config._contains_aws_secret_macro(single_value):
+                                # Note the trailing separator/slash on the context.
+                                aws_secret_context_path = f"{name}{args.path_separator}"
+                                single_value = config._expand_aws_secret_macros(
+                                    single_value, aws_secret_context_path=aws_secret_context_path)
+                            exports.append(f"export {key}={single_value}")
                             found = True
                 else:
                     exports.append(f"export {export_name}={value}")

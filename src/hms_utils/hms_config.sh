@@ -23,20 +23,29 @@
 #        AUTH0_SECRET:auth0/local/Auth0Secret \
 #        etc...
 #
-__HMS_CONFIG_SCRIPT=hms-config
 function hms_config_exports() {
+    for arg in "$@"; do
+        if [[ "$arg" == "--debug" || "$arg" == "-debug" ]]; then
+            __HMS_CONFIG_DEBUG=true
+            break
+        fi
+    done
     __HMS_CONFIG_TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
-    $__HMS_CONFIG_SCRIPT --export-file $__HMS_CONFIG_TMPFILE $*
+    hms-config --export-file $__HMS_CONFIG_TMPFILE $*
     hms_config_status=$?
     if [ -f $__HMS_CONFIG_TMPFILE ] ; then
         source $__HMS_CONFIG_TMPFILE
-        rm -f $__HMS_CONFIG_TMPFILE
+        if [ "$__HMS_CONFIG_DEBUG" != "true" ] ; then
+            rm -f $__HMS_CONFIG_TMPFILE
+        fi
     fi
+    unset __HMS_CONFIG_TMPFILE
+    unset __HMS_CONFIG_DEBUG
 }
 function hms_config_export() {
     hms_config_exports $*
 }
 function hms_config() {
-    $__HMS_CONFIG_SCRIPT $*
+    hms-config $*
     hms_config_status=$?
 }
