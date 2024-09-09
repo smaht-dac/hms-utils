@@ -71,14 +71,17 @@ def resolve_cname(url):
 
 
 def ping(dns):
-    if dns.startswith("\\052."):
-        return None, None, True
-    if dns.endswith(".dev"):
-        return None, None, True
     http = False
     https = False
+    skip = False
+    if dns.startswith("\\052."):
+        skip = True
+        return http, https, skip
+    elif dns.endswith(".dev"):
+        skip = True
+        return http, https, skip
     try:
-        requests.get(f"http://{dns}", verify=False, timeout=4)
+        requests.get(f"http://{dns}", allow_redirects=False, verify=False, timeout=4)
         http = True
     except Exception:
         pass
@@ -87,7 +90,37 @@ def ping(dns):
         https = True
     except Exception:
         pass
-    return http, https, False
+    return http, https, skip
+
+
+def redirect_url(dns):
+    if dns.startswith("\\052."):
+        return None
+    elif dns.endswith(".dev"):
+        return None
+    response = None
+    try:
+        response = requests.get(f"http://{dns}", allow_redirects=False, verify=False, timeout=4)
+    except Exception:
+        pass
+    try:
+        requests.get(f"https://{dns}", verify=False, timeout=4)
+    except Exception:
+        return None
+    redirect_url = None
+    if response and (response.status_code in [301, 302, 303, 307, 308]):
+        if redirect_url := response.headers['location']:
+            if redirect_url.endswith("/"):
+                redirect_url = redirect_url[:-1]
+            if redirect_url.endswith(":443"):
+                redirect_url = redirect_url[:-4]
+            if redirect_url.startswith("http://"):
+                redirect_url = redirect_url[7:]
+            elif redirect_url.startswith("https://"):
+                redirect_url = redirect_url[8:]
+            if redirect_url != dns:
+                return redirect_url
+    return redirect_url
 
 
 def ping_suffix(dns):
@@ -105,6 +138,9 @@ def ping_suffix(dns):
         return " (UNREACHABLE)"
 
 
+# print(resolve_cname("smaht-productionblue-2001144827.us-east-1.elb.amazonaws.com"))
+# exit(1)
+
 aws_profiles = AwsProfiles.read()
 for aws_profile in aws_profiles:
     _print(f"- ACCOUNT: {aws_profile.account} ({aws_profile.name})")
@@ -114,6 +150,8 @@ for aws_profile in aws_profiles:
             _print(f"    - {url}{ping_suffix(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
                 _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
+            if (rurl := redirect_url(url)) and (rurl != url):
+                _print(f"      - REDIRECT: {rurl}{ping_suffix(rurl)}")
     if urls := list_api_gateway_urls(aws_profile.name):
         _print(f"  - API GATEWAY: {len(urls)}")
         for url in urls:
