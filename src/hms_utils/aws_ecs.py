@@ -1013,7 +1013,6 @@ def main():
             exit(0)
         else:
             usage()
-        argi += 1
 
     if identity_swap:
         blue_green = True
