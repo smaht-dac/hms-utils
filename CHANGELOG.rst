@@ -2,6 +2,11 @@
 hms-utils : CHANGE LOG
 ======================
 
+1.2.45
+======
+* 2024-09-09/dmichaels
+  - Added GitHub support to hms-aws-ecs to get git commit date and latest commit.
+
 1.2.44
 ======
 * 2024-09-09/dmichaels
