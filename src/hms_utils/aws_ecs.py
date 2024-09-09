@@ -18,10 +18,6 @@ from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
 from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 
-# TODO: Does not really work right for 4dn because of the "Mirror" setup.
-# Not literally swapping task-definitions between the two (blue/green) services,
-# like with smaht, but rather swapping the "Mirror" task-definitions in and out.
-
 
 class AwsEcs:
 
