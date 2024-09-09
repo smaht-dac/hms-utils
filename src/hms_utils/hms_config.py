@@ -70,7 +70,7 @@ def main():
     if args.export:
         if args.export_file and os.path.exists(args.export_file):
             error(f"Export file must not already exist: {args.export_file}")
-        exports = []
+        exports = {}
         for name in args.names:
             if (colon := name.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
                 export_name = name[0:colon]
@@ -79,7 +79,7 @@ def main():
             else:
                 export_name = path_basename(name, args.path_separator)
             found = False ; found_dictionary = False  # noqa
-            if (value := merged_config.lookup(name, allow_dictionary=True)) is not None:
+            if (value := merged_config.lookup(name, allow_dictionary=True, raw=True)) is not None:
                 if (export_name == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
                     # Special case to handle list of paths the first of which specifies AWS_PROFILE,
                     # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
@@ -89,19 +89,31 @@ def main():
                     # exports for every direct (non-dictionary) key/value within it.
                     found_dictionary = True
                     for key in value:
+                        if Config._is_parent(key):
+                            continue
                         if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
                             if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
                                 # Same special case as above for (direct) items within a dictionary.
                                 os.environ[AWS_PROFILE_ENV_NAME] = single_value
+                            print(single_value)
                             if merged_config._contains_aws_secret_macro(single_value):
                                 # Note the trailing separator/slash on the context.
                                 aws_secret_context_path = f"{name}{args.path_separator}"
                                 single_value = config._expand_aws_secret_macros(
                                     single_value, aws_secret_context_path=aws_secret_context_path)
-                            exports.append(f"export {key}={single_value}")
+                            exports[key] = single_value
                             found = True
+                    if True:
+                        # TODO: Walk up the hierarchy to get direct values of each parent/ancestor.
+                        if parent := merged_config._get_parent(value):
+                            for key in parent:
+                                if Config._is_parent(key):
+                                    continue
+                                if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
+                                    pass
+                    # xyzzy
                 else:
-                    exports.append(f"export {export_name}={value}")
+                    exports[export_name] = value
                     found = True
             if not found:
                 if args.verbose:
@@ -110,16 +122,19 @@ def main():
                     else:
                         warning(f"{chars.rarrow} Config name/path not found: {name}")
                 status = 1
+        exports = dict(sorted(exports.items()))  # xyzzy
         if args.export_file:
             if args.verbose:
                 print(f"Writing exports to file: {args.export_file}")
             with io.open(args.export_file, "w") as f:
-                for export in sorted(exports):
+                for export in exports:
+                    export = f"export {export}={exports[export]}"
                     if args.verbose:
                         print(f"{chars.rarrow_hollow} {export}")
                     f.write(f"{export}\n")
         else:
             for export in sorted(exports):
+                export = f"export {export}={exports[export]}"
                 print(export)
     else:
         for name in args.names:
@@ -597,7 +612,8 @@ class Config:
         return merged_config
 
     def lookup(self, name: str, config: Optional[dict] = None,
-               allow_dictionary: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
+               allow_dictionary: bool = False, raw: bool = False,
+               _search_imports: bool = True) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -647,7 +663,7 @@ class Config:
                     return self._expand_aws_secret_macros(value, aws_secret_context_path=name)
             return value
         elif config and allow_dictionary:
-            return self._cleanjson(config)
+            return config if raw else self._cleanjson(config)
         return None
 
     @property
@@ -889,7 +905,8 @@ class Config:
         self._imap[parent_id] = parent
         item[Config._PARENT] = parent_id
 
-    def _is_parent(self, name: str) -> None:
+    @staticmethod
+    def _is_parent(name: str) -> None:
         return name == Config._PARENT
 
     @staticmethod
