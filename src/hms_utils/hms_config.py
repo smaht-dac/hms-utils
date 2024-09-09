@@ -137,7 +137,9 @@ def main():
                 print(export)
     else:
         for name in args.names:
-            if merged_config and ((value := merged_config.lookup(name, allow_dictionary=args.json)) is not None):
+            if merged_config and ((value := merged_config.lookup(
+                                            name, allow_dictionary=args.json,
+                                            aws_secret_context_path=args.aws_secret_context_path)) is not None):
                 if args.json_formatted and isinstance(value, dict):
                     print(json.dumps(value, indent=4))
                 else:
@@ -165,6 +167,7 @@ def parse_args(argv: List[str]) -> object:
         secrets_file = DEFAULT_SECRETS_FILE_NAME
         secrets_file_explicit = False
         secrets_imports = []
+        aws_secret_context_path = None
         import_secrets_files = []
         path_separator = DEFAULT_PATH_SEPARATOR
         name = None
@@ -240,6 +243,11 @@ def parse_args(argv: List[str]) -> object:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                 _usage()
             args.import_secrets_files.append(arg)
+            argi += 1
+        elif arg in ["--context", "-context"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                _usage()
+            args.aws_secret_context_path = arg
             argi += 1
         elif arg in ["--path-separator", "-path-separator", "--separator", "-separator", "--sep", "-sep"]:
             if (argi >= argn) or not (arg := argv[argi]) or (not arg):
@@ -611,9 +619,12 @@ class Config:
         return merged_config
 
     def lookup(self, name: str, config: Optional[dict] = None,
-               allow_dictionary: bool = False, raw: bool = False,
-               _search_imports: bool = True) -> Optional[str, dict]:
+               allow_dictionary: bool = False, aws_secret_context_path: Optional[str] = None,
+               raw: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
 
+        if not self._loading:
+            import pdb ; pdb.set_trace()  # noqa
+            pass
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
             if parent := self._get_parent(config):
@@ -641,8 +652,9 @@ class Config:
                             if macro_expanded_value := self._expand_macro_value(value, config):
                                 # TODO: Maybe ore tricky stuff needed here.
                                 if self._contains_aws_secret_macro(value):
-                                    return self._expand_aws_secret_macros(macro_expanded_value,
-                                                                          aws_secret_context_path=name)
+                                    return self._expand_aws_secret_macros(
+                                               macro_expanded_value,
+                                               aws_secret_context_path=aws_secret_context_path or name)
                                 return macro_expanded_value
                         return value
                 if _search_imports and (docs := self._imports):
@@ -659,7 +671,8 @@ class Config:
             if not self._loading:
                 # if self._is_aws_secret_macro(value):
                 if self._contains_aws_secret_macro(value):
-                    return self._expand_aws_secret_macros(value, aws_secret_context_path=name)
+                    return self._expand_aws_secret_macros(value,
+                                                          aws_secret_context_path=aws_secret_context_path or name)
             return value
         elif config and allow_dictionary:
             return config if raw else self._cleanjson(config)
