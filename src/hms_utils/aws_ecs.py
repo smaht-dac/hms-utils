@@ -2,7 +2,7 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 import os
 import requests
@@ -14,9 +14,10 @@ from dcicutils.misc_utils import format_size
 from dcicutils.secrets_utils import get_identity_secrets
 from hms_utils.aws.codebuild.utils import get_build_info
 from hms_utils.chars import chars
+from hms_utils.datetime_utils import convert_uptime_to_datetime, format_duration
+from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
-from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 
 
 class AwsEcs:
@@ -89,12 +90,12 @@ class AwsEcs:
 
         def print_cluster(self, shortened_names: bool = False, versioned_names: bool = False,
                           nodns: bool = False, nocontainer: bool = False, noimage: bool = False,
-                          nogit: bool = False, notasks: bool = False, nohealth: bool = False,
+                          nogit: bool = False, notasks: bool = False, nohealth: bool = False, nouptime: bool = False,
                           show: bool = False, verbose: bool = False, noprint: bool = False) -> Optional[str]:
 
             cluster = self
             cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
-            cluster_is_data = True
+            cluster_is_data = False
             lines = [] ; container_lines_previous = None  # noqa
             cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
@@ -147,8 +148,10 @@ class AwsEcs:
                                                                       service.task_definition.blue_or_green,
                                                                       underline=False)
                         line = (f"        DNS: {service_aname}"
-                                f"{f' {chars.rarrow} {service_cname}' if service_cname else ' (no cname)'}")
+                                f"{f' {chars.rarrow} {service_cname}' if service_cname else ''}")
                         if health:
+                            if portal_version := health.get("project_version"):
+                                line += f" {chars.dot_hollow} {portal_version}"
                             line += f" {chars.check if health else chars.xmark}"
                             if health_blue_or_green := AwsEcs._get_blue_or_green_from_health(health):
                                 if ((cluster_is_mirrored_state and (cluster.blue_or_green != health_blue_or_green)) or
@@ -159,6 +162,10 @@ class AwsEcs:
                                     line += chars.xmark
                                 # line += f" ({health_blue_or_green})"
                         lines.append(line)
+                        if (not nouptime) and health and (portal_uptime := health.get("uptime")):
+                            portal_uptime = convert_uptime_to_datetime(portal_uptime)
+                            portal_uptime = format_duration(datetime.now(timezone.utc) - portal_uptime, verbose=True)
+                            lines.append(f"     UPTIME: {portal_uptime}")
                     line = (
                         f"    -- TASK: {task_definition_name}"
                         f"{f' | {task_definition_annotation}' if task_definition_annotation else ''}")
@@ -735,15 +742,16 @@ class AwsEcs:
 
     def print(self, shortened_names: bool = False, versioned_names: bool = False, nodns: bool = False,
               nocontainer: bool = False, noimage: bool = False, nogit: bool = False, notasks: bool = False,
-              nohealth: bool = False, noasync: bool = False, show: bool = False, verbose: bool = False) -> AwsEcs:
+              nohealth: bool = False, nouptime: bool = False, noasync: bool = False,
+              show: bool = False, verbose: bool = False) -> AwsEcs:
         cluster_results = {}
         def print_cluster(cluster: AwsEcs.Cluster, noprint: bool = False):  # noqa
             nonlocal cluster_results, shortened_names, versioned_names, nodns
-            nonlocal nocontainer, noimage, nogit, notasks, nohealth, show, verbose
+            nonlocal nocontainer, noimage, nogit, notasks, nohealth, nouptime, show, verbose
             cluster_lines = cluster.print_cluster(
                 shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns,
                 nocontainer=nocontainer, noimage=noimage, nogit=nogit, notasks=notasks,
-                nohealth=nohealth, show=show, verbose=verbose, noprint=noprint)
+                nohealth=nohealth, nouptime=nouptime, show=show, verbose=verbose, noprint=noprint)
             cluster_results[cluster] = cluster_lines
         if noasync is not True:
             functions = [lambda cluster=cluster: print_cluster(cluster, noprint=True) for cluster in self.clusters]
@@ -965,6 +973,7 @@ def main():
     nogit = False
     notasks = False
     nohealth = False
+    nouptime = False
     nocolor = False
     noasync = False
     show = False
@@ -1010,6 +1019,8 @@ def main():
             nohealth = True
         elif arg in ["--nocolor", "-nocolor", "nocolor"]:
             nocolor = True
+        elif arg in ["--nouptime", "-nouptime", "nouptime"]:
+            nouptime = True
         elif arg in ["--show", "-show", "show"]:
             show = True
         elif arg in ["--unassociated", "-unassociated", "--unassoc", "-unassoc"]:
@@ -1051,7 +1062,7 @@ def main():
 
     ecs.print(shortened_names=shortened_names, versioned_names=versioned_names,
               nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-              notasks=notasks, nohealth=nohealth, show=show, noasync=noasync, verbose=verbose)
+              notasks=notasks, nohealth=nohealth, nouptime=nouptime, show=show, noasync=noasync, verbose=verbose)
 
     if identity_swap:
         swaps, error = ecs.identity_swap_plan()
@@ -1090,7 +1101,7 @@ def main():
             exit(1)
         ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names,
                           nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-                          notasks=notasks, nohealth=nohealth, show=show, verbose=verbose)
+                          notasks=notasks, nohealth=nohealth, nouptime=nouptime, show=show, verbose=verbose)
 
     if show_unassociated_task_definitions:
         if unassociated_task_definition_names := ecs.unassociated_task_definition_names:

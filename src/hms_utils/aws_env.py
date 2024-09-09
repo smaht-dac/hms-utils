@@ -9,9 +9,9 @@ import re
 import subprocess
 import sys
 from typing import List, Optional, Tuple
+from hms_utils.terminal_utils import terminal_color
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
-from hms_utils.terminal_utils import terminal_color
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Convenience utility to view/manage SSO/Okta-based AWS credentials, defined in the ~/.aws/config file.
