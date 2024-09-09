@@ -31,6 +31,9 @@ OBFUSCATED_VALUE = "********"
 
 SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
 
+# THIS IS NOT A SECRET - JUST TESTING gitleaks tool
+secret = "271230a3-ead1-4f5a-94ce-0f2347f84a95"
+
 
 def main():
 
