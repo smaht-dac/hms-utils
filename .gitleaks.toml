@@ -516,6 +516,7 @@ keywords = [
 [rules.allowlist]
 stopwords = [
     "27d040a3-ead1-4f5a-94ce-0fa6e7f84a95",  # s3-encrypt-key-id is not secret
+    "271230a3-ead1-4f5a-94ce-0f2347f84a95", # dummy data
     "000000",
     "aaaaaa",
     "about",
