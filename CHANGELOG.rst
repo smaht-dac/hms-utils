@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.42
+1.2.43
 ======
 * 2024-09-09/dmichaels
   - Working on better lookup for exports of dictionary in hms-config.
