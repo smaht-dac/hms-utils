@@ -622,9 +622,6 @@ class Config:
                allow_dictionary: bool = False, aws_secret_context_path: Optional[str] = None,
                raw: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
 
-        if not self._loading:
-            import pdb ; pdb.set_trace()  # noqa
-            pass
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
             if parent := self._get_parent(config):
