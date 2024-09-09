@@ -97,6 +97,7 @@ class AwsEcs:
 
             cluster = self
             cluster_running_task_count = len(cluster.running_tasks) if (not notasks) else 0
+            cluster_is_data = True
             lines = [] ; container_lines_previous = None  # noqa
             cluster_is_mirrored_state = True if cluster.blue_or_green else None
             if services := cluster.services:
@@ -132,6 +133,7 @@ class AwsEcs:
                         lines[cluster_line_index] = \
                             lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | STAGING")
                     elif " DATA " in service_annotation:
+                        cluster_is_data = True
                         lines[cluster_line_index] = \
                             lines[cluster_line_index].replace("__REPLACE_STAGING_DATA__", " | DATA")
                     else:
@@ -201,7 +203,11 @@ class AwsEcs:
                                     f" {chars.dot_hollow} {format_datetime(git_commit_date)}")
                             if git_commit_latest := container.get("git_commit_latest"):
                                 if git_commit_latest == git_commit:
+                                    # Check mark to indicate this is the latest commit.
                                     container_lines[len(container_lines) - 1] += f" {chars.check}"
+                                    if cluster_is_data:
+                                        # Double check mark to indicate we don't need an identity-swap.
+                                        container_lines[len(container_lines) - 1] += f"{chars.check}"
                                 else:
                                     container_lines[len(container_lines) - 1] += f" {chars.xmark}"
                     if elasticsearch_server := container.get("elasticsearch"):
