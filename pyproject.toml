@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.2.42"
+version = "1.2.43"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -37,6 +37,7 @@ hms-config = "hms_utils.hms_config:main"
 hms-config-script = "hms_utils.hms_config:main_show_script_path"
 hms-config-export = "hms_utils.hms_config:main_show_script_path"
 hms-config-exports = "hms_utils.hms_config:main_show_script_path"
+hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 
 [build-system]

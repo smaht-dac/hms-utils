@@ -6,6 +6,7 @@ hms-utils : CHANGE LOG
 ======
 * 2024-09-09/dmichaels
   - Working on better lookup for exports of dictionary in hms-config.
+  - New hms-portal-indexing-status script.
 
 1.2.40
 ======
