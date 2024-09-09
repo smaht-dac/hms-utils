@@ -1,0 +1,87 @@
+{
+    "auth0": {
+        "local": {
+            "client_id": "UfM_REDACTED_Hf9"
+        },
+        "todo": {
+            "client_id": "DQx_REDACTED_kN1"
+        }
+    },
+
+    "portal": {
+        "smaht": {
+            "wolf": {
+                "AWS_PROFILE": "smaht-wolf",
+                "IDENTITY": "C4AppConfigSmahtWolf",
+                "Auth0Client": "${auth0/local/client_id}",
+                "S3_ENCRYPT_KEY_ID": "REDACTED-ABC-DEF-GHI-JKL",
+                "tests": {
+                    "IDENTITY": "C4AppConfigSmahtDevtest"
+                }
+            }
+        },
+        "cgap": {
+            "devtest": {
+                "AWS_PROFILE": "cgap-devtest",
+                "GLOBAL_ENV_BUCKET": "cgap-devtest-main-foursight-envs",
+                "GLOBAL_BUCKET_ENV": "cgap-devtest-main-foursight-envs",
+                "Auth0Client": "${auth0/local/client_id}"
+            }
+        },
+        "fourfront": {
+            "mastertest": {
+                "AWS_PROFILE": "4dn",
+                "IDENTITY": "FoursightDevelopmentLocalApplicationSecret",
+                "GLOBAL_ENV_BUCKET": "foursight-prod-envs",
+                "Auth0Client": "${auth0/local/client_id}"
+            }
+        }
+    },
+
+    "foursight": {
+        "SSH_TUNNEL_ELASTICSEARCH_NAME": "${SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX}-${SSH_TUNNEL_ELASTICSEARCH_ENV}-${SSH_TUNNEL_ELASTICSEARCH_PORT}",
+        "SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX": "ssh-tunnel-elasticsearch-proxy",
+        "SSH_TUNNEL_ELASTICSEARCH_ENV": "${AWS_PROFILE}",
+        "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ELASTICSEARCH_PORT}",
+        "REDIS_HOST_LOCAL": "redis://localhost:6379",
+        "CHALICE_LOCAL": true,
+        "4dn": {
+            "AWS_PROFILE": "4dn",
+            "SSH_TUNNEL_ELASTICSEARCH_ENV": "${AWS_PROFILE}-mastertest",
+            "SSH_TUNNEL_ELASTICSEARCH_PORT": "9201",
+            "dev": {
+                "IDENTITY": "FoursightDevelopmentLocalApplicationSecret",
+                "STACK_NAME": "c4-foursight-development-stack"
+            },
+            "prod": {
+                "IDENTITY": "FoursightProductionApplicationConfiguration",
+                "STACK_NAME": "c4-foursight-fourfront-production-stack"
+            }
+        },
+        "cgap": {
+            "wolf": {
+                "AWS_PROFILE": "cgap-wolf",
+                "IDENTITY": "C4DatastoreCgapWolfC4DatastorecgapwolfapplicationconfigurationApplicationConfiguration",
+                "STACK_NAME": "c4-foursight-cgap-wolf-stack",
+                "SSH_TUNNEL_ELASTICSEARCH_PORT": 9203
+            }
+        },
+        "smaht": {
+            "Auth0Client": "${auth0/local/client_id}",
+            "Auth0Secret_TODO_THIS_DOES_NOT_WORK_YET_DUE_TO_EXPAND_BEFORE_NERGE_OR_SOMETHING": "${auth0/local/secret}",
+            "wolf": {
+                "AWS_PROFILE": "smaht-wolf",
+                "IDENTITY": "C4AppConfigFoursightSmahtDevelopment",
+                "STACK_NAME": "c4-foursight-development-stack",
+                "SSH_TUNNEL_ELASTICSEARCH_PORT": 9209
+            },
+            "prod": {
+                "AWS_PROFILE": "smaht-prod",
+                "IDENTITY": "C4AppConfigFoursightSmahtProduction",
+                "STACK_NAME": "c4-foursight-production-stack",
+                "SSH_TUNNEL_ELASTICSEARCH_ENV": "smaht-green",
+                "SSH_TUNNEL_ELASTICSEARCH_PORT": 9208
+            }
+        }
+    }
+}
