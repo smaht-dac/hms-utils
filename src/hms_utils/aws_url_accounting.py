@@ -137,6 +137,19 @@ def ping_suffix(dns):
     else:
         return " (UNREACHABLE)"
 
+def format_url(dns):
+    http, https, skip = ping(dns)
+    if skip:
+        return f"{dns} (N/A)"
+    if http:
+        if https:
+            return f"https://{dns} (HTTP/HTTPS)"
+        else:
+            return f"http://{dns} (HTTP)"
+    elif https:
+        return f"https://{dns} (HTTPS)"
+    else:
+        return f"{dns} (UNREACHABLE)"
 
 # print(resolve_cname("smaht-productionblue-2001144827.us-east-1.elb.amazonaws.com"))
 # exit(1)
@@ -147,26 +160,26 @@ for aws_profile in aws_profiles:
     if urls := list_elb_dns(aws_profile.name):
         _print(f"  - LOAD BALANCER: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ping_suffix(url)}")
+            _print(f"    - {format_url(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
+                _print(f"      - CNAME: {format_url(rurl)}")
             if (rurl := redirect_url(url)) and (rurl != url):
-                _print(f"      - REDIRECT: {rurl}{ping_suffix(rurl)}")
+                _print(f"      - REDIRECT: {format_url(rurl)}")
     if urls := list_api_gateway_urls(aws_profile.name):
         _print(f"  - API GATEWAY: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ping_suffix(url)}")
+            _print(f"    - {format_url(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
+                _print(f"      - CNAME: {format_url(rurl)}")
     if urls := list_route53_urls(aws_profile.name):
         _print(f"  - ROUTE 53: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ping_suffix(url)}")
+            _print(f"    - {format_url(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
+                _print(f"      - CNAME: {format_url(rurl)}")
     if urls := list_cloudfront_urls(aws_profile.name):
         _print(f"  - CLOUD FRONT: {len(urls)}")
         for url in urls:
-            _print(f"    - {url}{ping_suffix(url)}")
+            _print(f"    - {format_url(url)}")
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {rurl}{ping_suffix(rurl)}")
+                _print(f"      - CNAME: {format_url(rurl)}")
