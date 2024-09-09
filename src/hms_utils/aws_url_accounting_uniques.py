@@ -163,16 +163,16 @@ def ping_suffix(dns):
 def format_url(dns):
     http, https, skip = ping(dns)
     if skip:
-        return f"{dns} (N/A)"
+        return ""
     if http:
         if https:
-            return f"https://{dns} (HTTP/HTTPS)"
+            return f"https://{dns}"
         else:
-            return f"http://{dns} (HTTP)"
+            return f"http://{dns}"
     elif https:
-        return f"https://{dns} (HTTPS)"
+        return f"https://{dns}"
     else:
-        return f"{dns} (UNREACHABLE)"
+        return ""
 
 
 def just_url(s):
@@ -183,36 +183,35 @@ def just_url(s):
 
 aws_profiles = AwsProfiles.read()
 for aws_profile in aws_profiles:
+    uniques = set()
     _print(f"- ACCOUNT: {aws_profile.account} ({aws_profile.name})")
     if urls := list_acm_certificates(aws_profile.name):
-        _print(f"  - CERTIFICATES: {len(urls)}")
         for url in urls:
-            _print(f"    - {format_url(url)}")
+            uniques.add(format_url(url))
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
     if urls := list_elb_dns(aws_profile.name):
-        _print(f"  - LOAD BALANCER: {len(urls)}")
         for url in urls:
-            _print(f"    - {format_url(url)}")
+            uniques.add(format_url(url))
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
             if (rurl := redirect_url(url)) and (rurl != url):
-                _print(f"      - REDIRECT: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
     if urls := list_api_gateway_urls(aws_profile.name):
-        _print(f"  - API GATEWAY: {len(urls)}")
         for url in urls:
-            _print(f"    - {format_url(url)}")
+            uniques.add(format_url(url))
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
     if urls := list_route53_urls(aws_profile.name):
-        _print(f"  - ROUTE 53: {len(urls)}")
         for url in urls:
-            _print(f"    - {format_url(url)}")
+            uniques.add(format_url(url))
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
     if urls := list_cloudfront_urls(aws_profile.name):
-        _print(f"  - CLOUD FRONT: {len(urls)}")
         for url in urls:
-            _print(f"    - {format_url(url)}")
+            uniques.add(format_url(url))
             if (rurl := resolve_cname(url)) and (rurl != url):
-                _print(f"      - CNAME: {format_url(rurl)}")
+                uniques.add(format_url(rurl))
+    uniques = sorted(list(uniques))
+    for unique in uniques:
+        print(f"  - {unique}")
