@@ -2,6 +2,7 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
+from datetime import datetime
 from functools import lru_cache
 import os
 import requests
@@ -200,7 +201,7 @@ class AwsEcs:
                                                    f" {chars.dot_hollow} {git_commit}")
                             if git_commit_date := container.get("git_commit_date"):
                                 container_lines[len(container_lines) - 1] += (
-                                    f" {chars.dot_hollow} {format_datetime(git_commit_date)}")
+                                    f" {chars.dot_hollow} {format_datetime(git_commit_date, notz=True)}")
                             if git_commit_latest := container.get("git_commit_latest"):
                                 if git_commit_latest == git_commit:
                                     # Check mark to indicate this is the latest commit.
@@ -209,7 +210,18 @@ class AwsEcs:
                                         # Double check mark to indicate we don't need an identity-swap.
                                         container_lines[len(container_lines) - 1] += f"{chars.check}"
                                 else:
+                                    # Note that this image not built from the latest commit.
+                                    # Find out how old this is compared to the latest.
                                     container_lines[len(container_lines) - 1] += f" {chars.xmark}"
+                                    if git_commit_latest_date := container.get("git_commit_latest_date"):
+                                        delta_seconds = (datetime.fromisoformat(git_commit_latest_date) -
+                                                         datetime.fromisoformat(git_commit_date)).total_seconds()
+                                        if delta_seconds > 0:
+                                            if (delta_hours := int(delta_seconds / 3600)) > 0:
+                                                if (delta_days := int(delta_hours / 24)) > 0:
+                                                    container_lines[len(container_lines) - 1] += f" (-{delta_days}d)"
+                                                else:
+                                                    container_lines[len(container_lines) - 1] += f" (-{delta_hours}h)"
                     if elasticsearch_server := container.get("elasticsearch"):
                         elasticsearch_server = self._ecs._unversioned_name(elasticsearch_server)
                         if (cluster.blue_or_green and
@@ -397,12 +409,17 @@ class AwsEcs:
                     git_commit = build_info.get("commit")
                     git_commit_date = get_github_commit_date(git_repo, git_commit)
                     git_commit_latest = get_github_latest_commit(git_repo, git_branch)
+                    if git_commit_latest != git_commit:
+                        git_commit_latest_date = get_github_commit_date(git_repo, git_commit_latest)
+                    else:
+                        git_commit_latest_date = git_commit_date
                     return {
                        "repo": git_repo,
                        "branch": git_branch,
                        "commit": git_commit,
                        "commit_date": git_commit_date,
-                       "commit_latest": git_commit_latest
+                       "commit_latest": git_commit_latest,
+                       "commit_latest_date": git_commit_latest_date
                     }
                 return None
 
@@ -432,7 +449,7 @@ class AwsEcs:
                     image_repo = image_info["repo"]
                     image_tag = image_info["tag"]
                     image_size = image_info["size"]
-                    image_pushed_at = format_datetime(image_info["pushed"])
+                    image_pushed_at = format_datetime(image_info["pushed"], notz=True)
                     image_digest = image_info["digest"]
                     if (not nogit) and (build_info := get_image_build_info(image_repo, image_tag, image_digest)):
                         git_repo = build_info.get("repo")
@@ -440,6 +457,7 @@ class AwsEcs:
                         git_commit = build_info.get("commit")
                         git_commit_date = build_info.get("commit_date")
                         git_commit_latest = build_info.get("commit_latest")
+                        git_commit_latest_date = build_info.get("commit_latest_date")
                 result.append({"name": container_name,
                                "identity": container_identity,
                                "image": image,
@@ -452,6 +470,7 @@ class AwsEcs:
                                "git_commit": git_commit,
                                "git_commit_date": git_commit_date,
                                "git_commit_latest": git_commit_latest,
+                               "git_commit_latest_date": git_commit_latest_date,
                                "git_branch": git_branch,
                                "elasticsearch": elasticsearch_server,
                                "database": database_server,
@@ -722,16 +741,16 @@ class AwsEcs:
               nocontainer: bool = False, noimage: bool = False, nogit: bool = False, notasks: bool = False,
               nohealth: bool = False, noasync: bool = False, show: bool = False, verbose: bool = False) -> AwsEcs:
         cluster_results = {}
-        def print_cluster(cluster: AwsEcs.Cluster):  # noqa
-            nonlocal shortened_names, versioned_names, nodns
+        def print_cluster(cluster: AwsEcs.Cluster, noprint: bool = False):  # noqa
+            nonlocal cluster_results, shortened_names, versioned_names, nodns
             nonlocal nocontainer, noimage, nogit, notasks, nohealth, show, verbose
             cluster_lines = cluster.print_cluster(
                 shortened_names=shortened_names, versioned_names=versioned_names, nodns=nodns,
                 nocontainer=nocontainer, noimage=noimage, nogit=nogit, notasks=notasks,
-                nohealth=nohealth, show=show, verbose=verbose, noprint=True)
+                nohealth=nohealth, show=show, verbose=verbose, noprint=noprint)
             cluster_results[cluster] = cluster_lines
         if noasync is not True:
-            functions = [lambda cluster=cluster: print_cluster(cluster) for cluster in self.clusters]
+            functions = [lambda cluster=cluster: print_cluster(cluster, noprint=True) for cluster in self.clusters]
             run_concurrently(functions, nthreads=8)
             cluster_results = dict(sorted(cluster_results.items(),
                                           key=lambda cluster: (not cluster[0].blue_or_green, cluster[0].cluster_name)))
