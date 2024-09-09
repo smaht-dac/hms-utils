@@ -11,6 +11,7 @@ import sys
 from typing import List, Optional, Tuple
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
+from hms_utils.terminal_utils import terminal_color
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Convenience utility to view/manage SSO/Okta-based AWS credentials, defined in the ~/.aws/config file.
@@ -217,7 +218,15 @@ def print_aws_profile_line(aws_profile: object, verified_result: Optional[tuple]
     if aws_profile.default:
         line += f" {CHAR.larrow} default"
     if aws_profile_name_current == aws_profile.name:
-        line += f" {CHAR.larrow} current"
+        AwsProfiles().read().default
+        if ((not aws_profile.default) and
+            (aws_default_profile := AwsProfiles().read().default) and
+            (aws_default_profile.name != aws_profile.name)):  # noqa
+            # If both current and default set and current is not the same as default then
+            # make the current one stand out, as this is the one that will be used over default.
+            line += f" {CHAR.larrow} {terminal_color('current', 'red', bold=True, underline=True)}"
+        else:
+            line += f" {CHAR.larrow} current"
     print(line)
     return verified
 
