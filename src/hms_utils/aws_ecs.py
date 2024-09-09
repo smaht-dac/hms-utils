@@ -15,6 +15,7 @@ from hms_utils.aws.codebuild.utils import get_build_info
 from hms_utils.chars import chars
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
+from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 
 # TODO: Does not really work right for 4dn because of the "Mirror" setup.
 # Not literally swapping task-definitions between the two (blue/green) services,
@@ -195,6 +196,14 @@ class AwsEcs:
                             git_commit = container.get("git_commit")
                             container_lines.append(f"        GIT: {git_repo} {chars.dot_hollow} {git_branch}"
                                                    f" {chars.dot_hollow} {git_commit}")
+                            if git_commit_date := container.get("git_commit_date"):
+                                container_lines[len(container_lines) - 1] += (
+                                    f" {chars.dot_hollow} {format_datetime(git_commit_date)}")
+                            if git_commit_latest := container.get("git_commit_latest"):
+                                if git_commit_latest == git_commit:
+                                    container_lines[len(container_lines) - 1] += f" {chars.check}"
+                                else:
+                                    container_lines[len(container_lines) - 1] += f" {chars.xmark}"
                     if elasticsearch_server := container.get("elasticsearch"):
                         elasticsearch_server = self._ecs._unversioned_name(elasticsearch_server)
                         if (cluster.blue_or_green and
@@ -377,11 +386,18 @@ class AwsEcs:
                     (build_digest := build_info.get("digest")) and
                     (build_digest == image_digest)):  # noqa
                     if git_repo := build_info.get("github"):
-                        return {
-                           "repo": git_repo.replace("https://github.com/", ""),
-                           "commit": build_info.get("commit"),
-                           "branch": build_info.get("branch")
-                        }
+                        git_repo = git_repo.replace("https://github.com/", "")
+                    git_branch = build_info.get("branch")
+                    git_commit = build_info.get("commit")
+                    git_commit_date = get_github_commit_date(git_repo, git_commit)
+                    git_commit_latest = get_github_latest_commit(git_repo, git_branch)
+                    return {
+                       "repo": git_repo,
+                       "branch": git_branch,
+                       "commit": git_commit,
+                       "commit_date": git_commit_date,
+                       "commit_latest": git_commit_latest
+                    }
                 return None
 
             for container in containers:
@@ -414,8 +430,10 @@ class AwsEcs:
                     image_digest = image_info["digest"]
                     if (not nogit) and (build_info := get_image_build_info(image_repo, image_tag, image_digest)):
                         git_repo = build_info.get("repo")
-                        git_commit = build_info.get("commit")
                         git_branch = build_info.get("branch")
+                        git_commit = build_info.get("commit")
+                        git_commit_date = build_info.get("commit_date")
+                        git_commit_latest = build_info.get("commit_latest")
                 result.append({"name": container_name,
                                "identity": container_identity,
                                "image": image,
@@ -426,6 +444,8 @@ class AwsEcs:
                                "image_digest": image_digest,
                                "git_repo": git_repo,
                                "git_commit": git_commit,
+                               "git_commit_date": git_commit_date,
+                               "git_commit_latest": git_commit_latest,
                                "git_branch": git_branch,
                                "elasticsearch": elasticsearch_server,
                                "database": database_server,
@@ -715,7 +735,7 @@ class AwsEcs:
                     print(cluster_line)
         else:
             for cluster in self.clusters:
-                cluster.print_cluster()
+                print_cluster(cluster)
         print("")
 
     def _list_clusters(self) -> List[str]:
@@ -929,9 +949,9 @@ def main():
     show = False
     verbose = False
 
-    argi = 0
-    while argi < len(argv := sys.argv[1:]):
-        arg = argv[argi]
+    argi = 0 ; argn = len(argv := sys.argv[1:])  # noqa
+    while argi < argn:
+        arg = argv[argi] ; argi += 1  # noqa
         if arg in ["--bluegreen", "-bluegreen", "bluegreen", "--greenblue",
                    "-greenblue", "greenblue", "--bg", "-bg", "bg", "--gb", "-gb", "gb"]:
             # Show only blue/green clusters/services/task-definitions.
@@ -975,13 +995,19 @@ def main():
             show_unassociated_task_definitions = True
         elif arg in ["--noasync", "-noasync", "noasync"]:
             noasync = True
+        elif arg in ["--github-token", "-github-token", "--git", "-git"]:
+            if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                usage()
+            os.environ["GITHUB_TOKEN"] = arg
+            argi += 1
         elif arg in ["--verbose", "-verbose", "--verbose", "-verbose", "--v", "-v"]:
             verbose = True
         elif arg in ["--aws", "-aws", "--env", "-env"]:
             # Profile name from ~/.aws/config file.
-            if ((argi := argi + 1) >= len(argv)) or (aws_profile := argv[argi]).startswith("-"):
+            if (argi >= argn) or (aws_profile := argv[argi]).startswith("-"):
                 usage()
             os.environ["AWS_PROFILE"] = aws_profile
+            argi += 1
         elif arg in ["--version", "-version"]:
             print(f"hms-utils version: {get_version()}")
             exit(0)
