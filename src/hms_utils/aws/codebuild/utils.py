@@ -32,6 +32,9 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = No
             projects.remove(preferred_project)
             return [preferred_project, *projects]
 
+        projects = [project for project in projects
+                    if "pipeline" not in project.lower() and "tibanna" not in project.lower()]
+
         preferred_project = [project for project in projects if project == image_repo]
         if preferred_project:
             return prefer_project(preferred_project[0])

@@ -236,6 +236,8 @@ class AwsEcs:
                         container_lines.append(f"         ES: {elasticsearch_server}")
                     if database_server := container.get("database"):
                         container_lines.append(f"        RDS: {database_server}")
+                    if redis_server := container.get("redis"):
+                        container_lines.append(f"      REDIS: {redis_server}")
                     if global_env_bucket := container.get("global_env_bucket"):
                         container_lines.append(f"        GEB: {global_env_bucket}")
                     if s3_encrypt_key := container.get("s3_encrypt_key"):
@@ -245,9 +247,21 @@ class AwsEcs:
                             container_lines.append(f"        SEK: {s3_encrypt_key[:2]}******")
                         if s3_encrypt_key_id := container.get("s3_encrypt_key_id"):
                             container_lines[len(container_lines) - 1] += (
-                                f" {chars.dot_hollow} ID: {s3_encrypt_key_id}")
+                                f" {chars.dot_hollow} {s3_encrypt_key_id}")
                     elif s3_encrypt_key_id := container.get("s3_encrypt_key_id"):
                         container_lines.append(f"      SEKID: {s3_encrypt_key_id}")
+                    if verbose and (auth0_client := container.get("auth0_client")):
+                        container_lines.append(f"      AUTH0: {auth0_client}")
+                        if auth0_secret := container.get("auth0_secret"):
+                            if show:
+                                container_lines[len(container_lines) - 1] += (
+                                    f" {chars.dot_hollow} {auth0_secret}")
+                            else:
+                                container_lines[len(container_lines) - 1] += (
+                                    f" {chars.dot_hollow} {auth0_secret[:2]}******")
+                        if auth0_domain := container.get("auth0_domain"):
+                            container_lines[len(container_lines) - 1] += (
+                                f" {chars.dot_hollow} {auth0_domain}")
                     if container_lines != container_lines_previous:
                         lines += container_lines
                     container_lines_previous = container_lines
@@ -404,11 +418,11 @@ class AwsEcs:
             for container in containers:
                 container_name = container.get("name")
                 container_identity = None
-                elasticsearch_server = None
+                elasticsearch_server = None ; redis_server = None  # noqa
                 image = None ; image_repo = None ; image_tag = None  # noqa
                 image_size = None ; image_pushed_at = None ; image_digest = None  # noqa
-                git_repo = None ; git_branch = None ; git_commit = None
-                git_commit_date = None ; git_commit_latest = None ; git_commit_latest_date = None
+                git_repo = None ; git_branch = None ; git_commit = None  # noqa
+                git_commit_date = None ; git_commit_latest = None ; git_commit_latest_date = None  # noqa
                 build_project = None  # noqa
                 if envs := container.get("environment"):
                     # Get the IDENTITY associated with thie task-definition/container.
@@ -416,10 +430,14 @@ class AwsEcs:
                         if env.get("name") == "IDENTITY":
                             if container_identity := env.get("value"):
                                 elasticsearch_server = self._ecs._get_elasticsearch_server(container_identity)
+                                redis_server = self._ecs._get_redis_server(container_identity)
                                 database_server = self._ecs._get_database_server(container_identity)
                                 global_env_bucket = self._ecs._get_global_env_bucket(container_identity)
                                 s3_encrypt_key = self._ecs._get_s3_encrypt_key(container_identity)
                                 s3_encrypt_key_id = self._ecs._get_s3_encrypt_key_id(container_identity)
+                                auth0_client = self._ecs._get_auth0_client(container_identity)
+                                auth0_secret = self._ecs._get_auth0_secret(container_identity)
+                                auth0_domain = self._ecs._get_auth0_domain(container_identity)
                             break
                 # Get the ECR image associated with this container; looks like this:
                 # 643366669028.dkr.ecr.us-east-1.amazonaws.com/fourfront-production
@@ -456,9 +474,13 @@ class AwsEcs:
                                "git_branch": git_branch,
                                "elasticsearch": elasticsearch_server,
                                "database": database_server,
+                               "redis": redis_server,
                                "global_env_bucket": global_env_bucket,
                                "s3_encrypt_key": s3_encrypt_key,
-                               "s3_encrypt_key_id": s3_encrypt_key_id})
+                               "s3_encrypt_key_id": s3_encrypt_key_id,
+                               "auth0_client": auth0_client,
+                               "auth0_secret": auth0_secret,
+                               "auth0_domain": auth0_domain})
 
             # We just return one - that is all we normally have. TODO: Ask if this is for us alway true.
             return result[0] if result else {}
@@ -785,6 +807,12 @@ class AwsEcs:
         return self._get_identity_secrets(identity).get("RDS_HOSTNAME")
 
     @lru_cache
+    def _get_redis_server(self, identity: str) -> Optional[str]:
+        if redis := self._get_identity_secrets(identity).get("ENCODED_REDIS_SERVER"):
+            return self._unversioned_name(redis.replace("rediss://", ""))
+        return None
+
+    @lru_cache
     def _get_global_env_bucket(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("GLOBAL_ENV_BUCKET")
 
@@ -795,6 +823,18 @@ class AwsEcs:
     @lru_cache
     def _get_s3_encrypt_key_id(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("ENCODED_S3_ENCRYPT_KEY_ID")
+
+    @lru_cache
+    def _get_auth0_client(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("ENCODED_AUTH0_CLIENT")
+
+    @lru_cache
+    def _get_auth0_secret(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("ENCODED_AUTH0_SECRET")
+
+    @lru_cache
+    def _get_auth0_domain(self, identity: str) -> Optional[str]:
+        return self._get_identity_secrets(identity).get("ENCODED_AUTH0_DOMAIN")
 
     @lru_cache
     def _get_identity_secrets(self, identity: str) -> dict:
