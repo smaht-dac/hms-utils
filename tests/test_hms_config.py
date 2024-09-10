@@ -1,5 +1,6 @@
 import os
 from hms_utils.hms_config import Config
+from unittest.mock import patch
 
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -231,8 +232,18 @@ def test_hmsconfig_g():
     value = merged_config.lookup("foursight/smaht/Auth0Client")
     assert value == "UfM_REDACTED_Hf9"
 
-    return  # TODO
+    mocked_aws_secrets_value = {
+        "deploying_iam_user": "kent.pitman.biotest",
+        "ENCODED_AUTH0_CLIENT": "XYZ_REDACTED_auth0_client_ABC",
+        "ENCODED_AUTH0_SECRET": "XYZ_REDACTED_auth0_secret_ABC",
+        "RDS_NAME": "rds-cgap-wolf"
+    }
+    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
+        value = merged_config.lookup("foursight/cgap/wolf/Auth0Secret")
+        assert value == "XYZ_REDACTED_auth0_secret_ABC"
 
+    return  # TODO
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == ""
 

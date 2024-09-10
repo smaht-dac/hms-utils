@@ -3,7 +3,7 @@
         "local": {
             "client": "UfM_REDACTED_Hf9"
         },
-        "todo": {
+        "prod": {
             "client": "DQx_REDACTED_kN1"
         }
     },
@@ -63,7 +63,8 @@
                 "AWS_PROFILE": "cgap-wolf",
                 "IDENTITY": "C4DatastoreCgapWolfC4DatastorecgapwolfapplicationconfigurationApplicationConfiguration",
                 "STACK_NAME": "c4-foursight-cgap-wolf-stack",
-                "SSH_TUNNEL_ELASTICSEARCH_PORT": 9203
+                "SSH_TUNNEL_ELASTICSEARCH_PORT": 9203,
+                "Auth0Secret": "${auth0/prod/secret}"
             }
         },
         "smaht": {

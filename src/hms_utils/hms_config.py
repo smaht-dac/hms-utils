@@ -683,7 +683,6 @@ class Config:
                 value = None
         if value is not None:
             if not self._loading:
-                # if self._is_aws_secret_macro(value):
                 if self._contains_aws_secret_macro(value):
                     return self._expand_aws_secret_macros(value,
                                                           aws_secret_context_path=aws_secret_context_path or name)
@@ -901,15 +900,18 @@ class Config:
     @lru_cache(maxsize=64)
     def _lookup_aws_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
         try:
-            boto_secrets = BotoClient("secretsmanager")
-            if secrets := boto_secrets.get_secret_value(SecretId=secrets_name):
-                if secrets := json.loads(secrets.get("SecretString")):
-                    return secrets.get(secret_name)
+            if secrets := self._aws_get_secret_value(secrets_name):
+                return secrets.get(secret_name)
         except Exception:
             global SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING
             if not SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING:
                 warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
             return None
+
+    def _aws_get_secret_value(self, secrets_name: str) -> Optional[dict]:
+        boto_secrets = BotoClient("secretsmanager")
+        if secrets := boto_secrets.get_secret_value(SecretId=secrets_name):
+            return json.loads(secrets.get("SecretString"))
 
     def _import_config(self, config: dict, name: Optional[str] = None) -> None:
         if isinstance(config, dict) and config:
