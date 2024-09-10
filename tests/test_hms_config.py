@@ -248,9 +248,9 @@ def test_hmsconfig_g():
         value = merged_config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
         assert value == "XYZ_REDACTED_auth0_secret_ABC"
 
-    return  # TODO
-    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    value = merged_config.lookup("foursight/SSH_TUNNEL_ELASTICSEARCH_NAME", aws_secret_context_path="foursight/cgap/wolf")
     assert value == ""
+    return  # TODO
 
     value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == ""
