@@ -132,7 +132,7 @@ def main():
                     exports[export_name] = value
                     found = True
             if not found:
-                if args.verbose:
+                if args.nowarning:
                     if found_dictionary:
                         warning(f"{chars.rarrow} Config name/path contains no direct values: {name}")
                     else:
@@ -160,8 +160,13 @@ def main():
                 if args.json_formatted and isinstance(value, dict):
                     print(json.dumps(value, indent=4))
                 else:
-                    print(value)
+                    if args.verbose:
+                        print(f"{name}: {value}")
+                    else:
+                        print(value)
             else:
+                if not args.nowarning:
+                    warning(f"Cannot find name/path: {name}")
                 status = 1
 
     sys.exit(status)
@@ -204,6 +209,7 @@ def parse_args(argv: List[str]) -> object:
         export = False
         export_file = None
         verbose = False
+        nowarning = False
         debug = False
 
     args = Args()
@@ -306,6 +312,8 @@ def parse_args(argv: List[str]) -> object:
             args.export_file = argv[argi] ; argi += 1  # noqa
         elif arg in ["--debug", "-debug"]:
             args.debug = True
+        elif arg in ["--nowarning", "-nowarning", "--nowarnings", "-nowarnings"]:
+            args.nowarning = True
         elif arg in ["--verbose", "-verbose"]:
             args.verbose = True
         elif arg in ["--version", "-version"]:
@@ -467,10 +475,15 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
 
 def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: object) -> None:
 
+    secrets_imports = config.secrets_imports
+
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
-        nonlocal args, secrets
-        return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
-                else color(key or key_path, "red", nocolor=args.nocolor))
+        nonlocal args, secrets, secrets_imports
+        secret = False
+        if key_path:
+            if secrets and secrets.lookup(key_path) is not None:
+                secret = True
+        return color(key or key_path, "red", nocolor=args.nocolor) if secret else (key or key_path)
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
         nonlocal args, secrets
@@ -671,7 +684,7 @@ class Config:
                                                aws_secret_context_path=aws_secret_context_path or name)
                                 return macro_expanded_value
                         return value
-                if _search_imports and (docs := self._imports):
+                if _search_imports and (docs := self.imports):
                     for doc in docs:
                         if (value := self.lookup(name, doc, _search_imports=False)) is not None:
                             if isinstance(value, dict) and (not allow_dictionary):
@@ -692,13 +705,21 @@ class Config:
         return None
 
     @property
-    def _imports(self) -> List[dict]:
-        docs = []
+    def imports(self) -> List[dict]:
+        imports = []
         for key in self._json:
             if (key.startswith(Config._IMPORTED_CONFIG_KEY_PREFIX) or
                 key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX)) and isinstance(self._json[key], dict):  # noqa
-                docs.append(self._json[key])
-        return docs
+                imports.append(self._json[key])
+        return imports
+
+    @property
+    def secrets_imports(self) -> List[dict]:
+        imports = []
+        for key in self._json:
+            if key.startswith(Config._IMPORTED_SECRETS_KEY_PREFIX) and isinstance(self._json[key], dict):  # noqa
+                imports.append(self._json[key])
+        return imports
 
     def contains(self, name: str) -> bool:
         return self.lookup(name) is not None
@@ -960,7 +981,7 @@ class Config:
 
 
 def warning(message: str) -> None:
-    print(f"WARNING: {message}", file=sys.stderr)
+    print(f"WARNING: {message}", file=sys.stderr, flush=True)
 
 
 def error(message: str, usage: bool = False, status: int = 1,
