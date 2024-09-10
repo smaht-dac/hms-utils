@@ -84,6 +84,7 @@ def main():
                     # Special case to handle list of paths the first of which specifies AWS_PROFILE,
                     # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
                     os.environ[AWS_PROFILE_ENV_NAME] = value
+                # TODO: Refactor this increasingtly unwieldy logic.
                 if isinstance(value, dict):
                     # Special case: If target name/path is a dictionary then generate
                     # exports for every direct (non-dictionary) key/value within it.
@@ -95,6 +96,10 @@ def main():
                             if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
                                 # Same special case as above for (direct) items within a dictionary.
                                 os.environ[AWS_PROFILE_ENV_NAME] = single_value
+                            # TODO: A bit shaky on this ...
+                            if merged_config._contains_macro(single_value):
+                                single_value = merged_config._expand_macro_value(single_value, value)
+                            # TODO: A bit shaky on this ...
                             if merged_config._contains_aws_secret_macro(single_value):
                                 # Note the trailing separator/slash on the context.
                                 aws_secret_context_path = f"{name}{args.path_separator}"
@@ -103,14 +108,26 @@ def main():
                             exports[key] = single_value
                             found = True
                     if True:
-                        # TODO: Walk up the hierarchy to get direct values of each parent/ancestor.
-                        if parent := merged_config._get_parent(value):
+                        # Walk up the hierarchy to get direct values of each parent/ancestor.
+                        parent = merged_config._get_parent(value)
+                        while parent:
                             for key in parent:
                                 if Config._is_parent(key):
                                     continue
                                 if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
+                                    # TODO: Shaky on this ...
+                                    if merged_config._contains_macro(single_value):
+                                        single_value = merged_config._expand_macro_value(single_value, value)
+                                    # TODO: Shaky on this ...
+                                    if merged_config._contains_aws_secret_macro(single_value):
+                                        # Note the trailing separator/slash on the context.
+                                        aws_secret_context_path = f"{name}{args.path_separator}"
+                                        single_value = config._expand_aws_secret_macros(
+                                            single_value, aws_secret_context_path=aws_secret_context_path)
+                                    exports[key] = single_value
+                                    # xyzzy
                                     pass
-                    # xyzzy
+                            parent = merged_config._get_parent(parent)
                 else:
                     exports[export_name] = value
                     found = True
