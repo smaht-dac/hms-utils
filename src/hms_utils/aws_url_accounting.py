@@ -29,7 +29,7 @@ def list_elb_dns(account_id):
 def list_api_gateway_urls(account_id):
     session = boto3.Session(profile_name=account_id)
     api_gateway_client = session.client('apigateway')
-    apis = api_gateway_client.get_rest_apis()
+    apis = api_gateway_client.get_rest_apis(limit=1000)
     api_urls = []
     for api in apis['items']:
         api_urls.append(f"{api['id']}.execute-api.{session.region_name}.amazonaws.com")
@@ -91,26 +91,31 @@ def ping(dns):
     http = False
     https = False
     skip = False
+    forbidden = False
     if dns.startswith("\\052."):
         skip = True
-        return http, https, skip
+        return http, https, skip, forbidden
     elif dns.endswith(".dev"):
         skip = True
-        return http, https, skip
+        return http, https, skip, forbidden
     elif dns.endswith(".app"):
         skip = True
-        return http, https, skip
+        return http, https, skip, forbidden
     try:
-        requests.get(f"http://{dns}", allow_redirects=False, verify=False, timeout=4)
+        response = requests.get(f"http://{dns}", allow_redirects=False, verify=False, timeout=4)
+        if response.status_code == 403:
+            forbidden = True
         http = True
     except Exception:
         pass
     try:
-        requests.get(f"https://{dns}", verify=False, timeout=4)
+        response = requests.get(f"https://{dns}", verify=False, timeout=4)
+        if response.status_code == 403:
+            forbidden = True
         https = True
     except Exception:
         pass
-    return http, https, skip
+    return http, https, skip, forbidden
 
 
 def redirect_url(dns):
@@ -146,33 +151,40 @@ def redirect_url(dns):
 
 
 def ping_suffix(dns):
-    http, https, skip = ping(dns)
+    http, https, skip, forbidden = ping(dns)
     if skip:
-        return " (N/A)"
+        result = " (N/A)"
     if http:
         if https:
-            return " (HTTP/HTTPS)"
+            result = " (HTTP/HTTPS)"
         else:
-            return " (HTTP)"
+            result = " (HTTP)"
     elif https:
-        return " (HTTPS)"
+        result = " (HTTPS)"
     else:
-        return " (UNREACHABLE)"
+        result = " (UNREACHABLE)"
+    if forbidden:
+        result += " (FORBIDDEN)"
+    return result
 
 
 def format_url(dns):
-    http, https, skip = ping(dns)
+    http, https, skip, forbidden = ping(dns)
+    result = ""
     if skip:
-        return f"{dns} (N/A)"
+        result = f"{dns} (N/A)"
     if http:
         if https:
-            return f"https://{dns} (HTTP/HTTPS)"
+            result = f"https://{dns} (HTTP/HTTPS)"
         else:
-            return f"http://{dns} (HTTP)"
+            result = f"http://{dns} (HTTP)"
     elif https:
-        return f"https://{dns} (HTTPS)"
+        result = f"https://{dns} (HTTPS)"
     else:
-        return f"{dns} (UNREACHABLE)"
+        result = f"{dns} (UNREACHABLE)"
+    if forbidden:
+        result += " (FORBIDDEN)"
+    return result
 
 
 def just_url(s):
