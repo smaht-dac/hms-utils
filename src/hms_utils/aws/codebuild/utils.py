@@ -5,9 +5,10 @@ import re
 import time
 from typing import Dict, Generator, List, Optional, Tuple
 from dcicutils.datetime_utils import format_datetime
+from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 
 
-def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = None, previous_builds: int = 2) -> Dict:
+def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = None, previous_builds: int = 0) -> Dict:
     """
     Returns a dictionary with info about the three most recent CodeBuild builds
     for the given image repo and tag, or None if none found.
@@ -133,13 +134,6 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = No
     return response
 
 
-def _get_image_repo_and_tag(image_arn: str) -> Tuple[Optional[str], Optional[str]]:
-    # image_arn = _shortened_arn(image_arn)
-    image_arn = image_arn
-    parts = image_arn.split(":")
-    return (parts[0], parts[1]) if len(parts) == 2 else (None, None)
-
-
 @lru_cache
 def get_build_info(image_repo: str, image_tag: str) -> Optional[Dict]:
     # Cache this result within the enclosing function; for the below services loop.
@@ -152,6 +146,40 @@ def get_build_info(image_repo: str, image_tag: str) -> Optional[Dict]:
                 build["latest"] = {}
             build["latest"]["digest"] = _get_aws_codebuild_digest(log_group, log_stream, image_tag)
     return build
+
+
+def get_image_build_info(image_repo: str, image_tag: str, image_digest: str) -> Optional[dict]:
+    if ((build_info := get_build_info(image_repo, image_tag)) and
+        (build_info := build_info.get("latest")) and
+        (build_digest := build_info.get("digest")) and
+        (build_digest == image_digest)):  # noqa
+        if git_repo := build_info.get("github"):
+            git_repo = git_repo.replace("https://github.com/", "")
+        git_branch = build_info.get("branch")
+        git_commit = build_info.get("commit")
+        git_commit_date = get_github_commit_date(git_repo, git_commit)
+        git_commit_latest = get_github_latest_commit(git_repo, git_branch)
+        if git_commit_latest != git_commit:
+            git_commit_latest_date = get_github_commit_date(git_repo, git_commit_latest)
+        else:
+            git_commit_latest_date = git_commit_date
+        return {
+           "build_project": build_info["project"],
+           "repo": git_repo,
+           "branch": git_branch,
+           "commit": git_commit,
+           "commit_date": git_commit_date,
+           "commit_latest": git_commit_latest,
+           "commit_latest_date": git_commit_latest_date
+        }
+    return None
+
+
+def _get_image_repo_and_tag(image_arn: str) -> Tuple[Optional[str], Optional[str]]:
+    # image_arn = _shortened_arn(image_arn)
+    image_arn = image_arn
+    parts = image_arn.split(":")
+    return (parts[0], parts[1]) if len(parts) == 2 else (None, None)
 
 
 def _get_aws_codebuild_digest(log_group: str, log_stream: str, image_tag: Optional[str] = None) -> Optional[str]:

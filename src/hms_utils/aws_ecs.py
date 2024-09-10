@@ -12,10 +12,9 @@ from typing import List, Literal, Optional, Tuple, Union
 from dcicutils.datetime_utils import format_datetime
 from dcicutils.misc_utils import format_size
 from dcicutils.secrets_utils import get_identity_secrets
-from hms_utils.aws.codebuild.utils import get_build_info
+from hms_utils.aws.codebuild.utils import get_image_build_info
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import convert_uptime_to_datetime, format_duration
-from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
 
@@ -193,10 +192,12 @@ class AwsEcs:
                     container_lines = []
                     container_lines.append(f"   IDENTITY: {container['identity']}")
                     if image := container.get("image"):
+                        build_project = container.get("build_project")
                         image_pushed_at = container.get("image_pushed_at")
                         image_size = container.get("image_size")
                         container_lines.append(f"      IMAGE: {image}"
-                                               f" ({format_size(image_size)}) {chars.dot_hollow} {image_pushed_at}")
+                                               f" ({format_size(image_size)}) {chars.dot_hollow}"
+                                               f" {build_project} {chars.dot_hollow} {image_pushed_at}")
                         if git_repo := container.get("git_repo"):
                             git_branch = container.get("git_branch")
                             git_commit = container.get("git_commit")
@@ -400,32 +401,6 @@ class AwsEcs:
                 return {}
             result = []
 
-            @lru_cache
-            def get_image_build_info(image_repo: str, image_tag: str, image_digest: str) -> Optional[dict]:
-                if ((build_info := get_build_info(image_repo, image_tag)) and
-                    (build_info := build_info.get("latest")) and
-                    (build_digest := build_info.get("digest")) and
-                    (build_digest == image_digest)):  # noqa
-                    if git_repo := build_info.get("github"):
-                        git_repo = git_repo.replace("https://github.com/", "")
-                    git_branch = build_info.get("branch")
-                    git_commit = build_info.get("commit")
-                    git_commit_date = get_github_commit_date(git_repo, git_commit)
-                    git_commit_latest = get_github_latest_commit(git_repo, git_branch)
-                    if git_commit_latest != git_commit:
-                        git_commit_latest_date = get_github_commit_date(git_repo, git_commit_latest)
-                    else:
-                        git_commit_latest_date = git_commit_date
-                    return {
-                       "repo": git_repo,
-                       "branch": git_branch,
-                       "commit": git_commit,
-                       "commit_date": git_commit_date,
-                       "commit_latest": git_commit_latest,
-                       "commit_latest_date": git_commit_latest_date
-                    }
-                return None
-
             for container in containers:
                 container_name = container.get("name")
                 container_identity = None
@@ -455,6 +430,7 @@ class AwsEcs:
                     image_pushed_at = format_datetime(image_info["pushed"], notz=True)
                     image_digest = image_info["digest"]
                     if (not nogit) and (build_info := get_image_build_info(image_repo, image_tag, image_digest)):
+                        build_project = build_info.get("build_project")
                         git_repo = build_info.get("repo")
                         git_branch = build_info.get("branch")
                         git_commit = build_info.get("commit")
@@ -463,6 +439,7 @@ class AwsEcs:
                         git_commit_latest_date = build_info.get("commit_latest_date")
                 result.append({"name": container_name,
                                "identity": container_identity,
+                               "build_project": build_project,
                                "image": image,
                                "image_repo": image_repo,
                                "image_tag": image_tag,
