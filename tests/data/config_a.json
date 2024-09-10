@@ -1,10 +1,10 @@
 {
     "auth0": {
         "local": {
-            "client_id": "UfM_REDACTED_Hf9"
+            "client": "UfM_REDACTED_Hf9"
         },
         "todo": {
-            "client_id": "DQx_REDACTED_kN1"
+            "client": "DQx_REDACTED_kN1"
         }
     },
 
@@ -13,7 +13,7 @@
             "wolf": {
                 "AWS_PROFILE": "smaht-wolf",
                 "IDENTITY": "C4AppConfigSmahtWolf",
-                "Auth0Client": "${auth0/local/client_id}",
+                "Auth0Client": "${auth0/local/client}",
                 "S3_ENCRYPT_KEY_ID": "REDACTED-ABC-DEF-GHI-JKL",
                 "tests": {
                     "IDENTITY": "C4AppConfigSmahtDevtest"
@@ -25,7 +25,7 @@
                 "AWS_PROFILE": "cgap-devtest",
                 "GLOBAL_ENV_BUCKET": "cgap-devtest-main-foursight-envs",
                 "GLOBAL_BUCKET_ENV": "cgap-devtest-main-foursight-envs",
-                "Auth0Client": "${auth0/local/client_id}"
+                "Auth0Client": "${auth0/local/client}"
             }
         },
         "fourfront": {
@@ -33,7 +33,7 @@
                 "AWS_PROFILE": "4dn",
                 "IDENTITY": "FoursightDevelopmentLocalApplicationSecret",
                 "GLOBAL_ENV_BUCKET": "foursight-prod-envs",
-                "Auth0Client": "${auth0/local/client_id}"
+                "Auth0Client": "${auth0/local/client}"
             }
         }
     },
@@ -67,8 +67,8 @@
             }
         },
         "smaht": {
-            "Auth0Client": "${auth0/local/client_id}",
-            "Auth0Secret_TODO_THIS_DOES_NOT_WORK_YET_DUE_TO_EXPAND_BEFORE_NERGE_OR_SOMETHING": "${auth0/local/secret}",
+            "Auth0Client": "${auth0/local/client}",
+            "Auth0Secret": "${auth0/local/secret}",
             "wolf": {
                 "AWS_PROFILE": "smaht-wolf",
                 "IDENTITY": "C4AppConfigFoursightSmahtDevelopment",

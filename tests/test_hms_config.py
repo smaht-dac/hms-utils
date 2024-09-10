@@ -218,14 +218,20 @@ def test_hmsconfig_g():
     config = Config(config_file)
     secrets = Config(secrets_file)
     merged_config = config.merge_secrets(secrets)
-    return
-
-    # TODO
-    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
-    assert value == ""
 
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
-    assert value == ""
+    assert value == "ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209"
+
+    value = merged_config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == "ssh-tunnel-elasticsearch-proxy-smaht-green-9208"
+
+    value = merged_config.lookup("foursight/smaht/Auth0Secret")
+    assert value == "REDACTED_auth0_local_secret_value"
+
+    value = merged_config.lookup("foursight/smaht/Auth0Client")
+    assert value == "UfM_REDACTED_Hf9"
+
+    return  # TODO
 
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == ""
