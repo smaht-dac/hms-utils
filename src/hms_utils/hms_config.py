@@ -46,14 +46,17 @@ def main():
             config = Config(args.config_file,
                             config_imports=args.config_imports,
                             secrets_imports=args.secrets_imports,
-                            path_separator=args.path_separator, nomacros=args.nomacros)
+                            path_separator=args.path_separator,
+                            nomacros=args.nomacros, noaws=args.noaws)
         except Exception as e:
             error(f"Cannot process config file: {args.config_file}", exception=e, trace=True)
 
     secrets = None
     if args.secrets_file:
         try:
-            secrets = Config(args.secrets_file, path_separator=args.path_separator, nomacros=args.nomacros)
+            secrets = Config(args.secrets_file,
+                             path_separator=args.path_separator,
+                             nomacros=args.nomacros, noaws=args.noaws)
         except Exception as e:
             error(f"Cannot process secrets file: {args.secrets_file}", exception=e, trace=True)
 
@@ -208,6 +211,7 @@ def parse_args(argv: List[str]) -> object:
         nomacros = False
         export = False
         export_file = None
+        noaws = False
         verbose = False
         nowarning = False
         debug = False
@@ -310,6 +314,8 @@ def parse_args(argv: List[str]) -> object:
                 _usage()
             args.export = True
             args.export_file = argv[argi] ; argi += 1  # noqa
+        elif arg in ["-noaws", "noaws"]:
+            args.noaws = True
         elif arg in ["--debug", "-debug"]:
             args.debug = True
         elif arg in ["--nowarning", "-nowarning", "--nowarnings", "-nowarnings"]:
@@ -621,7 +627,7 @@ class Config:
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  config_imports: List[dict] = [], secrets_imports: List[dict] = [],
-                 path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False) -> None:
+                 path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False, noaws: bool = False) -> None:
         self._json = {}
         self._path_separator = path_separator
         self._expand_macros = not nomacros
@@ -630,6 +636,7 @@ class Config:
         self.unmerged_secrets = None
         self._config_imports = config_imports
         self._secrets_imports = secrets_imports
+        self._noaws = noaws
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._ignore_missing_macro = True
         self._stringize_non_primitive_types = True
@@ -920,6 +927,8 @@ class Config:
 
     @lru_cache(maxsize=64)
     def _lookup_aws_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
+        if self._noaws:
+            return "<NOAWS>"
         try:
             if secrets := self._aws_get_secret_value(secrets_name):
                 return secrets.get(secret_name)
