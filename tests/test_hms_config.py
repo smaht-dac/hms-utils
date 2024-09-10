@@ -243,6 +243,11 @@ def test_hmsconfig_g():
         value = merged_config.lookup("foursight/cgap/wolf/Auth0Secret")
         assert value == "XYZ_REDACTED_auth0_secret_ABC"
 
+    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
+        value = merged_config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
+        assert value == "XYZ_REDACTED_auth0_secret_ABC"
+
     return  # TODO
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == ""
