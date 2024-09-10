@@ -247,13 +247,3 @@ def test_hmsconfig_g():
         mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
         value = merged_config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
         assert value == "XYZ_REDACTED_auth0_secret_ABC"
-
-    return  # TODO
-    value = merged_config.lookup("foursight/SSH_TUNNEL_ELASTICSEARCH_NAME", aws_secret_context_path="foursight/cgap/wolf")
-    assert value == ""
-
-    value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
-    assert value == ""
-
-    value = config.lookup("foursight/4dn/dev/SSH_TUNNEL_ELASTICSEARCH_NAME")
-    assert value == ""
