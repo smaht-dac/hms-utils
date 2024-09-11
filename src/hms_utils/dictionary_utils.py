@@ -121,3 +121,34 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
     for key in sorted(nonleafs.keys()):
         sorted_data[key] = sort_dictionary(data[key])
     return sorted_data
+
+
+class JSON(dict):
+
+    _PARENT = "@@@__PARENT__@@@"
+
+    def __init__(self, data: dict, simple: bool = False) -> None:
+        super().__init__(data)
+        if simple is True:
+            self._map = None
+        else:
+            self._map = {}
+            self._initialize()
+
+    def _initialize(self, parent: Optional[dict] = None) -> None:
+        if parent is None:
+            parent = self
+        for key in parent:
+            child = parent[key]
+            if isinstance(child, dict):
+                self._set_parent(child, parent)
+                self._initialize(child)
+
+    def get_parent(self, item: dict) -> Optional[dict]:
+        return None if self._map is None else self._map.get(item.get(JSON._PARENT))
+
+    def _set_parent(self, item: dict, parent: dict) -> None:
+        if self._map is not None:
+            parent_id = id(parent)
+            self._map[parent_id] = parent
+            item[JSON._PARENT] = parent_id
