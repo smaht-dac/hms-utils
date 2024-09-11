@@ -1,6 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
-from typing import List, Optional, Callable
+from typing import Callable, List, Optional, Union
 
 
 def print_dictionary_tree(data: dict,
