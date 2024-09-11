@@ -411,7 +411,7 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
 
     def tree_key_modifier(key_path: str, key: Optional[str] = None) -> Optional[str]:
         nonlocal args, secrets
-        return ((key or key_path) if ((not secrets) or (secrets.lookup(key_path) is None))
+        return ((key or key_path) if ((not secrets) or (not secrets.contains(key_path)))
                 else color(key or key_path, "red", nocolor=args.nocolor))
 
     def tree_value_modifier(key_path: str, value: str) -> Optional[str]:
@@ -419,7 +419,7 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
         if (not args.show_secrets) and secrets and secrets.contains(key_path):
             value = OBFUSCATED_VALUE
         return value if ((not secrets) or
-                         (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
+                         (not secrets.contains(key_path))) else color(value, "red", nocolor=args.nocolor)
 
     def tree_value_annotator(key_path: str) -> Optional[str]:
         nonlocal unmerged_secrets
@@ -437,7 +437,7 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
 
     def tree_arrow_indicator(key_path: str) -> str:
         nonlocal secrets
-        return chars.rarrow_hollow if (secrets and (secrets.lookup(key_path) is not None)) else ""
+        return chars.rarrow_hollow if (secrets and secrets.contains(key_path)) else ""
 
     if merged_config and secrets:
         if not args.nosort:
@@ -487,7 +487,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         nonlocal args, secrets, secrets_imports
         secret = False
         if key_path:
-            if secrets and secrets.lookup(key_path) is not None:
+            if secrets and secrets.contains(key_path):
                 secret = True
         return color(key or key_path, "red", nocolor=args.nocolor) if secret else (key or key_path)
 
@@ -496,7 +496,7 @@ def print_config_and_secrets_unmerged(config: Config, secrets: Config, args: obj
         if (not args.show_secrets) and secrets and secrets.contains(key_path):
             value = OBFUSCATED_VALUE
         return value if ((not secrets) or
-                         (secrets.lookup(key_path) is None)) else color(value, "red", nocolor=args.nocolor)
+                         (not secrets.contains(key_path))) else color(value, "red", nocolor=args.nocolor)
 
     if config:
         if not args.json_only:
@@ -657,7 +657,7 @@ class Config:
 
     def lookup(self, name: str, config: Optional[dict] = None,
                allow_dictionary: bool = False, aws_secret_context_path: Optional[str] = None,
-               raw: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
+               noaws: bool = False, raw: bool = False, _search_imports: bool = True) -> Optional[str, dict]:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
@@ -688,7 +688,7 @@ class Config:
                                 if self._contains_aws_secret_macro(value):
                                     return self._expand_aws_secret_macros(
                                                macro_expanded_value,
-                                               aws_secret_context_path=aws_secret_context_path or name)
+                                               aws_secret_context_path=aws_secret_context_path or name, noaws=noaws)
                                 return macro_expanded_value
                         return value
                 if _search_imports and (docs := self.imports):
@@ -705,7 +705,8 @@ class Config:
             if not self._loading:
                 if self._contains_aws_secret_macro(value):
                     return self._expand_aws_secret_macros(value,
-                                                          aws_secret_context_path=aws_secret_context_path or name)
+                                                          aws_secret_context_path=aws_secret_context_path or name,
+                                                          noaws=noaws)
             return value
         elif config and allow_dictionary:
             return config if raw else self._cleanjson(config)
@@ -729,7 +730,7 @@ class Config:
         return imports
 
     def contains(self, name: str) -> bool:
-        return self.lookup(name) is not None
+        return self.lookup(name, noaws=True) is not None
 
     @property
     def file(self) -> dict:
@@ -894,10 +895,10 @@ class Config:
                 return True
         return False
 
-    def _expand_aws_secret_macros(self, value: str, aws_secret_context_path: str) -> Optional[str]:
+    def _expand_aws_secret_macros(self, value: str, aws_secret_context_path: str, noaws: bool = False) -> Optional[str]:
         while ((match := Config._AWS_SECRET_MACRO_PATTERN.search(value)) and
                (secret_specifier := match.group(1))):
-            if macro_value := self._expand_aws_secret_macro(secret_specifier, aws_secret_context_path):
+            if macro_value := self._expand_aws_secret_macro(secret_specifier, aws_secret_context_path, noaws=noaws):
                 macro = f"{Config._AWS_SECRET_MACRO_START}{secret_specifier}{Config._AWS_SECRET_MACRO_END}"
                 value = value.replace(macro, macro_value)
             else:
@@ -909,7 +910,8 @@ class Config:
         value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
-    def _expand_aws_secret_macro(self, secret_specifier: str, aws_secret_context_path: str) -> Optional[str]:
+    def _expand_aws_secret_macro(self, secret_specifier: str,
+                                 aws_secret_context_path: str, noaws: bool = False) -> Optional[str]:
         if (index := secret_specifier.find(self._path_separator)) > 0:
             secret_name = secret_specifier[index + 1:]
             secrets_name = secret_specifier[0:index]
@@ -921,13 +923,13 @@ class Config:
                 secrets_name_path = f"{aws_secret_context_path}/{Config._AWS_SECRET_NAME_NAME}"
                 secrets_name = self.lookup(secrets_name_path)
         if secrets_name and secret_name:
-            if secret_value := self._lookup_aws_secret(secrets_name, secret_name):
+            if secret_value := self._lookup_aws_secret(secrets_name, secret_name, noaws=noaws):
                 return secret_value
         return None
 
     @lru_cache(maxsize=64)
-    def _lookup_aws_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
-        if self._noaws:
+    def _lookup_aws_secret(self, secrets_name: str, secret_name: str, noaws: bool = False) -> Optional[str]:
+        if noaws or self._noaws:
             return "__noaws__"
         try:
             if secrets := self._aws_get_secret_value(secrets_name):
