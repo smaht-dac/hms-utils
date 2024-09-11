@@ -648,7 +648,7 @@ class Config:
     def merge_secrets(self, secrets: Config) -> Config:
         merged_config_json, merged_secretst, unmerged_secretst = (
             Config._merge_config_and_secrets(self.json, secrets.json, path_separator=self._path_separator))
-        merged_config = Config(merged_config_json)
+        merged_config = Config(merged_config_json, noaws=self._noaws)
         merged_config._file = self.file
         merged_config.secrets = secrets
         merged_config.merged_secrets = merged_secretst
@@ -928,7 +928,7 @@ class Config:
     @lru_cache(maxsize=64)
     def _lookup_aws_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
         if self._noaws:
-            return "<NOAWS>"
+            return "__noaws__"
         try:
             if secrets := self._aws_get_secret_value(secrets_name):
                 return secrets.get(secret_name)
