@@ -125,30 +125,17 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
 
 class JSON(dict):
 
-    _PARENT = "@@@__PARENT__@@@"
-
-    def __init__(self, data: dict, simple: bool = False) -> None:
+    def __init__(self, data: dict, _simple: bool = False) -> None:
         super().__init__(data)
-        if simple is True:
-            self._map = None
-        else:
-            self._map = {}
-            self._initialize()
+        self.parent = None
+        if _simple is not True:
+            self._initialize(self)
 
-    def _initialize(self, parent: Optional[dict] = None) -> None:
-        if parent is None:
-            parent = self
+    def _initialize(self, parent: dict) -> None:
         for key in parent:
             child = parent[key]
             if isinstance(child, dict):
-                self._set_parent(child, parent)
+                child = JSON(child, _simple=True)
+                child.parent = parent
+                parent[key] = child
                 self._initialize(child)
-
-    def get_parent(self, item: dict) -> Optional[dict]:
-        return None if self._map is None else self._map.get(item.get(JSON._PARENT))
-
-    def _set_parent(self, item: dict, parent: dict) -> None:
-        if self._map is not None:
-            parent_id = id(parent)
-            self._map[parent_id] = parent
-            item[JSON._PARENT] = parent_id
