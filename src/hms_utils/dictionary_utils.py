@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import List, Optional, Callable
+from typing import Any, List, Optional, Callable
 
 
 def print_dictionary_tree(data: dict,
@@ -125,8 +125,10 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
 
 class JSON(dict):
 
-    def __init__(self, data: dict, _simple: bool = False) -> None:
-        super().__init__(data)
+    def __init__(self, data: Optional[dict] = None, _simple: bool = False) -> None:
+        if isinstance(data, JSON):
+            pass
+        super().__init__(data if isinstance(data, dict) else {})
         self.parent = None
         if _simple is not True:
             self._initialize(self)
@@ -139,3 +141,10 @@ class JSON(dict):
                 child.parent = parent
                 parent[key] = child
                 self._initialize(child)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if isinstance(value, dict) and id(value.parent) != id(self):
+            if not isinstance(value, JSON):
+                value = JSON(value, _simple=True)
+            value.parent = self
+        super().__setitem__(key, value)
