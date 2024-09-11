@@ -1,5 +1,6 @@
+from __future__ import annotations
 from copy import deepcopy
-from typing import Any, List, Optional, Callable
+from typing import List, Optional, Callable
 
 
 def print_dictionary_tree(data: dict,
@@ -123,28 +124,39 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
     return sorted_data
 
 
+# This JSON class isa dictionary type which also suport "parent" property.
+# Should be able to use EXACTLY like a dict after creating with JSON(your_dict);
+# including copying and setting properties to either other dictionaires or JSON objects.
+#
 class JSON(dict):
 
-    def __init__(self, data: Optional[dict] = None, _simple: bool = False) -> None:
+    def __init__(self, data: Optional[Union[dict, JSON]] = None, _default: bool = True) -> None:
         if isinstance(data, JSON):
-            pass
-        super().__init__(data if isinstance(data, dict) else {})
+            data = deepcopy(dict(data)) if _default is True else dict(data)
+        elif not isinstance(data, dict):
+            data = {}
+        super().__init__(data)
         self.parent = None
-        if _simple is not True:
-            self._initialize(self)
+        self._initialize(self) if _default is True else None
 
-    def _initialize(self, parent: dict) -> None:
+    def _initialize(self, parent: JSON) -> None:
         for key in parent:
             child = parent[key]
             if isinstance(child, dict):
-                child = JSON(child, _simple=True)
+                if not isinstance(child, JSON):
+                    child = JSON(child, _default=False)
                 child.parent = parent
-                parent[key] = child
+                super(JSON, parent).__setitem__(key, child)  # bypass override below
                 self._initialize(child)
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key, value):
         if isinstance(value, dict) and id(value.parent) != id(self):
-            if not isinstance(value, JSON):
-                value = JSON(value, _simple=True)
+            if isinstance(value, JSON):
+                value = deepcopy(value)
+            else:
+                value = JSON(value)
             value.parent = self
         super().__setitem__(key, value)
+
+    def __deepcopy__(self, memo):
+        return JSON(deepcopy(dict(self), memo))

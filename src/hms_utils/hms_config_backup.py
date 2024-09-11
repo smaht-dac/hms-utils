@@ -15,7 +15,7 @@ from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import (
-    JSON, delete_paths_from_dictionary, print_dictionary_list,
+    delete_paths_from_dictionary, print_dictionary_list,
     print_dictionary_tree, sort_dictionary
 )
 from hms_utils.version_utils import get_version
@@ -93,6 +93,8 @@ def main():
                     # exports for every direct (non-dictionary) key/value within it.
                     found_dictionary = True
                     for key in value:
+                        if Config._is_parent(key):
+                            continue
                         if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
                             if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
                                 # Same special case as above for (direct) items within a dictionary.
@@ -110,9 +112,11 @@ def main():
                             found = True
                     if True:
                         # Walk up the hierarchy to get direct values of each parent/ancestor.
-                        parent = value.parent
+                        parent = merged_config._get_parent(value)
                         while parent:
                             for key in parent:
+                                if Config._is_parent(key):
+                                    continue
                                 if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
                                     # TODO: Shaky on this ...
                                     if merged_config._contains_macro(single_value):
@@ -124,7 +128,9 @@ def main():
                                         single_value = config._expand_aws_secret_macros(
                                             single_value, aws_secret_context_path=aws_secret_context_path)
                                     exports[key] = single_value
-                            parent = parent.parent
+                                    # xyzzy
+                                    pass
+                            parent = merged_config._get_parent(parent)
                 else:
                     exports[export_name] = value
                     found = True
@@ -135,7 +141,7 @@ def main():
                     else:
                         warning(f"{chars.rarrow} Config name/path not found: {name}")
                 status = 1
-        exports = dict(sorted(exports.items()))
+        exports = dict(sorted(exports.items()))  # xyzzy
         if args.export_file:
             if args.verbose:
                 print(f"Writing exports to file: {args.export_file}")
@@ -355,9 +361,9 @@ def parse_args(argv: List[str]) -> object:
         try:
             with io.open(import_config_file) as f:
                 if import_config_file.startswith(".yaml") or import_config_file.startswith(".yml"):
-                    config_import_json = JSON(yaml.safe_load(f))
+                    config_import_json = yaml.safe_load(f)
                 else:
-                    config_import_json = JSON(json.load(f))
+                    config_import_json = json.load(f)
         except Exception:
             error(f"Cannot load (import) config file: {import_config_file}")
         args.config_imports.append(config_import_json)
@@ -374,7 +380,7 @@ def parse_args(argv: List[str]) -> object:
                 if import_secrets_file.startswith(".yaml") or import_secrets_file.startswith(".yml"):
                     secrets_import_json = yaml.safe_load(f)
                 else:
-                    secrets_import_json = JSON(json.load(f))
+                    secrets_import_json = json.load(f)
         except Exception:
             error(f"Cannot load (import) secrets file: {import_secrets_file}")
         args.secrets_imports.append(secrets_import_json)
@@ -615,13 +621,14 @@ class Config:
     _AWS_SECRET_MACRO_END = _MACRO_END
     _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
     _AWS_SECRET_NAME_NAME = "IDENTITY"
+    _PARENT = "@@@__PARENT__@@@"
     _IMPORTED_CONFIG_KEY_PREFIX = "@@@__CONFIG__:"
     _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
 
     def __init__(self, file_or_dictionary: Union[str, dict],
                  config_imports: List[dict] = [], secrets_imports: List[dict] = [],
                  path_separator: str = DEFAULT_PATH_SEPARATOR, nomacros: bool = False, noaws: bool = False) -> None:
-        self._json = JSON()
+        self._json = {}
         self._path_separator = path_separator
         self._expand_macros = not nomacros
         self.secrets = None
@@ -633,6 +640,7 @@ class Config:
         # These booleans are effectively immutable; decided on this default/unchangable behavior.
         self._ignore_missing_macro = True
         self._stringize_non_primitive_types = True
+        self._imap = {}
         self._loading = True
         self._load(file_or_dictionary)
         self._loading = False
@@ -653,11 +661,11 @@ class Config:
 
         def lookup_upwards(name: str, config: dict) -> Optional[str]:  # noqa
             nonlocal self
-            if parent := config.parent:
+            if parent := self._get_parent(config):
                 while parent:
                     if ((value := parent.get(name)) is not None) and Config._is_primitive_type(value):
                         return value
-                    parent = parent.parent
+                    parent = self._get_parent(parent)
             return None
 
         if config is None:
@@ -738,15 +746,15 @@ class Config:
 
     def _load(self, file_or_dictionary: Union[str, dict]) -> None:
         if isinstance(file_or_dictionary, dict):
-            self._json = JSON(file_or_dictionary)
+            self._json = file_or_dictionary
             self._file = None
         else:
             self._file = file_or_dictionary
             with io.open(file_or_dictionary, "r") as f:
                 if self._file.endswith(".yaml") or self._file.endswith(".yml"):
-                    self._json = JSON(yaml.safe_load(f))
+                    self._json = yaml.safe_load(f)
                 else:
-                    self._json = JSON(json.load(f))
+                    self._json = json.load(f)
         for config_import in self._config_imports:
             self._import_config(config_import)
         for secrets_import in self._secrets_imports:
@@ -755,7 +763,7 @@ class Config:
             _ = self._macro_expand(self._json)
 
     @staticmethod
-    def _merge_config_and_secrets(config: JSON, secrets: JSON,
+    def _merge_config_and_secrets(config: dict, secrets: dict,
                                   path_separator: str = DEFAULT_PATH_SEPARATOR) -> Tuple[dict, list, list]:
         if not (isinstance(config, dict) or isinstance(secrets, dict)):
             return None, None
@@ -776,9 +784,10 @@ class Config:
 
     def _macro_expand(self, data: dict) -> dict:
         for name in data:  # TODO: check for duplicate keys.
-            if not (name := name.strip()):
+            if not ((name := name.strip()) and (not self._is_parent(name))):
                 continue
             if isinstance(data[name], dict):
+                self._set_parent(data[name], data)
                 data[name] = self._macro_expand(data[name])
             elif not Config._is_primitive_type(data[name]) and not self._stringize_non_primitive_types:
                 raise Exception(f"Non-primitive type found: {name}")
@@ -792,13 +801,13 @@ class Config:
             if Config._is_primitive_type(macro_value):
                 return str(macro_value)
             return None
-        data = data.parent
+        data = self._get_parent(data)
         while data:
             if (macro_value := self.lookup(macro_name, data)) is not None:
                 if Config._is_primitive_type(macro_value):
                     return str(macro_value)
                 return None
-            data = data.parent
+            data = self._get_parent(data)
         return None
 
     def _expand_macro_value(self, value: str, data: dict) -> Optional[str]:
@@ -948,6 +957,18 @@ class Config:
     def _is_primitive_type(value: Any) -> bool:  # noqa
         return isinstance(value, (int, float, str, bool))
 
+    def _get_parent(self, item: dict) -> Optional[dict]:
+        return self._imap.get(item.get(Config._PARENT))
+
+    def _set_parent(self, item: dict, parent: dict) -> None:
+        parent_id = id(parent)
+        self._imap[parent_id] = parent
+        item[Config._PARENT] = parent_id
+
+    @staticmethod
+    def _is_parent(name: str) -> None:
+        return name == Config._PARENT
+
     @staticmethod
     def _cleanjson(data: dict) -> dict:
         data = deepcopy(data)
@@ -959,7 +980,14 @@ class Config:
                     todelete.append(key)
             for key in todelete:
                 del data[key]
+        def remove_parent_properties(data: dict) -> None:  # noqa
+            if isinstance(data, dict):
+                if Config._PARENT in data:
+                    del data[Config._PARENT]
+                for key, value in list(data.items()):
+                    remove_parent_properties(value)
         remove_imported_configs(data)
+        remove_parent_properties(data)
         return data
 
 
