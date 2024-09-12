@@ -171,6 +171,8 @@ class AwsEcs:
                     if not notasks:
                         line += f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}"
                     lines.append(line)
+                    if verbose and (target_group_arn := service.target_group_arn):
+                        lines.append(f"     TARGET: {target_group_arn}")
                 if cluster_is_mirrored_state is True:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
                 elif cluster_is_mirrored_state is False:
@@ -285,6 +287,7 @@ class AwsEcs:
                                           if isinstance(task_definition, str) else None))
             self._dns_aname = None
             self._dns_cname = None
+            self._target_group_arn = None
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.service_name)
         @property  # noqa
@@ -337,7 +340,7 @@ class AwsEcs:
             # Get ANAME/CNAME so we can definitively see which service is associated with data/staging.
             # From service (e.g. c4-ecs-blue-green-smaht-production-stack-SmahtgreenPortalService-aYgRm5cTsSu0),
             # get application load-balancer (EC2) target-group name (e.g. TargetGroupApplicationGreen), and then
-            # the load-balancer name (e.g. smaht-productiongreen - though should be able to go directlry to LB?),
+            # the load-balancer name (e.g. smaht-productiongreen - though should be able to go directly to LB?),
             # and there get, e.g.: DNS: smaht-productiongreen-1114221794.us-east-1.elb.amazonaws.com (A Record).
             if self._dns_aname:
                 return self._dns_aname
@@ -352,6 +355,7 @@ class AwsEcs:
                     if target_group_arn := load_balancer.get("targetGroupArn"):
                         if ((target_groups := boto_elb.describe_target_groups(TargetGroupArns=[target_group_arn])) and
                             (target_group := target_groups.get("TargetGroups")[0])):  # noqa
+                            self._target_group_arn = target_group.get("TargetGroupArn")
                             if load_balancers := target_group.get("LoadBalancerArns"):
                                 if load_balancer := boto_elb.describe_load_balancers(
                                         LoadBalancerArns=load_balancers)["LoadBalancers"]:
@@ -380,6 +384,11 @@ class AwsEcs:
             if not self.dns_aname:
                 return None
             return self._dns_cname
+        @property  # noqa
+        def target_group_arn(self) -> Optional[str]:
+            if not self._target_group_arn:
+                _ = self.dns_aname
+            return self._target_group_arn
         def __str__(self) -> str:  # noqa
             annotation = self.get_annotation()
             return f"{self.service_name}{f' {annotation}' if annotation else ''}"
