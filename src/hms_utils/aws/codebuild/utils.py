@@ -99,9 +99,13 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: str,
                     return create_build_info(build)
             return None
 
+        # TODO: Something going wrong when showing swap state - wires crossed.
         get_builds_from_boto_this_many_at_a_time = 4
+        nbuilds = 0
         next_token = None
         while True:
+            if nbuilds >= previous_builds:
+                break
             if next_token:
                 build_ids = codebuild.list_builds_for_project(projectName=project, nextToken=next_token)
             else:
@@ -113,6 +117,9 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: str,
                 build_ids = build_ids[get_builds_from_boto_this_many_at_a_time:]
                 builds = codebuild.batch_get_builds(ids=build_ids_batch)["builds"]
                 for build in builds:
+                    if nbuilds >= previous_builds:
+                        break
+                    nbuilds += 1
                     build = get_relevant_build_info(build)
                     if build:
                         yield build

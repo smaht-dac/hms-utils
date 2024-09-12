@@ -1148,7 +1148,8 @@ def main():
             exit(1)
         ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names,
                           nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-                          notasks=notasks, nohealth=nohealth, nouptime=nouptime, show=show, verbose=verbose)
+                          notasks=notasks, nohealth=nohealth, nouptime=nouptime, show=show,
+                          noasync=noasync, verbose=verbose)
 
     if show_unassociated_task_definitions:
         if unassociated_task_definition_names := ecs.unassociated_task_definition_names:
