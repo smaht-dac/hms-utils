@@ -2,7 +2,7 @@
 hms-utils : CHANGE LOG
 ======================
 
-1.2.58
+1.2.59
 ======
 * 2024-09-11/dmichaels
   - Using new dictionary_utils.JSON for parent-award dictionary.
