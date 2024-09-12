@@ -172,7 +172,7 @@ class AwsEcs:
                         line += f"{f' | ({service_running_task_count})' if service_running_task_count > 0 else ''}"
                     lines.append(line)
                     if verbose and (target_group_arn := service.target_group_arn):
-                        lines.append(f"     TARGET: {target_group_arn}")
+                        lines.append(f"       LBTG: {target_group_arn}")
                 if cluster_is_mirrored_state is True:
                     lines[cluster_line_index] = lines[cluster_line_index].replace("__REPLACEBELOW__", " | MIRRORED")
                 elif cluster_is_mirrored_state is False:
@@ -1146,9 +1146,11 @@ def main():
         if error:
             print(error)
             exit(1)
+        # TODO: Something going wrong when showing image info in swap state - wires crossed; disable for
+        # now; might be better like this anyways - too much noise; don't want all that to see swap state.
         ecs_swapped.print(shortened_names=shortened_names, versioned_names=versioned_names,
-                          nodns=nodns, nocontainer=nocontainer, noimage=noimage, nogit=nogit,
-                          notasks=notasks, nohealth=nohealth, nouptime=nouptime, show=show,
+                          nodns=nodns, nocontainer=True, noimage=noimage, nogit=nogit,
+                          notasks=notasks, nohealth=True, nouptime=True, show=show,
                           noasync=noasync, verbose=verbose)
 
     if show_unassociated_task_definitions:

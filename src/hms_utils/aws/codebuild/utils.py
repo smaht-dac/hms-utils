@@ -99,7 +99,6 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: str,
                     return create_build_info(build)
             return None
 
-        # TODO: Something going wrong when showing swap state - wires crossed.
         get_builds_from_boto_this_many_at_a_time = 4
         nbuilds = 0
         next_token = None
