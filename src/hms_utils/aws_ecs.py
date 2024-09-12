@@ -161,6 +161,8 @@ class AwsEcs:
                                     line += chars.xmark
                                 # line += f" ({health_blue_or_green})"
                         lines.append(line)
+                        if verbose and (certificate_expiration_date:= service.certificate_expiration_date):
+                            lines.append(f"      CEREX: {format_datetime(certificate_expiration_date)}")
                         if (not nouptime) and health and (portal_uptime := health.get("uptime")):
                             portal_uptime = convert_uptime_to_datetime(portal_uptime)
                             portal_uptime = format_duration(datetime.now(timezone.utc) - portal_uptime, verbose=True)
@@ -288,6 +290,7 @@ class AwsEcs:
             self._dns_aname = None
             self._dns_cname = None
             self._target_group_arn = None
+            self._certificate_expiration_date = None
             self._ecs = ecs if isinstance(ecs, AwsEcs) else AwsEcs()
             self._ecs._note_name(self.service_name)
         @property  # noqa
@@ -371,6 +374,7 @@ class AwsEcs:
                                             certificate_info = boto_acm.describe_certificate(
                                                 CertificateArn=ssl_certificate_arn)
                                             certificate = certificate_info.get("Certificate")
+                                            self._certificate_expiration_date = certificate.get("NotAfter")
                                             if certificate_names := certificate.get("SubjectAlternativeNames"):
                                                 self._dns_cname = certificate_names[0]
                                             break
@@ -389,6 +393,11 @@ class AwsEcs:
             if not self._target_group_arn:
                 _ = self.dns_aname
             return self._target_group_arn
+        @property  # noqa
+        def certificate_expiration_date(self) -> Optional[str]:
+            if not self._certificate_expiration_date:
+                _ = self.dns_aname
+            return self._certificate_expiration_date
         def __str__(self) -> str:  # noqa
             annotation = self.get_annotation()
             return f"{self.service_name}{f' {annotation}' if annotation else ''}"
@@ -429,18 +438,19 @@ class AwsEcs:
 
             # Mistake before in not getting correct image build info based on digest associated with running tasks.
             service_running_tasks_image_digest = None
-            if service_running_tasks := service._ecs._boto_ecs.describe_tasks(cluster=service.cluster.cluster_name,
-                                                                              tasks=service.running_tasks)["tasks"]:
-                for service_running_task in service_running_tasks:
-                    for service_running_task_container in service_running_task.get("containers", []):
-                        if digest := service_running_task_container.get("imageDigest"):
-                            if service_running_tasks_image_digest is None:
-                                service_running_tasks_image_digest = digest
-                            elif service_running_tasks_image_digest != digest:
-                                print(f"WARNING: Different running task image digest"
-                                      f" values for service: {service.service_name}")
-                                service_running_tasks_image_digest = None
-                                break
+            if service_running_tasks := service.running_tasks:
+                if service_running_tasks := service._ecs._boto_ecs.describe_tasks(cluster=service.cluster.cluster_name,
+                                                                                  tasks=service_running_tasks)["tasks"]:
+                    for service_running_task in service_running_tasks:
+                        for service_running_task_container in service_running_task.get("containers", []):
+                            if digest := service_running_task_container.get("imageDigest"):
+                                if service_running_tasks_image_digest is None:
+                                    service_running_tasks_image_digest = digest
+                                elif service_running_tasks_image_digest != digest:
+                                    print(f"WARNING: Different running task image digest"
+                                          f" values for service: {service.service_name}")
+                                    service_running_tasks_image_digest = None
+                                    break
 
             for container in containers:
                 container_name = container.get("name")
