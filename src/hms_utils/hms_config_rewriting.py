@@ -2,17 +2,23 @@ import json
 import io
 import os
 import re
-from typing import Any, List, Optional, Union
+import sys
+from typing import Any, List, Optional, Tuple, Union
 from hms_utils.dictionary_utils import JSON
+from hms_utils.misc_utils import is_primitive_type
 
 DEFAULT_PATH_SEPARATOR = "/"
-PATH_PARENT_COMPONENT = ".."
-DEFAULT_CONFIG_FILE = os.path.expanduser("~/.config/hms/config.json")
-DEFAULT_SECRETS_FILE = os.path.expanduser("~/.config/hms/secrets.json")
+# DEFAULT_CONFIG_FILE = os.path.expanduser("~/.config/hms/config.json")
+# DEFAULT_SECRETS_FILE = os.path.expanduser("~/.config/hms/secrets.json")
+DEFAULT_CONFIG_FILE = os.path.expanduser("~/repos/hms-utils/config.json")
+DEFAULT_SECRETS_FILE = os.path.expanduser("~/repos/hms-utils/secrets.json")
 
 
 class Config:
 
+    _PATH_COMPONENT_PARENT = ".."
+    _PATH_COMPONENT_CURRENT = "."
+    _PATH_COMPONENT_ROOT = DEFAULT_PATH_SEPARATOR
     _MACRO_START = "${"
     _MACRO_END = "}"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
@@ -35,32 +41,81 @@ class Config:
     def lookup_with_macro_expansion(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
         if not (value := self.lookup(path, config)):
             return None
+        missing_macro_found = False
         while True:
             if not (match := Config._MACRO_PATTERN.search(value)):
                 break
             if macro_value := match.group(1):
-                if (resolved_macro_value := self.lookup(macro_value)):
-                    import pdb ; pdb.set_trace()  # noqa
+                import pdb ; pdb.set_trace()  # noqa
+                if (resolved_macro_value := self.lookup(macro_value, config)) is not None:
+                    if not is_primitive_type(resolved_macro_value):
+                        warning(f"Macro must resolve to primitive type: {macro_value}")
+                        return value
                     value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
-                    pass
+                elif self._ignore_missing_macro:
+                    value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                          f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+                else:
+                    missing_macro_found = True
+                    raise Exception(f"Macro not found: {macro_value}")
+        if missing_macro_found and self._ignore_missing_macro:
+            value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
+            value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
     def lookup(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
+        value, context = self._lookup(path, config)
+        import pdb ; pdb.set_trace()  # noqa
+        return value
         if config is None:
             config = self._json
         value = config
         for path_component in self.unpack_path(path):
-            if path_component == PATH_PARENT_COMPONENT:
+            if path_component == Config._PATH_COMPONENT_PARENT:
                 value = value.parent
             elif (value := value.get(path_component)) is None:
                 return None
         return value
 
+    def _lookup(self, path: str, config: Optional[JSON] = None) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+        if config is None:
+            config = self._json
+        value = config
+        previous_value = value
+        if path_components := self.unpack_path(path): # noqa
+            if path_component == Config._PATH_COMPONENT_ROOT: # noqa
+                config = config.root
+                value = config
+            for path_component in self.unpack_path(path):
+                if path_component == Config._PATH_COMPONENT_PARENT:
+                    previous_value = previous_value.parent
+                    value = value.parent
+                elif (found_value := value.get(path_component)) is not None:
+                    previous_value = value
+                    value = found_value
+                else:
+                    return None, value
+        return value, previous_value
+
+    def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
+        if config is None:
+            config = self._json
+        if (macro_value := self.lookup(macro_value, config)) is not None:
+            return macro_value
+            # if is_primitive_type(macro_value):
+            #     return macro_value
+            # return None
+        return None
+
     def unpack_path(self, path: str) -> List[str]:
         path_components = []
-        for path_component in path.split(self._path_separator):
-            if (path_component := path_component.strip()):
-                path_components.append(path_component)
+        if isinstance(path, str) and (path := path.strip()):
+            if path.startswith(Config._PATH_COMPONENT_ROOT):
+                path = path[len(Config._PATH_COMPONENT_ROOT):]
+                path_components.append(Config._PATH_COMPONENT_ROOT)
+            for path_component in path.split(self._path_separator):
+                if (path_component := path_component.strip()):
+                    path_components.append(path_component)
         return path_components
 
     def repack_path(self, path_components: List[str]) -> List[str]:
@@ -77,6 +132,11 @@ with io.open(DEFAULT_SECRETS_FILE, "r") as f:
 
 config = Config(config)
 secrets = Config(secrets)
+
+
+def warning(message: str) -> None:
+    print(f"WARNING: {message}", file=sys.stderr, flush=True)
+
 
 print()
 path = "portal/smaht///wolf"

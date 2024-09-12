@@ -8,7 +8,8 @@ from dcicutils.datetime_utils import format_datetime
 from hms_utils.github_utils import get_github_commit_date, get_github_latest_commit
 
 
-def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = None, previous_builds: int = 0) -> Dict:
+def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: str,
+                           image_digest: str, previous_builds: int = 8) -> Optional[dict]:
     """
     Returns a dictionary with info about the three most recent CodeBuild builds
     for the given image repo and tag, or None if none found.
@@ -118,44 +119,23 @@ def get_aws_ecr_build_info(image_repo_or_arn: str, image_tag: Optional[str] = No
             if not next_token:
                 break
 
-    number_of_previous_builds_to_return = previous_builds
-    response = {}
     for project in get_projects():
         for build in get_relevant_builds(project):
-            if not response.get("latest"):
-                response["latest"] = build
-            else:
-                if not response.get("others"):
-                    response["others"] = []
-                response["others"].append(build)
-            if number_of_previous_builds_to_return <= 0:
-                break
-            number_of_previous_builds_to_return -= 1
-        if number_of_previous_builds_to_return <= 0:
-            break
-
-    return response
+            if image_digest:
+                if build_image_digest := _get_aws_codebuild_digest(build["log_group"], build["log_stream"], image_tag):
+                    if image_digest == build_image_digest:
+                        return build
+    return None
 
 
 @lru_cache
-def get_build_info(image_repo: str, image_tag: str) -> Optional[Dict]:
+def get_build_info(image_repo: str, image_tag: str, image_digest: Optional[str] = None) -> Optional[Dict]:
     # Cache this result within the enclosing function; for the below services loop.
-    build = get_aws_ecr_build_info(image_repo, image_tag)  # TODO , previous_builds=previous_builds)
-    if True:  # include_build_digest:
-        log_group = build.get("latest", {}).get("log_group")
-        log_stream = build.get("latest", {}).get("log_stream")
-        if log_group and log_stream:
-            if not build.get("latest"):
-                build["latest"] = {}
-            build["latest"]["digest"] = _get_aws_codebuild_digest(log_group, log_stream, image_tag)
-    return build
+    return get_aws_ecr_build_info(image_repo, image_tag, image_digest)
 
 
 def get_image_build_info(image_repo: str, image_tag: str, image_digest: str) -> Optional[dict]:
-    if ((build_info := get_build_info(image_repo, image_tag)) and
-        (build_info := build_info.get("latest")) and
-        (build_digest := build_info.get("digest")) and
-        (build_digest == image_digest)):  # noqa
+    if build_info := get_build_info(image_repo, image_tag, image_digest):
         if git_repo := build_info.get("github"):
             git_repo = git_repo.replace("https://github.com/", "")
         git_branch = build_info.get("branch")

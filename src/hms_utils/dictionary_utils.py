@@ -146,10 +146,11 @@ class JSON(dict):
                 if not isinstance(child, JSON):
                     child = JSON(child, _default=False)
                 child.parent = parent
+                # child.root = lambda child=child: JSON._root(child)
                 super(JSON, parent).__setitem__(key, child)  # bypass override below
                 self._initialize(child)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         if isinstance(value, dict) and id(value.parent) != id(self):
             if isinstance(value, JSON):
                 value = deepcopy(value)
@@ -158,5 +159,13 @@ class JSON(dict):
             value.parent = self
         super().__setitem__(key, value)
 
-    def __deepcopy__(self, memo):
+    @property
+    def root(self) -> Optional[JSON]:
+        node = self
+        while True:
+            if node.parent is None:
+                return node
+            node = node.parent
+
+    def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))

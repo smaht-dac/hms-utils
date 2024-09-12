@@ -184,7 +184,7 @@ class AwsEcs:
                         lines[cluster_line_index] += f" {chars.xmark}"
             for service in services:
                 if ((not nocontainer) and
-                    (container := service.task_definition.get_container(noimage=noimage, nogit=nogit))):  # noqa
+                    (container := service.task_definition.get_container(service, noimage=noimage, nogit=nogit))):  # noqa
                     # The container info (for our purposes) is virtually always the same across services,
                     # i.e. portal, indexer, and ingester, within the clustser; so we only show this once
                     # per cluster, if all the info is exactly the same; we don't print container["name"] here
@@ -198,6 +198,9 @@ class AwsEcs:
                         container_lines.append(f"      IMAGE: {image}"
                                                f" ({format_size(image_size)}) {chars.dot_hollow}"
                                                f" {build_project} {chars.dot_hollow} {image_pushed_at}")
+                        if verbose:
+                            if (image_digest := container.get("image_digest")):
+                                container_lines.append(f"     DIGEST: {image_digest}")
                         if git_repo := container.get("git_repo"):
                             git_branch = container.get("git_branch")
                             git_commit = container.get("git_commit")
@@ -406,7 +409,7 @@ class AwsEcs:
         def type(self) -> str:
             return AwsEcs._type(self.task_definition_name)
 
-        def get_container(self, noimage: bool = False, nogit: bool = False) -> dict:
+        def get_container(self, service: AwsEcs.Service, noimage: bool = False, nogit: bool = False) -> dict:
 
             try:
                 containers = self._ecs._boto_ecs.describe_task_definition(
@@ -414,6 +417,21 @@ class AwsEcs:
             except Exception:
                 return {}
             result = []
+
+            # Mistake before in not getting correct image build info based on digest associated with running tasks.
+            service_running_tasks_image_digest = None
+            if service_running_tasks := service._ecs._boto_ecs.describe_tasks(cluster=service.cluster.cluster_name,
+                                                                              tasks=service.running_tasks)["tasks"]:
+                for service_running_task in service_running_tasks:
+                    for service_running_task_container in service_running_task.get("containers", []):
+                        if digest := service_running_task_container.get("imageDigest"):
+                            if service_running_tasks_image_digest is None:
+                                service_running_tasks_image_digest = digest
+                            elif service_running_tasks_image_digest != digest:
+                                print(f"WARNING: Different running task image digest"
+                                      f" values for service: {service.service_name}")
+                                service_running_tasks_image_digest = None
+                                break
 
             for container in containers:
                 container_name = container.get("name")
@@ -448,8 +466,9 @@ class AwsEcs:
                     image_tag = image_info["tag"]
                     image_size = image_info["size"]
                     image_pushed_at = format_datetime(image_info["pushed"], notz=True)
-                    image_digest = image_info["digest"]
-                    if (not nogit) and (build_info := get_image_build_info(image_repo, image_tag, image_digest)):
+                    image_digest = service_running_tasks_image_digest or image_info["digest"]
+                    if ((not nogit) and
+                        (build_info := get_image_build_info(image_repo, image_tag, image_digest))):  # noqa
                         build_project = build_info.get("build_project")
                         git_repo = build_info.get("repo")
                         git_branch = build_info.get("branch")
