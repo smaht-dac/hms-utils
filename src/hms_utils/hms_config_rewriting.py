@@ -83,9 +83,10 @@ class Config:
         value = config
         previous_value = value
         if path_components := self.unpack_path(path): # noqa
-            if path_component == Config._PATH_COMPONENT_ROOT: # noqa
+            if path_components[0] == Config._PATH_COMPONENT_ROOT: # noqa
                 config = config.root
                 value = config
+                path_components = path_components[1:]
             for path_component in self.unpack_path(path):
                 if path_component == Config._PATH_COMPONENT_PARENT:
                     previous_value = previous_value.parent
