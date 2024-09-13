@@ -4,6 +4,8 @@ from botocore.client import BaseClient as BotoEcs
 from collections import namedtuple
 from datetime import datetime, timezone
 from functools import lru_cache
+import io
+import json
 import os
 import requests
 import sys
@@ -247,6 +249,22 @@ class AwsEcs:
                         container_lines.append(f"      REDIS: {redis_server}")
                     if global_env_bucket := container.get("global_env_bucket"):
                         container_lines.append(f"        GEB: {global_env_bucket}")
+                        s3 = AwsS3(global_env_bucket)
+                        if main_ecosystem := s3.load_json_file("main.ecosystem"):
+                            if ecosystem := main_ecosystem.get("ecosystem"):
+                                container_lines.append(
+                                    f"        ECO: ecosystem: {ecosystem.replace('.ecosystem', '')}")
+                                if ecosystem := s3.load_json_file(ecosystem):
+                                    if ((data_env_name := ecosystem.get("prd_env_name")) and
+                                        (staging_env_name := ecosystem.get("stg_env_name"))):  # noqa
+                                        container_lines[len(container_lines) - 1] += (
+                                            f" {chars.dot_hollow} staging: {staging_env_name}"
+                                            f" {chars.dot_hollow} data: {data_env_name}")
+                            elif ((data_env_name := main_ecosystem.get("prd_env_name")) and
+                                  (staging_env_name := main_ecosystem.get("stg_env_name"))):
+                                container_lines.append(
+                                    f"        ECO: staging: {staging_env_name}"
+                                    f" {chars.dot_hollow} data: {data_env_name}")
                     if s3_encrypt_key := container.get("s3_encrypt_key"):
                         if show:
                             container_lines.append(f"        SEK: {s3_encrypt_key}")
@@ -388,6 +406,11 @@ class AwsEcs:
             if not self.dns_aname:
                 return None
             return self._dns_cname
+        @property  # noqa
+        def global_env_bucket(self) -> Optional[str]:
+            if not self._global_env_bucket:
+                _ = self.dns_aname
+            return self._global_env_bucket
         @property  # noqa
         def target_group_arn(self) -> Optional[str]:
             if not self._target_group_arn:
@@ -1010,6 +1033,21 @@ class AwsEcs:
         if dark:
             attributes.append("dark")
         return colored(value, color.lower(), attrs=attributes)
+
+
+class AwsS3:
+
+    def __init__(self, bucket: str) -> None:
+        self._bucket = bucket if isinstance(bucket, str) and (bucket := bucket.strip()) else None
+        self._boto_s3 = BotoClient("s3") if self._bucket else None
+
+    def load_json_file(self, key: str) -> Optional[dict]:
+        try:
+            stream = io.BytesIO()
+            self._boto_s3.download_fileobj(Fileobj=stream, Bucket=self._bucket, Key=key)
+            return json.loads(stream.getvalue())
+        except Exception:
+            return {}
 
 
 def usage() -> None:
