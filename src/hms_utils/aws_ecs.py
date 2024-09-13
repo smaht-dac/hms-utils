@@ -249,22 +249,31 @@ class AwsEcs:
                         container_lines.append(f"      REDIS: {redis_server}")
                     if global_env_bucket := container.get("global_env_bucket"):
                         container_lines.append(f"        GEB: {global_env_bucket}")
-                        s3 = AwsS3(global_env_bucket)
-                        if main_ecosystem := s3.load_json_file("main.ecosystem"):
+                        if environment_name := container.get("environment_name"):
+                            container_lines[len(container_lines) - 1] += f" {chars.dot_hollow} {environment_name}"
+                        if (cluster.blue_or_green and
+                            (s3 := AwsS3(global_env_bucket)) and
+                            (main_ecosystem := s3.load_json_file("main.ecosystem"))):  # noqa
                             if ecosystem := main_ecosystem.get("ecosystem"):
                                 container_lines.append(
                                     f"        ECO: ecosystem: {ecosystem.replace('.ecosystem', '')}")
                                 if ecosystem := s3.load_json_file(ecosystem):
-                                    if ((data_env_name := ecosystem.get("prd_env_name")) and
-                                        (staging_env_name := ecosystem.get("stg_env_name"))):  # noqa
-                                        container_lines[len(container_lines) - 1] += (
-                                            f" {chars.dot_hollow} staging: {staging_env_name}"
-                                            f" {chars.dot_hollow} data: {data_env_name}")
-                            elif ((data_env_name := main_ecosystem.get("prd_env_name")) and
-                                  (staging_env_name := main_ecosystem.get("stg_env_name"))):
-                                container_lines.append(
-                                    f"        ECO: staging: {staging_env_name}"
-                                    f" {chars.dot_hollow} data: {data_env_name}")
+                                    if production_env_name := ecosystem.get("prd_env_name"):
+                                        if staging_env_name := ecosystem.get("stg_env_name"):  # noqa
+                                            container_lines[len(container_lines) - 1] += (
+                                                f" {chars.dot_hollow} staging: {staging_env_name}"
+                                                f" {chars.dot_hollow} data: {production_env_name}")
+                                        else:
+                                            container_lines[len(container_lines) - 1] += (
+                                                f" {chars.dot_hollow} production: {production_env_name}")
+                            elif production_env_name := main_ecosystem.get("prd_env_name"):
+                                if staging_env_name := main_ecosystem.get("stg_env_name"):
+                                    container_lines.append(
+                                        f"        ECO: staging: {staging_env_name}"
+                                        f" {chars.dot_hollow} data: {production_env_name}")
+                                else:
+                                    container_lines.append(
+                                        f"        ECO: production: {production_env_name}")
                     if s3_encrypt_key := container.get("s3_encrypt_key"):
                         if show:
                             container_lines.append(f"        SEK: {s3_encrypt_key}")
@@ -412,6 +421,11 @@ class AwsEcs:
                 _ = self.dns_aname
             return self._global_env_bucket
         @property  # noqa
+        def environment_name(self) -> Optional[str]:
+            if not self._environment_name:
+                _ = self.dns_aname
+            return self._environment_name
+        @property  # noqa
         def target_group_arn(self) -> Optional[str]:
             if not self._target_group_arn:
                 _ = self.dns_aname
@@ -493,6 +507,7 @@ class AwsEcs:
                                 redis_server = self._ecs._get_redis_server(container_identity)
                                 database_server = self._ecs._get_database_server(container_identity)
                                 global_env_bucket = self._ecs._get_global_env_bucket(container_identity)
+                                environment_name = self._ecs._get_environment_name(container_identity)
                                 s3_encrypt_key = self._ecs._get_s3_encrypt_key(container_identity)
                                 s3_encrypt_key_id = self._ecs._get_s3_encrypt_key_id(container_identity)
                                 auth0_client = self._ecs._get_auth0_client(container_identity)
@@ -537,6 +552,7 @@ class AwsEcs:
                                "database": database_server,
                                "redis": redis_server,
                                "global_env_bucket": global_env_bucket,
+                               "environment_name": environment_name,
                                "s3_encrypt_key": s3_encrypt_key,
                                "s3_encrypt_key_id": s3_encrypt_key_id,
                                "auth0_client": auth0_client,
@@ -876,6 +892,11 @@ class AwsEcs:
     @lru_cache
     def _get_global_env_bucket(self, identity: str) -> Optional[str]:
         return self._get_identity_secrets(identity).get("GLOBAL_ENV_BUCKET")
+
+    @lru_cache
+    def _get_environment_name(self, identity: str) -> Optional[str]:
+        return (self._get_identity_secrets(identity).get("ENV_NAME") or
+                self._get_identity_secrets(identity).get("ENCODED_BS_ENV"))
 
     @lru_cache
     def _get_s3_encrypt_key(self, identity: str) -> Optional[str]:
