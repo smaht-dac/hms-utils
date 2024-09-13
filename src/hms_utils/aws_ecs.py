@@ -216,6 +216,15 @@ class AwsEcs:
                                             container_lines[len(container_lines) - 1] += (
                                                 f" {chars.dot_hollow} staging: {staging_env_name}"
                                                 f" {chars.dot_hollow} data: {production_env_name}")
+                                            if ((cluster_is_mirrored_state and
+                                                 self._ecs._is_blue(production_env_name) and
+                                                 self._ecs._is_green(staging_env_name)) or
+                                                ((not cluster_is_mirrored_state) and
+                                                 self._ecs._is_green(production_env_name) and
+                                                 self._ecs._is_blue(staging_env_name))):
+                                                container_lines[len(container_lines) - 1] += f" {chars.check}"
+                                            else:
+                                                container_lines[len(container_lines) - 1] += f" {chars.xmark}"
                                         else:
                                             container_lines[len(container_lines) - 1] += (
                                                 f" {chars.dot_hollow} production: {production_env_name}")
