@@ -46,7 +46,6 @@ class Config:
             if not (match := Config._MACRO_PATTERN.search(value)):
                 break
             if macro_value := match.group(1):
-                import pdb ; pdb.set_trace()  # noqa
                 if (resolved_macro_value := self.lookup(macro_value, config)) is not None:
                     if not is_primitive_type(resolved_macro_value):
                         warning(f"Macro must resolve to primitive type: {macro_value}")
@@ -65,7 +64,6 @@ class Config:
 
     def lookup(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, config)
-        import pdb ; pdb.set_trace()  # noqa
         return value
         if config is None:
             config = self._json
@@ -80,23 +78,32 @@ class Config:
     def _lookup(self, path: str, config: Optional[JSON] = None) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if config is None:
             config = self._json
-        value = config
-        previous_value = value
-        if path_components := self.unpack_path(path): # noqa
-            if path_components[0] == Config._PATH_COMPONENT_ROOT: # noqa
-                config = config.root
-                value = config
+        context = config
+        context_current_only = False
+        value = None
+        if path_components := self.unpack_path(path):
+            if path_components[0] == Config._PATH_COMPONENT_ROOT:
+                context = context.root
                 path_components = path_components[1:]
-            for path_component in self.unpack_path(path):
+            elif path_components[0] == Config._PATH_COMPONENT_CURRENT:
+                context_current_only = True
+                path_components = path_components[1:]
+            path_components_last_index = len(path_components) - 1
+            for path_component_index, path_component in enumerate(path_components):
                 if path_component == Config._PATH_COMPONENT_PARENT:
-                    previous_value = previous_value.parent
-                    value = value.parent
-                elif (found_value := value.get(path_component)) is not None:
-                    previous_value = value
-                    value = found_value
+                    if (context := context.parent) is None:
+                        return None, None
+                elif (value := context.get(path_component)) is not None:
+                    if isinstance(value, JSON):
+                        context = value
+                    elif path_component_index == path_components_last_index:
+                        return value, context
+                    else:
+                        # Found terminal (non-dictionary) value but not last in path so not found.
+                        return None, context
                 else:
-                    return None, value
-        return value, previous_value
+                    return None, context
+        return value, context
 
     def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
         if config is None:
@@ -119,8 +126,13 @@ class Config:
                     path_components.append(path_component)
         return path_components
 
-    def repack_path(self, path_components: List[str]) -> List[str]:
-        return self._path_separator.join(path_components)
+    def repack_path(self, path_components: List[str]) -> str:
+        if isinstance(path_components, list) and path_components:
+            if path_components[0] == self._path_separator:
+                return self._path_separator + self._path_separator.join(path_components[1:])
+            else:
+                return self._path_separator.join(path_components)
+        return ""
 
     def normalize_path(self, path: str) -> List[str]:
         return self.repack_path(self.unpack_path(path))
@@ -138,6 +150,11 @@ secrets = Config(secrets)
 def warning(message: str) -> None:
     print(f"WARNING: {message}", file=sys.stderr, flush=True)
 
+path = "/portal/../portal/smaht//wolf"
+path = "//portal/smaht//wolf"
+config.unpack_path(path)
+value = config.lookup(path)
+print(f"{config.normalize_path(path)}: {value}")
 
 print()
 path = "portal/smaht///wolf"
