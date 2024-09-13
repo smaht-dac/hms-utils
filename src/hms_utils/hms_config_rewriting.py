@@ -78,24 +78,24 @@ class Config:
     def _lookup(self, path: str, config: Optional[JSON] = None) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if config is None:
             config = self._json
-        context = config
-        context_current_only = False
         value = None
+        context = None
+        context_current_only = False  # noqa
         if path_components := self.unpack_path(path):
             if path_components[0] == Config._PATH_COMPONENT_ROOT:
-                context = context.root
+                config = config.root
                 path_components = path_components[1:]
             elif path_components[0] == Config._PATH_COMPONENT_CURRENT:
-                context_current_only = True
+                context_current_only = True  # noqa
                 path_components = path_components[1:]
             path_components_last_index = len(path_components) - 1
             for path_component_index, path_component in enumerate(path_components):
                 if path_component == Config._PATH_COMPONENT_PARENT:
-                    if (context := context.parent) is None:
+                    if (config := config.parent) is None:
                         return None, None
-                elif (value := context.get(path_component)) is not None:
+                elif (value := config.get(path_component)) is not None:
                     if isinstance(value, JSON):
-                        context = value
+                        context = config = value
                     elif path_component_index == path_components_last_index:
                         return value, context
                     else:
@@ -150,11 +150,15 @@ secrets = Config(secrets)
 def warning(message: str) -> None:
     print(f"WARNING: {message}", file=sys.stderr, flush=True)
 
+
 path = "/portal/../portal/smaht//wolf"
 path = "//portal/smaht//wolf"
-config.unpack_path(path)
-value = config.lookup(path)
-print(f"{config.normalize_path(path)}: {value}")
+path = "/xportal/smaht/wolf/IDENTIT"
+# value = config.lookup(path)
+# print(f"{config.normalize_path(path)}: {value}")
+value, context = config._lookup(path)
+print(f"{config.normalize_path(path)}: {value} | {context}")
+exit(0)
 
 print()
 path = "portal/smaht///wolf"
