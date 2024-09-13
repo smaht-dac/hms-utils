@@ -197,6 +197,33 @@ class AwsEcs:
                     # because that actually is not unique and that would mess this up for our common case.
                     container_lines = []
                     container_lines.append(f"   IDENTITY: {container['identity']}")
+                    if global_env_bucket := container.get("global_env_bucket"):
+                        container_lines.append(f"        GEB: {global_env_bucket}")
+                        if environment_name := container.get("environment_name"):
+                            container_lines[len(container_lines) - 1] += f" {chars.dot_hollow} {environment_name}"
+                        if (cluster.blue_or_green and
+                            (s3 := AwsS3(global_env_bucket)) and
+                            (main_ecosystem := s3.load_json_file("main.ecosystem"))):  # noqa
+                            if ecosystem := main_ecosystem.get("ecosystem"):
+                                container_lines.append(
+                                    f"        ECO: ecosystem: {ecosystem.replace('.ecosystem', '')}")
+                                if ecosystem := s3.load_json_file(ecosystem):
+                                    if production_env_name := ecosystem.get("prd_env_name"):
+                                        if staging_env_name := ecosystem.get("stg_env_name"):  # noqa
+                                            container_lines[len(container_lines) - 1] += (
+                                                f" {chars.dot_hollow} staging: {staging_env_name}"
+                                                f" {chars.dot_hollow} data: {production_env_name}")
+                                        else:
+                                            container_lines[len(container_lines) - 1] += (
+                                                f" {chars.dot_hollow} production: {production_env_name}")
+                            elif production_env_name := main_ecosystem.get("prd_env_name"):
+                                if staging_env_name := main_ecosystem.get("stg_env_name"):
+                                    container_lines.append(
+                                        f"        ECO: staging: {staging_env_name}"
+                                        f" {chars.dot_hollow} data: {production_env_name}")
+                                else:
+                                    container_lines.append(
+                                        f"        ECO: production: {production_env_name}")
                     if image := container.get("image"):
                         build_project = container.get("build_project")
                         image_pushed_at = container.get("image_pushed_at")
@@ -247,33 +274,6 @@ class AwsEcs:
                         container_lines.append(f"        RDS: {database_server}")
                     if redis_server := container.get("redis"):
                         container_lines.append(f"      REDIS: {redis_server}")
-                    if global_env_bucket := container.get("global_env_bucket"):
-                        container_lines.append(f"        GEB: {global_env_bucket}")
-                        if environment_name := container.get("environment_name"):
-                            container_lines[len(container_lines) - 1] += f" {chars.dot_hollow} {environment_name}"
-                        if (cluster.blue_or_green and
-                            (s3 := AwsS3(global_env_bucket)) and
-                            (main_ecosystem := s3.load_json_file("main.ecosystem"))):  # noqa
-                            if ecosystem := main_ecosystem.get("ecosystem"):
-                                container_lines.append(
-                                    f"        ECO: ecosystem: {ecosystem.replace('.ecosystem', '')}")
-                                if ecosystem := s3.load_json_file(ecosystem):
-                                    if production_env_name := ecosystem.get("prd_env_name"):
-                                        if staging_env_name := ecosystem.get("stg_env_name"):  # noqa
-                                            container_lines[len(container_lines) - 1] += (
-                                                f" {chars.dot_hollow} staging: {staging_env_name}"
-                                                f" {chars.dot_hollow} data: {production_env_name}")
-                                        else:
-                                            container_lines[len(container_lines) - 1] += (
-                                                f" {chars.dot_hollow} production: {production_env_name}")
-                            elif production_env_name := main_ecosystem.get("prd_env_name"):
-                                if staging_env_name := main_ecosystem.get("stg_env_name"):
-                                    container_lines.append(
-                                        f"        ECO: staging: {staging_env_name}"
-                                        f" {chars.dot_hollow} data: {production_env_name}")
-                                else:
-                                    container_lines.append(
-                                        f"        ECO: production: {production_env_name}")
                     if s3_encrypt_key := container.get("s3_encrypt_key"):
                         if show:
                             container_lines.append(f"        SEK: {s3_encrypt_key}")
