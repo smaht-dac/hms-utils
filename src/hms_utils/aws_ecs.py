@@ -164,7 +164,10 @@ class AwsEcs:
                                 # line += f" ({health_blue_or_green})"
                         lines.append(line)
                         if verbose and (certificate_expiration_date := service.certificate_expiration_date):
-                            lines.append(f"      CEREX: {format_datetime(certificate_expiration_date)}")
+                            certificate_expiration_duration = (
+                                format_duration(certificate_expiration_date - datetime.now(timezone.utc), verbose=True))
+                            lines.append(f"     CERTEX: {format_datetime(certificate_expiration_date)}"
+                                         f" {chars.dot_hollow} {certificate_expiration_duration}")
                         if (not nouptime) and health and (portal_uptime := health.get("uptime")):
                             portal_uptime = convert_uptime_to_datetime(portal_uptime)
                             portal_uptime = format_duration(datetime.now(timezone.utc) - portal_uptime, verbose=True)
