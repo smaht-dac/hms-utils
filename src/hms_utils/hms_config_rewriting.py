@@ -5,6 +5,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.dictionary_utils import JSON
 from hms_utils.misc_utils import is_primitive_type
 
+# UNDER DEVELOPMENT: Basically rewriting hms_config to be tighter based on lessons learned.
 
 class Config:
 
