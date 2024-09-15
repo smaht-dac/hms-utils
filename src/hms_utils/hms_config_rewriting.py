@@ -63,12 +63,12 @@ class Config:
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
-    def lookup(self, path: str, config: Optional[JSON] = None,
+    def lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
                simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
         return value
 
-    def _lookup(self, path: str, config: Optional[JSON] = None,
+    def _lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
@@ -85,7 +85,6 @@ class Config:
             config = config.root
             path_components = path_components[1:]
         value = context = None
-        path_component_index_last = len(path_components) - 1
         for path_component_index, path_component in enumerate(path_components):
             context = config
             if (value := config.get(path_component)) is None:
@@ -93,7 +92,7 @@ class Config:
             if isinstance(value, JSON):
                 # Found a JSON in the path so recurse down to it.
                 config = value
-            elif path_component_index < path_component_index_last:
+            elif path_component_index < (len(path_components) - 1):
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
