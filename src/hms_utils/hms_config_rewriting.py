@@ -64,12 +64,12 @@ class Config:
         return value
 
     def lookup(self, path: str, config: Optional[JSON] = None,
-               simple: bool = False, noparents: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config, noparents=noparents)
+               simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
+        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
         return value
 
     def _lookup(self, path: str, config: Optional[JSON] = None,
-                simple: bool = False, noparents: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
         if (not (path_components := self.unpack_path(path))) or (path_components == [Config._PATH_COMPONENT_ROOT]):
@@ -91,12 +91,37 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        if (value is None) and (path_component_index > 0) and (noparents is not True):
+        if (value is None) and (path_component_index > 0) and (noinherit is not True):
+            #
             # Search for the remaining path up through parents simulating inheritance.
-            path_components = path_components[0:path_component_index - 1] + path_components[path_component_index:]
-            path = self.repack_path(path_components, root=path_root)
-            config = context.parent
-            return self._lookup(path, config)
+            # Disable this behavior with the noinherit flag. And if the simple flag
+            # is set then we only do this behavior for the last component of a path.
+            # For example if we have this hierarchy:
+            #
+            #   - portal:
+            #     - identity: identity_value
+            #     - auth:
+            #       - client: auth_client_value
+            #     - smaht:
+            #       - wolf:
+            #         - some_property: some_property_value
+            #
+            # When we lookup /portal/smaht/wolf/identity we would get the value for /portal/identity,
+            # identity_value, because it is visible within the /portal/smaht/wolf context; and if
+            # we lookup /portal/wolf/auth/client we would get the value for /portal/auth/client,
+            # auth_client_value, because it - /portal/auth - is also visible with that context.
+            # Now if the simple flag is set then the first case gets the same result, but the latter
+            # case - /portal/smaht/wolf/auth/client will return None because we would be looking for
+            # a path with more than one component - auth/client - within the inherited/parent contexts.
+            # The simple case is in case it turns out the that non-simple case is not very intuitive.
+            #
+            path_components_left = path_components[0:path_component_index - 1]
+            path_components_right = path_components[path_component_index:]
+            if (simple is not True) or len(path_components_right) == 1:
+                path_components = path_components_left + path_components_right
+                path = self.repack_path(path_components, root=path_root)
+                config = context.parent
+                return self._lookup(path, config)
         return value, context
 
     def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:

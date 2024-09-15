@@ -51,5 +51,5 @@ def test_hms_config_rewrite_a():
     assert config.lookup("bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/alfa") == "alfa_value"
-    assert config.lookup("/bravo/alfa", noparents=True) is None
+    assert config.lookup("/bravo/alfa", noinherit=True) is None
     assert config.lookup("/bravo/alfa", simple=True) == "alfa_value"
