@@ -1,10 +1,7 @@
 from __future__ import annotations
-import json
-import io
-import os
 import re
 import sys
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.dictionary_utils import JSON
 from hms_utils.misc_utils import is_primitive_type
 
@@ -29,7 +26,8 @@ class Config:
     _IMPORTED_CONFIG_KEY_PREFIX = "@@@__CONFIG__:"
     _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
 
-    def __init__(self, config: JSON, path_separator: Optional[str] = None) -> None:
+    def __init__(self, config: JSON, path_separator: Optional[str] = None,
+                 warning: Optional[Union[Callable, bool]] = None) -> None:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if not isinstance(config, JSON):
@@ -37,6 +35,9 @@ class Config:
         self._json = config
         self._path_separator = path_separator
         self._ignore_missing_macro = True
+        self._warning = (warning if callable(warning)
+                         else (lambda message: print(message, file=sys.stderr, flush=True)
+                               if warning is True else lambda message: None))
 
     def lookup_with_macro_expansion(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
         if not (value := self.lookup(path, config)):
@@ -48,7 +49,7 @@ class Config:
             if macro_value := match.group(1):
                 if (resolved_macro_value := self.lookup(macro_value, config)) is not None:
                     if not is_primitive_type(resolved_macro_value):
-                        warning(f"Macro must resolve to primitive type: {macro_value}")
+                        self._warning(f"Macro must resolve to primitive type: {macro_value}")
                         return value
                     value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
                 elif self._ignore_missing_macro:
@@ -62,12 +63,13 @@ class Config:
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
-    def lookup(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config)
+    def lookup(self, path: str, config: Optional[JSON] = None,
+               simple: bool = False, noparents: bool = False) -> Optional[Union[Any, JSON]]:
+        value, context = self._lookup(path, config, noparents=noparents)
         return value
 
     def _lookup(self, path: str, config: Optional[JSON] = None,
-                noparents: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                simple: bool = False, noparents: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
         if (not (path_components := self.unpack_path(path))) or (path_components == [Config._PATH_COMPONENT_ROOT]):
@@ -128,7 +130,7 @@ class Config:
             for path_component in path.split(path_separator):
                 if ((path_component := path_component.strip()) and (path_component != Config._PATH_COMPONENT_CURRENT)):
                     if path_component == Config._PATH_COMPONENT_PARENT:
-                        if len(path_components) > 1:
+                        if (len(path_components) > 0) and (path_components != [Config._PATH_COMPONENT_ROOT]):
                             path_components = path_components[:-1]
                         continue
                     path_components.append(path_component)
@@ -148,58 +150,3 @@ class Config:
     @staticmethod
     def _normalize_path(path: str, path_separator: Optional[str] = None) -> List[str]:
         return Config._repack_path(Config._unpack_path(path, path_separator), path_separator)
-
-
-print(Config._normalize_path("//abc//def/ghi"))
-
-DEFAULT_PATH_SEPARATOR = Config._PATH_SEPARATOR
-# DEFAULT_CONFIG_FILE = os.path.expanduser("~/.config/hms/config.json")
-# DEFAULT_SECRETS_FILE = os.path.expanduser("~/.config/hms/secrets.json")
-DEFAULT_CONFIG_FILE = os.path.expanduser("~/repos/hms-utils/tests/data/config.json")
-DEFAULT_SECRETS_FILE = os.path.expanduser("~/repos/hms-utils/tests/data/secrets.json")
-
-
-with io.open(DEFAULT_CONFIG_FILE, "r") as f:
-    config = JSON(json.load(f))
-with io.open(DEFAULT_SECRETS_FILE, "r") as f:
-    secrets = JSON(json.load(f))
-
-config = Config(config)
-secrets = Config(secrets)
-
-
-def warning(message: str) -> None:
-    print(f"WARNING: {message}", file=sys.stderr, flush=True)
-
-
-# path = "//abc/def/ghi/../../../../jkl/mno/.."
-# print(Config._unpack_path(path))
-
-path = "/portal/../portal/smaht//wolf"
-path = "/portal/smaht/wolf/IDENTITY"
-path = "/portal/smaht/xyzzy"
-path = "/portal/smaht/identity/smaht/dev"
-# value = config.lookup(path)
-# print(f"{config.normalize_path(path)}: {value}")
-value, context = config._lookup(path)
-print(f"{config.normalize_path(path)}: {value} | {context}")
-
-print()
-path = "portal/smaht///wolf"
-value = config.lookup(path)
-print(f"{config.normalize_path(path)}: {value}")
-
-print()
-path = "portal/smaht///wolf/.."
-value = config.lookup(path)
-print(f"{config.normalize_path(path)}: {value}")
-
-print()
-path = "/s3/encrypt-key-id"
-value = secrets.lookup(path)
-print(f"{config.normalize_path(path)}: {value}")
-
-print()
-path = "foursight/cgap/dbmi/IDENTITY"
-value = config.lookup_with_macro_expansion(path)
-print(f"{config.normalize_path(path)}: {value}")
