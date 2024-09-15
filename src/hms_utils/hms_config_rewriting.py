@@ -39,15 +39,19 @@ class Config:
                          else (lambda message: print(message, file=sys.stderr, flush=True)
                                if warning is True else lambda message: None))
 
-    def lookup_with_macro_expansion(self, path: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
-        if not (value := self.lookup(path, config)):
-            return None
+    def lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
+               expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
+        print(f"xyzzy/lookup({path})")
+        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
+        if (value is None) or (expand is False):
+            return value
         missing_macro_found = False
         while True:
-            if not (match := Config._MACRO_PATTERN.search(value)):
+            if (not isinstance(value, str)) or (not (match := Config._MACRO_PATTERN.search(value))):
                 break
             if macro_value := match.group(1):
-                if (resolved_macro_value := self.lookup(macro_value, config)) is not None:
+                resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+                if resolved_macro_value is not None:
                     if not is_primitive_type(resolved_macro_value):
                         self._warning(f"Macro must resolve to primitive type: {macro_value}")
                         return value
@@ -55,36 +59,31 @@ class Config:
                 elif self._ignore_missing_macro:
                     value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
                                           f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
-                else:
                     missing_macro_found = True
+                else:
                     raise Exception(f"Macro not found: {macro_value}")
         if missing_macro_found and self._ignore_missing_macro:
             value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
 
-    def lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
-               simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
-        return value
-
     def _lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
+        value = None ; context = config  # noqa
         if isinstance(path, list):
             # Actually allow the path to the path-components.
             if not (path_components := path):
-                return None, config
+                return value, context
         elif not (path_components := self.unpack_path(path)):
-            return None, config
+            return value, context
         if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
             if len(path_components) == 1:
                 # Trivial case of just the root path ("/").
-                return None, config
+                return value, context
             config = config.root
             path_components = path_components[1:]
-        value = context = None
         for path_component_index, path_component in enumerate(path_components):
             context = config
             if (value := config.get(path_component)) is None:
@@ -96,7 +95,8 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        if (value is None) and (path_component_index > 0) and (noinherit is not True):
+        # TODO: understand this (my) logic better.
+        if (value is None) and (noinherit is not True) and ((path_component_index > 0) or context.parent):
             #
             # Search for the remaining path up through parents simulating inheritance.
             # Disable this behavior with the noinherit flag. And if the simple flag

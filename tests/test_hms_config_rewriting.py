@@ -12,7 +12,7 @@ def test_hms_config_rewrite_a():
             "bravo_sub": "bravo_sub_value"
         },
         "delta": "delta_value"
-        })
+    })
 
     assert config.unpack_path("/abc/def/ghi") == ["/", "abc", "def", "ghi"]
     assert config.unpack_path("//abc/def/ghi") == ["/", "abc", "def", "ghi"]
