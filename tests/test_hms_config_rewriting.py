@@ -85,3 +85,24 @@ def test_hms_config_rewrite_c():
     assert config.lookup("/bravo/echo", simple=simple) == "echo_value"
     assert config.lookup("/bravo/alfa", simple=simple) == "alfa_value"
     assert config.lookup("/bravo/delta/echo", simple=simple) is None
+
+
+def test_hms_config_rewrite_d():
+
+    config = Config({
+        "alfa": "${alfa_macro_a}_alpha_inter_${aws_profile}",
+        "alfa_macro_a": "alfa_macro_value_a",
+        "alfa_macro_b": "alfa_macro_value_b",
+        "bravo": {
+            "aws_profile": "4dn",
+            "bravo_sub": "bravo_sub_value",
+            "bravo_sub_with_alfa_macro": "${alfa}_xyzzy",
+            "bravo_sub_with_macro": "${alfa_macro_a}_alpha_inter_${alfa_macro_b}",
+        },
+        "delta": "delta_value"
+    })
+
+    assert config.lookup("alfa") == "alfa_macro_value_a_alpha_inter_${aws_profile}"
+    assert config.lookup("bravo/bravo_sub_with_macro") == "alfa_macro_value_a_alpha_inter_alfa_macro_value_b"
+    # The alfa macro sub-value ${aws_profile} evaluated in context of /bravo.
+    assert config.lookup("bravo/bravo_sub_with_alfa_macro") == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"

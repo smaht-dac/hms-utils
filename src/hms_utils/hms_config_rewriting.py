@@ -41,7 +41,6 @@ class Config:
 
     def lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        print(f"xyzzy/lookup({path})")
         value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
         if (value is None) or (expand is False):
             return value
@@ -95,8 +94,7 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        # TODO: understand this (my) logic better.
-        if (value is None) and (noinherit is not True) and ((path_component_index > 0) or context.parent):
+        if (value is None) and (noinherit is not True) and context.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
             # Disable this behavior with the noinherit flag. And if the simple flag
@@ -125,8 +123,7 @@ class Config:
             if (simple is not True) or len(path_components_right) == 1:
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                config = context.parent
-                return self._lookup(path, config)
+                return self._lookup(path, config=context.parent)
         return value, context
 
     def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
