@@ -67,7 +67,7 @@ class Config:
         return value
 
     def _lookup(self, path: str, config: Optional[JSON] = None,
-                parents: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                noparents: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
         if (not (path_components := self.unpack_path(path))) or (path_components == [Config._PATH_COMPONENT_ROOT]):
@@ -89,10 +89,12 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        if (value is None) and (path_component_index > 0) and (parents is not False):
+        if (value is None) and (path_component_index > 0) and (noparents is not True):
             # Search for the remaining path up through parents simulating inheritance.
             path_components = path_components[0:path_component_index - 1] + path_components[path_component_index:]
-            return self._lookup(self.repack_path(path_components, path_root), context.parent)
+            path = self.repack_path(path_components, root=path_root)
+            config = context.parent
+            return self._lookup(path, config)
         return value, context
 
     def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
