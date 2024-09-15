@@ -72,10 +72,16 @@ class Config:
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
-        if (not (path_components := self.unpack_path(path))) or (path_components == [Config._PATH_COMPONENT_ROOT]):
-            # No valid path or just the trival root ("/") path.
+        if isinstance(path, list):
+            # Actually allow the path to the path-components.
+            if not (path_components := path):
+                return None, config
+        elif not (path_components := self.unpack_path(path)):
             return None, config
         if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
+            if len(path_components) == 1:
+                # Trivial case of just the root path ("/").
+                return None, config
             config = config.root
             path_components = path_components[1:]
         value = context = None
