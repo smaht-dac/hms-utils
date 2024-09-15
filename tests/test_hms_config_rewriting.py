@@ -4,7 +4,7 @@ from hms_utils.hms_config_rewriting import Config
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
-def test_hmsconfig_g():
+def test_hms_config_rewrite_a():
 
     config = Config({
         "alfa": "alfa_value",

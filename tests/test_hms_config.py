@@ -5,7 +5,7 @@ from unittest.mock import patch
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
-def test_hmsconfig_a():
+def test_hms_config_a():
     config = Config({
         "alpha": "1",
         "bravo": "${alpha}_2",
@@ -50,7 +50,7 @@ def test_hmsconfig_a():
     assert config.lookup("charlie/zulu/xx") == "zuluhere"
 
 
-def test_hmsconfig_b():
+def test_hms_config_b():
     config = Config({
         "A": {
             "A1": "123",
@@ -74,7 +74,7 @@ def test_hmsconfig_b():
     assert config.lookup("A/B/A1") == "123"
 
 
-def test_hmsconfig_c():
+def test_hms_config_c():
     config = Config({
         "A": {
             "A1": "123",
@@ -89,7 +89,7 @@ def test_hmsconfig_c():
         }
     })
     assert config.lookup("A/B/B3") == "b3value_123_456_b2value_123"
-    # This one is even trickier; want to get A2 from A/B context like the above (test_hmsconfig_b)
+    # This one is even trickier; want to get A2 from A/B context like the above (test_hms_config_b)
     # test but then here notice that it has unexpanded macros, i.e. ${B2} within 123_456_${B2},
     # and then we want to evaluate the macros within the context of A/B.
     assert config.lookup("A/B/A2") == "123_456_b2value_123"
@@ -126,7 +126,7 @@ def test_hmsconfig_c():
     assert config.lookup("A/B/C/C3") == "b3value_123_456_b2value_123"
 
 
-def test_hmsconfig_d():
+def test_hms_config_d():
     config = Config({
         "foursight": {
             "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
@@ -144,7 +144,7 @@ def test_hmsconfig_d():
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
 
 
-def test_hmsconfig_e():
+def test_hms_config_e():
     config = Config({
         "foursight": {
             "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
@@ -163,7 +163,7 @@ def test_hmsconfig_e():
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209x"
 
 
-def test_hmsconfig_f():
+def test_hms_config_f():
     config = Config({
         "foursight": {
             "SSH_TUNNEL_ES_NAME_PREFIX": "ssh-tunnel-es-proxy",
@@ -212,7 +212,7 @@ def test_hmsconfig_f():
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
 
 
-def test_hmsconfig_g():
+def test_hms_config_g():
 
     config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
     secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_a.json")
