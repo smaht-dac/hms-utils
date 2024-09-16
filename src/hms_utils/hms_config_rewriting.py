@@ -1,6 +1,8 @@
 from __future__ import annotations
 from boto3 import client as BotoClient
+import io
 import json
+import os
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
@@ -29,6 +31,12 @@ class Config:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if not isinstance(config, JSON):
+            if isinstance(config, str) and os.path.isfile(config):
+                try:
+                    with io.open(config, "r") as f:
+                        config = json.load(f)
+                except Exception:
+                    pass
             config = JSON(config) if isinstance(config, dict) else {}
         self._json = config
         self._path_separator = path_separator
@@ -44,11 +52,12 @@ class Config:
 
     def lookup(self, path: str, config: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
+        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit, expand=expand)
         return value if ((value is None) or (expand is False)) else self._expand_macros(value, context)
 
     def _lookup(self, path: str, config: Optional[JSON] = None,
-                simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                simple: bool = False, noinherit: bool = False,
+                expand: bool = True) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
         value = None
@@ -95,13 +104,18 @@ class Config:
             # a path with more than one component - auth/client - within the inherited/parent contexts.
             # The simple case is in case it turns out the that non-simple case is not very intuitive.
             #
-            path_components_left = path_components[0:min(0, path_component_index - 1)]
+            path_components_left = path_components[0:max(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
                 # This is a little tricky; and note we lookup in parent but expand in current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
+                # return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
+                value = self.lookup(path, config=config.parent, expand=False)
+                if expand:
+                    value = self._expand_macros(value, config)
+                return value, config
+                # return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
@@ -137,7 +151,7 @@ class Config:
         return value
 
     def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
-        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context, expand=False)
         if (resolved_macro_value is None) and self._custom_macro_lookup:
             resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
         return resolved_macro_value, resolved_macro_context
@@ -242,3 +256,59 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+
+config = Config({
+    "foursight": {
+        "SSH_TUNNEL_ES_NAME": "SOMEPREFIX-${SSH_TUNNEL_ES_ENV}-SOMEPORT",
+        "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+        "smaht": {
+            "prod": {
+                "AWS_PROFILE": "smaht-prod",
+                "SSH_TUNNEL_ES_ENV": "smaht-green"
+            }
+        }
+    }
+})
+
+# (Pdb) macro_value
+# 'SSH_TUNNEL_ES_ENV'
+# (Pdb) context
+# {'prod': {'AWS_PROFILE': 'smaht-prod', 'SSH_TUNNEL_ES_ENV': 'smaht-green'}}
+# (Pdb) self._lookup(macro_value, config=context)
+# ('${AWS_PROFILE}', {'prod': {'AWS_PROFILE': 'smaht-prod', 'SSH_TUNNEL_ES_ENV': 'smaht-green'}})
+
+value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ES_NAME")  # should be  SOMEPREFIX-smaht-green-SOMEPORT
+print(value)
+
+
+config = Config({
+    "auth0": {
+        "local": {
+            "xsecret": "REDACTED_auth0_local_secret_value"
+        }
+    },
+    "foursight": {
+        "smaht": {
+            "Auth0Secret": "${auth0/local/secret}"
+        }
+    }
+})
+value = config.lookup("foursight/smaht/Auth0Secret")  # infinite loop
+# value = config.lookup("foursight/Auth0Secret")  # infinite loop
+print(value)
+
+
+config = Config({
+    "auth0": {
+        "local": {
+            "secret": "REDACTED_auth0_local_secret_value"
+        }
+    },
+    "foursight": {
+            "Auth0Secret": "${auth0/local/secret}"
+    }
+})
+
+value = config.lookup("foursight/Auth0Secret")  # recursiion depth
+print(value)

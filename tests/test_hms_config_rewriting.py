@@ -2,6 +2,11 @@ import os
 from unittest.mock import patch
 from hms_utils.hms_config_rewriting import Config
 
+# TODO: delte
+from copy import deepcopy
+from typing import Tuple
+from hms_utils.dictionary_utils import JSON
+
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 
@@ -317,15 +322,15 @@ def test_hms_config_f():
 
 def test_hms_config_g():
 
-    return
-
-    # TODO
-
+    import json
     config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
     secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_a.json")
     config = Config(config_file)
     secrets = Config(secrets_file)
-    merged_config = config.merge_secrets(secrets)
+    merged_config, merged_secrets, unmerged_secrets = Dummy.merge(config.json, secrets.json)
+    merged_config = Config(merged_config)
+    print(json.dumps(merged_config.json, indent=4))
+    # merged_config = config.merge_secrets(secrets)
 
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == "ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209"
@@ -339,18 +344,42 @@ def test_hms_config_g():
     value = merged_config.lookup("foursight/smaht/Auth0Client")
     assert value == "UfM_REDACTED_Hf9"
 
+    return  # TODO
+
     mocked_aws_secrets_value = {
         "deploying_iam_user": "kent.pitman.biotest",
         "ENCODED_AUTH0_CLIENT": "XYZ_REDACTED_auth0_client_ABC",
         "ENCODED_AUTH0_SECRET": "XYZ_REDACTED_auth0_secret_ABC",
         "RDS_NAME": "rds-cgap-wolf"
     }
-    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+    hms_config_class = "hms_utils.hms_config_rewriting.ConfigWithAwsMacroExpander"
+    with patch(f"{hms_config_class}._aws_get_secret_value") as mocked_aws_get_secret_value:
         mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
         value = merged_config.lookup("foursight/cgap/wolf/Auth0Secret")
         assert value == "XYZ_REDACTED_auth0_secret_ABC"
 
-    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+    with patch(f"{hms_config_class}._aws_get_secret_value") as mocked_aws_get_secret_value:
         mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
         value = merged_config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
         assert value == "XYZ_REDACTED_auth0_secret_ABC"
+
+
+class Dummy:
+    @staticmethod
+    def merge(config: JSON, secrets: JSON, path_separator: str = "/") -> Tuple[dict, list, list]:
+        if not (isinstance(config, dict) or isinstance(secrets, dict)):
+            return None, None
+        merged = deepcopy(config) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
+        def merge(config: dict, secrets: dict, path: str = "") -> None:  # noqa
+            nonlocal unmerged_secrets, path_separator
+            for key, value in secrets.items():
+                key_path = f"{path}{path_separator}{key}" if path else key
+                if key not in config:
+                    config[key] = secrets[key]
+                    merged_secrets.append(key_path)
+                elif isinstance(config[key], dict) and isinstance(secrets[key], dict):
+                    merge(config[key], secrets[key], path=key_path)
+                else:
+                    unmerged_secrets.append(key_path)
+        merge(merged, secrets)
+        return merged, merged_secrets, unmerged_secrets
