@@ -226,3 +226,21 @@ def test_hms_config_c():
     assert config.lookup("A/A2") == "123_456_${C2}"
     assert config.lookup("A2") is None
     assert config.lookup("A/B/C/A3") == "123_978_b3value_123_456_b2value_123"
+
+
+def test_hms_config_d():
+    config = Config({
+        "foursight": {
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
+            "smaht": {
+                "wolf": {
+                    "SSH_TUNNEL_ES_PORT": 9209,
+                    "SSH_TUNNEL_ES_ENV": "smaht_wolf",
+                    "SSH_TUNNEL_ES_NAME": "${foursight/SSH_TUNNEL_ES_NAME}"
+                }
+            }
+        }
+    })
+    assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"

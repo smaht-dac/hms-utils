@@ -127,7 +127,7 @@ class Config:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}")
                     return value
-                value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
+                value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
             elif self._ignore_missing_macro:
                 value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
                                       f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
