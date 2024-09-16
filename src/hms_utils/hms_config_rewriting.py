@@ -41,52 +41,26 @@ class Config:
                          else (lambda message: print(message, file=sys.stderr, flush=True)
                                if warning is True else lambda message: None))
 
-    def lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
+    def lookup(self, path: str, config: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
-        if (value is None) or (expand is False):
-            return value
-        missing_macro_found = False
-        while True:
-            if (not isinstance(value, str)) or (not (match := Config._MACRO_PATTERN.search(value))):
-                break
-            if macro_value := match.group(1):
-                resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
-                if resolved_macro_value is not None:
-                    if not is_primitive_type(resolved_macro_value):
-                        self._warning(f"Macro must resolve to primitive type: {macro_value}")
-                        return value
-                    value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
-                elif self._ignore_missing_macro:
-                    value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
-                                          f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
-                    missing_macro_found = True
-                else:
-                    raise Exception(f"Macro not found: {macro_value}")
-        if missing_macro_found and self._ignore_missing_macro:
-            value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
-            value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
-        return value
+        return value if ((value is None) or (expand is False)) else self._expand_macros(value, context)
 
-    def _lookup(self, path: Union[str, List[str]], config: Optional[JSON] = None,
+    def _lookup(self, path: str, config: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
-        value = None ; context = config  # noqa
-        if isinstance(path, list):
-            # Actually allow the path to the path-components.
-            if not (path_components := path):
-                return value, context
-        elif not (path_components := self.unpack_path(path)):
-            return value, context
+        value = None
+        if not (path_components := self.unpack_path(path)):
+            # No or invalid path.
+            return value, config
         if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
             if len(path_components) == 1:
                 # Trivial case of just the root path ("/").
-                return value, context
+                return value, config
             config = config.root
             path_components = path_components[1:]
         for path_component_index, path_component in enumerate(path_components):
-            context = config
             if (value := config.get(path_component)) is None:
                 break
             if isinstance(value, JSON):
@@ -96,7 +70,7 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        if (value is None) and (noinherit is not True) and context.parent:
+        if (value is None) and (noinherit is not True) and config.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
             # Disable this behavior with the noinherit flag. And if the simple flag
@@ -125,18 +99,35 @@ class Config:
             if (simple is not True) or len(path_components_right) == 1:
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                return self._lookup(path, config=context.parent)
-        return value, context
+                return self._lookup(path, config=config.parent)
+        return value, config
 
-    def lookup_macro(self, macro_value: str, config: Optional[JSON] = None) -> Optional[Union[Any, JSON]]:
-        if config is None:
-            config = self._json
-        if (macro_value := self.lookup(macro_value, config)) is not None:
-            return macro_value
-            # if is_primitive_type(macro_value):
-            #     return macro_value
-            # return None
-        return None
+    def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
+        missing_macro_found = False
+        while True:
+            if (not isinstance(value, str)) or (not (match := Config._MACRO_PATTERN.search(value))):
+                break
+            if macro_value := match.group(1):
+                resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+                if resolved_macro_value is not None:
+                    if not is_primitive_type(resolved_macro_value):
+                        self._warning(f"Macro must resolve to primitive type: {macro_value}")
+                        return value
+                    value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
+                elif self._ignore_missing_macro:
+                    value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                          f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+                    missing_macro_found = True
+                else:
+                    raise Exception(f"Macro not found: {macro_value}")
+        if missing_macro_found and self._ignore_missing_macro:
+            value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
+            value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
+        #
+        # TODO
+        # If value isa JSON then need to expand macros within it.
+        #
+        return value
 
     def unpack_path(self, path: str) -> List[str]:
         return Config._unpack_path(path, path_separator=self._path_separator)
