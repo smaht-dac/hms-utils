@@ -52,12 +52,11 @@ class Config:
 
     def lookup(self, path: str, config: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit, expand=expand)
+        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
         return value if ((value is None) or (expand is False)) else self._expand_macros(value, context)
 
     def _lookup(self, path: str, config: Optional[JSON] = None,
-                simple: bool = False, noinherit: bool = False,
-                expand: bool = True) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         if (config is None) or (not isinstance(config, JSON)):
             config = self._json
         value = None
@@ -116,7 +115,7 @@ class Config:
                 # #     value = self._expand_macros(value, config)
                 # # return value, config
                 # ## return self.lookup(path, config=config.parent, expand=False), config
-                value, _ = self._lookup(path, config=config.parent, expand=False)
+                value, _ = self._lookup(path, config=config.parent)
                 return value, config
         return value, config
 
@@ -153,7 +152,7 @@ class Config:
         return value
 
     def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
-        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context, expand=False)
+        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
         if (resolved_macro_value is None) and self._custom_macro_lookup:
             resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
         return resolved_macro_value, resolved_macro_context
