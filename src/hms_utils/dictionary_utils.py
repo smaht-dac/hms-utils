@@ -127,7 +127,7 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
 # within the main dictionary. Should be able to use EXACTLY like a dict after creating with JSON(dict);
 # including copying and setting properties to either other dictionaires or JSON objects.
-# Also has a "root" property on each sub-dictionary referring to the main/root one. 
+# Also has a "root" property on each sub-dictionary referring to the main/root one.
 #
 class JSON(dict):
 

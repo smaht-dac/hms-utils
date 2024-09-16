@@ -64,7 +64,8 @@ def test_hms_config_rewrite_c():
             "bravo_sub_two": "bravo_sub_two_value",
             "bravo_sub_three": {
                 "bravo_sub_sub": {
-                    "bravo_sub_sub_sub": "bravo_sub_sub_sub_value"
+                    "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
+                    "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__${alfa}"
                  }
             }
         },
@@ -79,12 +80,19 @@ def test_hms_config_rewrite_c():
     assert config.lookup("/bravo/echo", simple=simple) == "echo_value"
     assert config.lookup("/bravo/alfa", simple=simple) == "alfa_value"
     assert config.lookup("/bravo/delta/echo", simple=simple) == "delta_echo_value"
+    assert config.lookup("/delta/echo", simple=simple) == "delta_echo_value"
+    assert config.lookup("/delta/alfa", simple=simple) == "alfa_value"
+    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) == {"bravo_sub_sub_sub":
+                                                                                          "bravo_sub_sub_sub_value",
+                                                                                          "bravo_sub_sub_sub_two":
+                                                                                          "bravo_sub_sub_sub_two_value__${alfa}"}
 
     simple = True
     assert config.lookup("/bravo/bravo_sub_two", simple=simple) == "bravo_sub_two_value"
     assert config.lookup("/bravo/echo", simple=simple) == "echo_value"
     assert config.lookup("/bravo/alfa", simple=simple) == "alfa_value"
     assert config.lookup("/bravo/delta/echo", simple=simple) is None
+    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) is None
 
 
 def test_hms_config_rewrite_d():
