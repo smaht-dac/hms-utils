@@ -146,3 +146,19 @@ def test_hms_config_a():
     assert config.lookup("charlie/echo") == "3_1_2_4_echooooo${zulu}"  # WARNING: zule evaluates to non-string.
     assert config.lookup("charlie/echoxx") == "3_1_2_4_echooooozuluhere"
     assert config.lookup("charlie/zulu/xx") == "zuluhere"
+
+
+def test_hms_config_b():
+    config = Config({
+        "A": {
+            "A1": "123",
+            "B": {
+                "B1": "${A1}"
+            }
+        }
+    })
+
+    assert config.lookup("A/A1") == "123"
+    assert config.lookup("A/B/B1") == "123"
+    # This was the tricky-ish one; look back up the tree from the A/B context.
+    assert config.lookup("A/B/A1") == "123"
