@@ -103,6 +103,15 @@ class Config:
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
+        expanded_value = self._expand_macros_within_string_value(value, context)
+        if isinstance(expanded_value, JSON):
+            for key in expanded_value:
+                if isinstance(expanded_value[key], str):
+                    expanded_value[key] = self._expand_macros(expanded_value[key], expanded_value)
+                    pass
+        return expanded_value
+
+    def _expand_macros_within_string_value(self, value: str, context: Optional[JSON] = None) -> Any:
         missing_macro_found = False
         while True:
             if (not isinstance(value, str)) or (not (match := Config._MACRO_PATTERN.search(value))):
@@ -123,10 +132,6 @@ class Config:
         if missing_macro_found and self._ignore_missing_macro:
             value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
-        #
-        # TODO
-        # If value isa JSON then need to expand macros within it.
-        #
         return value
 
     def unpack_path(self, path: str) -> List[str]:
