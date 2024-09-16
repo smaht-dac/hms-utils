@@ -107,8 +107,7 @@ class Config:
             value = self._expand_macros_within_string(value, context)
         elif isinstance(value, JSON):
             for key in value:
-                if isinstance(value[key], str):
-                    value[key] = self._expand_macros(value[key], value)
+                value[key] = self._expand_macros(value[key], value)
         return value
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
