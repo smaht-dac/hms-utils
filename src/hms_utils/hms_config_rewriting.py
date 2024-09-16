@@ -51,9 +51,9 @@ class Config:
         return self._json
 
     def lookup(self, path: str, context: Optional[JSON] = None,
-               expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
+               noexpand: bool = False, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, context, simple=simple, noinherit=noinherit)
-        return value if ((value is None) or (expand is False)) else self._expand_macros(value, context)
+        return value if ((value is None) or (noexpand is True)) else self._expand_macros(value, context)
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
