@@ -113,3 +113,36 @@ def test_hms_config_rewrite_d():
     assert config.lookup("bravo/bravo_sub_with_macro") == "alfa_macro_value_a_alpha_inter_alfa_macro_value_b"
     # The alfa macro sub-value ${aws_profile} evaluated in context of /bravo.
     assert config.lookup("bravo/bravo_sub_with_alfa_macro") == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COPIED FROM test_hms_config.py ...
+# ----------------------------------------------------------------------------------------------------------------------
+
+def test_hms_config_a():
+
+    config = Config({
+        "alpha": "1",
+        "bravo": "${alpha}_2",
+        "charlie": {
+            "echo": "3_${bravo}_4_echooooo${zulu}",
+            "echoxx": "3_${bravo}_4_echooooo${zulu/xx}",
+            "foxtrot": "4",
+            "zulu": {
+                "xx": "zuluhere"
+            },
+            "indigo": {
+                "juliet": "5_${alpha}_${zulu}_${charlie/echo}"
+            }
+        },
+        "delta": {
+            "golf": "3",
+            "hotel": "3"
+        },
+        "zulu": "99"
+    }, warning=True)
+
+    assert config.lookup("zulu") == "99"
+    assert config.lookup("charlie/echo") == "3_1_2_4_echooooo${zulu}"  # WARNING: zule evaluates to non-string.
+    assert config.lookup("charlie/echoxx") == "3_1_2_4_echooooozuluhere"
+    assert config.lookup("charlie/zulu/xx") == "zuluhere"

@@ -168,5 +168,18 @@ class JSON(dict):
                 return node
             node = node.parent
 
+    @property
+    def context_path(self) -> Optional[str]:
+        context = self
+        context_path = []
+        context_parent = context.parent
+        while context_parent:
+            for key in context_parent:
+                if context_parent[key] == context:
+                    context_path.insert(0, key)
+            context = context.parent
+            context_parent = context_parent.parent
+        return context_path
+
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))

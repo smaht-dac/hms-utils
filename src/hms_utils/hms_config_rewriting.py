@@ -120,7 +120,7 @@ class Config:
             resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
-                    self._warning(f"Macro must resolve to primitive type: {macro_value}")
+                    self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}")
                     return value
                 value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
             elif self._ignore_missing_macro:
@@ -142,6 +142,9 @@ class Config:
 
     def normalize_path(self, path: str) -> List[str]:
         return self.repack_path(self.unpack_path(path))
+
+    def context_path(self, context: JSON, path: Optional[str] = None) -> Optional[str]:
+        return Config._context_path(context, path, path_separator=self._path_separator)
 
     @staticmethod
     def _unpack_path(path: str, path_separator: Optional[str] = None) -> List[str]:
@@ -175,3 +178,13 @@ class Config:
     @staticmethod
     def _normalize_path(path: str, path_separator: Optional[str] = None) -> List[str]:
         return Config._repack_path(Config._unpack_path(path, path_separator), path_separator)
+
+    @staticmethod
+    def _context_path(context: JSON, path: Optional[str] = None, path_separator: Optional[str] = None) -> Optional[str]:
+        if not (context_path := context.context_path):
+            return None
+        if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
+            path_separator = Config._PATH_SEPARATOR
+        if isinstance(path, str):
+            context_path.append(path)
+        return f"{path_separator}{path_separator.join(context_path)}"
