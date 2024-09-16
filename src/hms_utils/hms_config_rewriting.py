@@ -94,7 +94,7 @@ class Config:
             # a path with more than one component - auth/client - within the inherited/parent contexts.
             # The simple case is in case it turns out the that non-simple case is not very intuitive.
             #
-            path_components_left = path_components[0:path_component_index - 1]
+            path_components_left = path_components[0:min(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
                 path_components = path_components_left + path_components_right

@@ -162,3 +162,59 @@ def test_hms_config_b():
     assert config.lookup("A/B/B1") == "123"
     # This was the tricky-ish one; look back up the tree from the A/B context.
     assert config.lookup("A/B/A1") == "123"
+
+
+def test_hms_config_c():
+    config = Config({
+        "A": {
+            "A1": "123",
+            "A2": "${A1}_456_${B2}",
+            "A3": "${A1}_789_${B4}",
+            "B": {
+                "B1": "${A1}",
+                "B2": "b2value_${A1}",
+                "B3": "b3value_${A2}",
+                "B4": "b4value_${B1}"
+            }
+        }
+    })
+    assert config.lookup("A/B/B3") == "b3value_123_456_b2value_123"
+    # This one is even trickier; want to get A2 from A/B context like the above (test_hms_config_b)
+    # test but then here notice that it has unexpanded macros, i.e. ${B2} within 123_456_${B2},
+    # and then we want to evaluate the macros within the context of A/B.
+    return
+#   import pdb ; pdb.set_trace()  # noqa
+#   x = config.lookup("A/B/A2") # 123_456_${B2}
+#   import pdb ; pdb.set_trace()  # noqa
+#   assert config.lookup("A/B/A2") == "123_456_b2value_123"
+#   assert config.lookup("A/B/A3") == "123_789_b4value_123"
+
+    config = Config({
+        "A": {
+            "A1": "123",
+            "A2": "${A1}_456_${B2}",
+            "X": {
+               "B": {
+                   "B1": "${A1}",
+                   "B2": "b2value_${A1}",
+                   "B3": "b3value_${A2}"
+               }
+            }
+        }
+    })
+    assert config.lookup("A/X/B/B3") == "b3value_123_456_b2value_123"
+
+    config = Config({
+        "A": {
+            "A1": "123",
+            "A2": "${A1}_456_${C2}",
+            "B": {
+                "C": {
+                    "C1": "${A1}",
+                    "C2": "b2value_${A1}",
+                    "C3": "b3value_${A2}"
+                }
+            }
+        }
+    })
+    assert config.lookup("A/B/C/C3") == "b3value_123_456_b2value_123"
