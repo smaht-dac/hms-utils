@@ -357,7 +357,6 @@ def test_hms_config_f():
 
 def test_hms_config_g():
 
-    import json
     config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
     secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_a.json")
     config = Config(config_file)
