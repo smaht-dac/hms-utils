@@ -115,7 +115,6 @@ class Config:
                 if expand:
                     value = self._expand_macros(value, config)
                 return value, config
-                # return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
