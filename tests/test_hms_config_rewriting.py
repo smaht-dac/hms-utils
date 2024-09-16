@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 from hms_utils.hms_config_rewriting import Config
 
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -244,3 +245,112 @@ def test_hms_config_d():
         }
     })
     assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
+
+
+def test_hms_config_e():
+    config = Config({
+        "foursight": {
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh_tunnel_elasticsearch_proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}_${SSH_TUNNEL_ES_ENV}_${SSH_TUNNEL_ES_PORT}",  # noqa
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
+            "smaht": {
+                "wolf": {
+                    "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}x",
+                    "SSH_TUNNEL_ES_PORT": 9209,
+                    "SSH_TUNNEL_ES_ENV": "smaht_wolf",
+                    "SSH_TUNNEL_ES_NAME": "${foursight/SSH_TUNNEL_ES_NAME}"
+                }
+            }
+        }
+    })
+    assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209x"
+
+
+def test_hms_config_f():
+    config = Config({
+        "foursight": {
+            "SSH_TUNNEL_ES_NAME_PREFIX": "ssh-tunnel-es-proxy",
+            "SSH_TUNNEL_ES_NAME": "${SSH_TUNNEL_ES_NAME_PREFIX}-${SSH_TUNNEL_ES_ENV}-${SSH_TUNNEL_ES_PORT}",
+            "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+            "ES_HOST_LOCAL": "http://localhost:${SSH_TUNNEL_ES_PORT}",
+            "4dn": {
+                "AWS_PROFILE": "4dn",
+                "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}-mastertest",
+                "SSH_TUNNEL_ES_PORT": "9201",
+                "dev": {
+                    "IDENTITY": "FoursightDevelopmentLocalApplicationSecret",
+                },
+                "prod": {
+                    "IDENTITY": "FoursightProductionApplicationConfiguration",
+                }
+            },
+            "cgap": {
+                "wolf": {
+                    "AWS_PROFILE": "cgap-wolf",
+                    "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+                    "SSH_TUNNEL_ES_PORT": 9203
+                }
+            },
+            "smaht": {
+                "wolf": {
+                    "AWS_PROFILE": "smaht-wolf",
+                    "SSH_TUNNEL_ES_PORT": 9209
+                }
+            }
+        }
+    })
+
+    # These were the tricky ones.
+    assert config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-smaht-wolf-9209"
+    assert config.lookup("foursight/cgap/wolf/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-cgap-wolf-9203"
+    assert config.lookup("foursight/4dn/prod/SSH_TUNNEL_ES_NAME") == "ssh-tunnel-es-proxy-4dn-mastertest-9201"
+
+    assert config.lookup("foursight/4dn/AWS_PROFILE") == "4dn"
+    assert config.lookup("foursight/4dn/dev/AWS_PROFILE") == "4dn"
+    assert config.lookup("foursight/4dn/SSH_TUNNEL_ES_ENV") == "4dn-mastertest"
+    assert config.lookup("foursight/4dn/dev/SSH_TUNNEL_ES_ENV") == "4dn-mastertest"
+    assert config.lookup("foursight/4dn/SSH_TUNNEL_ES_PORT") == "9201"
+    assert config.lookup("foursight/4dn/dev/SSH_TUNNEL_ES_PORT") == "9201"
+
+    assert config.lookup("foursight/smaht/wolf/ES_HOST_LOCAL") == "http://localhost:9209"
+
+
+def test_hms_config_g():
+
+    return
+
+    # TODO
+
+    config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
+    secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_a.json")
+    config = Config(config_file)
+    secrets = Config(secrets_file)
+    merged_config = config.merge_secrets(secrets)
+
+    value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == "ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209"
+
+    value = merged_config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
+    assert value == "ssh-tunnel-elasticsearch-proxy-smaht-green-9208"
+
+    value = merged_config.lookup("foursight/smaht/Auth0Secret")
+    assert value == "REDACTED_auth0_local_secret_value"
+
+    value = merged_config.lookup("foursight/smaht/Auth0Client")
+    assert value == "UfM_REDACTED_Hf9"
+
+    mocked_aws_secrets_value = {
+        "deploying_iam_user": "kent.pitman.biotest",
+        "ENCODED_AUTH0_CLIENT": "XYZ_REDACTED_auth0_client_ABC",
+        "ENCODED_AUTH0_SECRET": "XYZ_REDACTED_auth0_secret_ABC",
+        "RDS_NAME": "rds-cgap-wolf"
+    }
+    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
+        value = merged_config.lookup("foursight/cgap/wolf/Auth0Secret")
+        assert value == "XYZ_REDACTED_auth0_secret_ABC"
+
+    with patch('hms_utils.hms_config.Config._aws_get_secret_value') as mocked_aws_get_secret_value:
+        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
+        value = merged_config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
+        assert value == "XYZ_REDACTED_auth0_secret_ABC"
