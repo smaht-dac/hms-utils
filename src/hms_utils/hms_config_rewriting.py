@@ -97,9 +97,10 @@ class Config:
             path_components_left = path_components[0:min(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
+                # Yes this is a little tricky; and note we _lookup in parent but expand in current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                return self._lookup(path, config=config.parent)
+                return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:

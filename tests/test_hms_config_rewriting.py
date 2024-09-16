@@ -182,12 +182,8 @@ def test_hms_config_c():
     # This one is even trickier; want to get A2 from A/B context like the above (test_hms_config_b)
     # test but then here notice that it has unexpanded macros, i.e. ${B2} within 123_456_${B2},
     # and then we want to evaluate the macros within the context of A/B.
-    return
-#   import pdb ; pdb.set_trace()  # noqa
-#   x = config.lookup("A/B/A2") # 123_456_${B2}
-#   import pdb ; pdb.set_trace()  # noqa
-#   assert config.lookup("A/B/A2") == "123_456_b2value_123"
-#   assert config.lookup("A/B/A3") == "123_789_b4value_123"
+    assert config.lookup("A/B/A2") == "123_456_b2value_123"
+    assert config.lookup("A/B/A3") == "123_789_b4value_123"
 
     config = Config({
         "A": {
