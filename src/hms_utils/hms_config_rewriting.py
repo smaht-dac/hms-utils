@@ -111,9 +111,12 @@ class Config:
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
                 # return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
-                value = self.lookup(path, config=config.parent, expand=False)
-                if expand:
-                    value = self._expand_macros(value, config)
+                # # value = self.lookup(path, config=config.parent, expand=False)
+                # # if expand:
+                # #     value = self._expand_macros(value, config)
+                # # return value, config
+                # ## return self.lookup(path, config=config.parent, expand=False), config
+                value, _ = self._lookup(path, config=config.parent, expand=False)
                 return value, config
         return value, config
 
@@ -256,6 +259,8 @@ class ConfigWithAwsMacroExpander(Config):
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
 
+
+# TODO: Put these in tests ...
 
 config = Config({
     "foursight": {
