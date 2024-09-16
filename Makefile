@@ -14,6 +14,9 @@ lint:
 test:
 	poetry run pytest -vv
 
+testv:
+	poetry run pytest -vv -s
+
 clean:
 	find . -name .pytest_cache -exec rm -rf {} +
 	find . -name __pycache__ -exec rm -rf {} +

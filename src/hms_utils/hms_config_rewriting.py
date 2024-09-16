@@ -1,4 +1,6 @@
 from __future__ import annotations
+from boto3 import client as BotoClient
+import json
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
@@ -20,15 +22,9 @@ class Config:
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
-    _AWS_SECRET_MACRO_NAME_PREFIX = "aws-secret:"
-    _AWS_SECRET_MACRO_START = f"{_MACRO_START}{_AWS_SECRET_MACRO_NAME_PREFIX}"
-    _AWS_SECRET_MACRO_END = _MACRO_END
-    _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
-    _AWS_SECRET_NAME_NAME = "IDENTITY"
-    _IMPORTED_CONFIG_KEY_PREFIX = "@@@__CONFIG__:"
-    _IMPORTED_SECRETS_KEY_PREFIX = "@@@__SECRETS__:"
 
     def __init__(self, config: JSON, path_separator: Optional[str] = None,
+                 custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None) -> None:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
@@ -36,9 +32,10 @@ class Config:
             config = JSON(config) if isinstance(config, dict) else {}
         self._json = config
         self._path_separator = path_separator
+        self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
         self._ignore_missing_macro = True
         self._warning = (warning if callable(warning)
-                         else (lambda message: print(message, file=sys.stderr, flush=True)
+                         else (lambda message: print(f"WARNING: {message}", file=sys.stderr, flush=True)
                                if warning is True else lambda message: None))
 
     @property
@@ -122,7 +119,7 @@ class Config:
         while True:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
                 break
-            resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+            resolved_macro_value, resolved_macro_context = self._lookup_macro(macro_value, context=context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}")
@@ -138,6 +135,12 @@ class Config:
             value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
+
+    def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
+        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+        if (resolved_macro_value is None) and self._custom_macro_lookup:
+            resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
+        return resolved_macro_value, resolved_macro_context
 
     def unpack_path(self, path: str) -> List[str]:
         return Config._unpack_path(path, path_separator=self._path_separator)
@@ -193,3 +196,49 @@ class Config:
         if isinstance(path, str):
             context_path.append(path)
         return f"{path_separator}{path_separator.join(context_path)}"
+
+
+class ConfigWithAwsMacroExpander(Config):
+
+    _AWS_SECRET_MACRO_NAME_PREFIX = "aws-secret:"
+    _AWS_SECRET_MACRO_START = f"{Config._MACRO_START}{_AWS_SECRET_MACRO_NAME_PREFIX}"
+    _AWS_SECRET_MACRO_END = Config._MACRO_END
+    _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
+    _AWS_SECRET_NAME_NAME = "IDENTITY"
+
+    def __init__(self, config: JSON, path_separator: Optional[str] = None,
+                 noaws: bool = False, raise_exception: bool = False,
+                 warning: Optional[Union[Callable, bool]] = None) -> None:
+        super().__init__(config, path_separator=path_separator,
+                         custom_macro_lookup=self._lookup_macro_custom, warning=warning)
+        self._noaws = noaws is True
+        self._raise_exception = raise_exception is True
+
+    def _lookup_macro_custom(self, macro_value: str, context: Optional[JSON] = None) -> Any:
+        if not macro_value.startswith(ConfigWithAwsMacroExpander._AWS_SECRET_MACRO_NAME_PREFIX):
+            return None
+        secret_specifier = macro_value[len(ConfigWithAwsMacroExpander._AWS_SECRET_MACRO_NAME_PREFIX):]
+        return self._lookup_aws_secret(secret_specifier, context)
+
+    def _lookup_aws_secret(self, secret_specifier: str, context: str) -> Optional[str]:
+        if (index := secret_specifier.find(self._path_separator)) > 0:
+            secret_name = secret_specifier[index + 1:]
+            secrets_name = secret_specifier[0:index]
+        else:
+            secret_name = secret_specifier
+            secrets_name = self.lookup(ConfigWithAwsMacroExpander._AWS_SECRET_NAME_NAME, context)
+        return self._aws_get_secret(secrets_name, secret_name)
+
+    def _aws_get_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
+        if self._noaws:
+            return None
+        try:
+            boto_secrets = BotoClient("secretsmanager")
+            secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
+            secrets = json.loads(secrets.get("SecretString"))
+            return secrets[secret_name]
+        except Exception as e:
+            if self._raise_exception is True:
+                raise e
+            self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
+        return None
