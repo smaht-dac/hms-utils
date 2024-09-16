@@ -106,17 +106,10 @@ class Config:
             path_components_left = path_components[0:max(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
-                # This is a little tricky; and note we lookup in parent but expand in current context.
+                # This is a little tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                # return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
-                # # value = self.lookup(path, config=config.parent, expand=False)
-                # # if expand:
-                # #     value = self._expand_macros(value, config)
-                # # return value, config
-                # ## return self.lookup(path, config=config.parent, expand=False), config
-                value, _ = self._lookup(path, config=config.parent)
-                return value, config
+                return self._lookup(path, config=config.parent)[0], config
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
@@ -257,61 +250,3 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
-
-
-# TODO: Put these in tests ...
-
-config = Config({
-    "foursight": {
-        "SSH_TUNNEL_ES_NAME": "SOMEPREFIX-${SSH_TUNNEL_ES_ENV}-SOMEPORT",
-        "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
-        "smaht": {
-            "prod": {
-                "AWS_PROFILE": "smaht-prod",
-                "SSH_TUNNEL_ES_ENV": "smaht-green"
-            }
-        }
-    }
-})
-
-# (Pdb) macro_value
-# 'SSH_TUNNEL_ES_ENV'
-# (Pdb) context
-# {'prod': {'AWS_PROFILE': 'smaht-prod', 'SSH_TUNNEL_ES_ENV': 'smaht-green'}}
-# (Pdb) self._lookup(macro_value, config=context)
-# ('${AWS_PROFILE}', {'prod': {'AWS_PROFILE': 'smaht-prod', 'SSH_TUNNEL_ES_ENV': 'smaht-green'}})
-
-value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ES_NAME")  # should be  SOMEPREFIX-smaht-green-SOMEPORT
-print(value)
-
-
-config = Config({
-    "auth0": {
-        "local": {
-            "xsecret": "REDACTED_auth0_local_secret_value"
-        }
-    },
-    "foursight": {
-        "smaht": {
-            "Auth0Secret": "${auth0/local/secret}"
-        }
-    }
-})
-value = config.lookup("foursight/smaht/Auth0Secret")  # infinite loop
-# value = config.lookup("foursight/Auth0Secret")  # infinite loop
-print(value)
-
-
-config = Config({
-    "auth0": {
-        "local": {
-            "secret": "REDACTED_auth0_local_secret_value"
-        }
-    },
-    "foursight": {
-            "Auth0Secret": "${auth0/local/secret}"
-    }
-})
-
-value = config.lookup("foursight/Auth0Secret")  # recursiion depth
-print(value)

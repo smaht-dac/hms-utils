@@ -121,6 +121,41 @@ def test_hms_config_rewrite_d():
     assert config.lookup("bravo/bravo_sub_with_alfa_macro") == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"
 
 
+def test_hms_config_rewrite_e():
+
+    config = Config({
+        "foursight": {
+            "SSH_TUNNEL_ES_NAME": "SOMEPREFIX-${SSH_TUNNEL_ES_ENV}-SOMEPORT",
+            "SSH_TUNNEL_ES_ENV": "${AWS_PROFILE}",
+            "smaht": {
+                "prod": {
+                    "AWS_PROFILE": "smaht-prod",
+                    "SSH_TUNNEL_ES_ENV": "smaht-green"
+                }
+            }
+        }
+    })
+    assert config.lookup("foursight/smaht/prod/SSH_TUNNEL_ES_NAME") == "SOMEPREFIX-smaht-green-SOMEPORT"
+
+
+def test_hms_config_rewrite_f():
+    config = Config({
+        "auth0": {
+            "local": {
+                "secret": "REDACTED_auth0_local_secret_value"
+            }
+        },
+        "foursight": {
+            "smaht": {
+                "Auth0Secret": "${auth0/local/secret}",
+                "XAuth0Secret": "${auth0/local/xsecret}"
+            }
+        }
+    })
+    assert config.lookup("foursight/smaht/Auth0Secret") == "REDACTED_auth0_local_secret_value"
+    assert config.lookup("foursight/smaht/XAuth0Secret") == "${auth0/local/xsecret}"
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # ADAPTED FROM test_hms_config.py ...
 # ----------------------------------------------------------------------------------------------------------------------
@@ -329,7 +364,6 @@ def test_hms_config_g():
     secrets = Config(secrets_file)
     merged_config, merged_secrets, unmerged_secrets = Dummy.merge(config.json, secrets.json)
     merged_config = Config(merged_config)
-    print(json.dumps(merged_config.json, indent=4))
     # merged_config = config.merge_secrets(secrets)
 
     value = merged_config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
