@@ -112,9 +112,11 @@ class Config:
         return expanded_value
 
     def _expand_macros_within_string_value(self, value: str, context: Optional[JSON] = None) -> Any:
+        if not (isinstance(value, str) and value):
+            return value
         missing_macro_found = False
         while True:
-            if (not isinstance(value, str)) or (not (match := Config._MACRO_PATTERN.search(value))):
+            if not (match := Config._MACRO_PATTERN.search(value)):
                 break
             if macro_value := match.group(1):
                 resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
