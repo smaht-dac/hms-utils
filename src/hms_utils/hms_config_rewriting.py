@@ -129,7 +129,7 @@ class Config:
                 missing_macro_found = True
             else:
                 raise Exception(f"Macro not found: {macro_value}")
-        if missing_macro_found and self._ignore_missing_macro:
+        if missing_macro_found:
             value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
         return value
