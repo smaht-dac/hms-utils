@@ -82,12 +82,9 @@ def test_hms_config_rewrite_c():
     assert config.lookup("/bravo/delta/echo", simple=simple) == "delta_echo_value"
     assert config.lookup("/delta/echo", simple=simple) == "delta_echo_value"
     assert config.lookup("/delta/alfa", simple=simple) == "alfa_value"
-#   assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) == {
-#           "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
-#           "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__${alfa}"}
-#   assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) == {
-#           "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
-#           "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__alfa_value"}
+    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) == {
+            "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
+            "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__alfa_value"}
 
     simple = True
     assert config.lookup("/bravo/bravo_sub_two", simple=simple) == "bravo_sub_two_value"

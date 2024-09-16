@@ -103,34 +103,33 @@ class Config:
         return value, config
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
-        expanded_value = self._expand_macros_within_string_value(value, context)
-        if isinstance(expanded_value, JSON):
-            for key in expanded_value:
-                if isinstance(expanded_value[key], str):
-                    expanded_value[key] = self._expand_macros(expanded_value[key], expanded_value)
-                    pass
-        return expanded_value
+        if isinstance(value, str):
+            value = self._expand_macros_within_string(value, context)
+        elif isinstance(value, JSON):
+            for key in value:
+                if isinstance(value[key], str):
+                    value[key] = self._expand_macros(value[key], value)
+        return value
 
-    def _expand_macros_within_string_value(self, value: str, context: Optional[JSON] = None) -> Any:
+    def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
         if not (isinstance(value, str) and value):
             return value
         missing_macro_found = False
         while True:
-            if not (match := Config._MACRO_PATTERN.search(value)):
+            if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
                 break
-            if macro_value := match.group(1):
-                resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
-                if resolved_macro_value is not None:
-                    if not is_primitive_type(resolved_macro_value):
-                        self._warning(f"Macro must resolve to primitive type: {macro_value}")
-                        return value
-                    value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
-                elif self._ignore_missing_macro:
-                    value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
-                                          f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
-                    missing_macro_found = True
-                else:
-                    raise Exception(f"Macro not found: {macro_value}")
+            resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+            if resolved_macro_value is not None:
+                if not is_primitive_type(resolved_macro_value):
+                    self._warning(f"Macro must resolve to primitive type: {macro_value}")
+                    return value
+                value = value.replace(f"${{{macro_value}}}", resolved_macro_value)
+            elif self._ignore_missing_macro:
+                value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                      f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+                missing_macro_found = True
+            else:
+                raise Exception(f"Macro not found: {macro_value}")
         if missing_macro_found and self._ignore_missing_macro:
             value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
             value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
