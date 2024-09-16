@@ -114,6 +114,7 @@ def test_hms_config_c():
         "A": {
             "A1": "123",
             "A2": "${A1}_456_${C2}",
+            "A3": "${A1}_978_${C3}",
             "B": {
                 "C": {
                     "C1": "${A1}",
@@ -124,6 +125,19 @@ def test_hms_config_c():
         }
     })
     assert config.lookup("A/B/C/C3") == "b3value_123_456_b2value_123"
+
+    assert config.lookup("A/B/C/C3") == "b3value_123_456_b2value_123"
+    assert config.lookup("A/B/C/A1") == "123"
+    assert config.lookup("A/B/A1") == "123"
+    assert config.lookup("A/A1") == "123"
+    assert config.lookup("A1") is None
+    assert config.lookup("A", allow_dictionary=True) == config.json["A"]
+    assert config.lookup("B") is None
+    assert config.lookup("A/B/C/A2") == "123_456_b2value_123"
+    assert config.lookup("A/B/A2") == "123_456_${C2}"
+    assert config.lookup("A/A2") == "123_456_${C2}"
+    assert config.lookup("A2") is None
+    assert config.lookup("A/B/C/A3") == "123_978_b3value_123_456_b2value_123"
 
 
 def test_hms_config_d():

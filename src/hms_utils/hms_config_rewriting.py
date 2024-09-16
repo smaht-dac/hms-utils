@@ -41,6 +41,10 @@ class Config:
                          else (lambda message: print(message, file=sys.stderr, flush=True)
                                if warning is True else lambda message: None))
 
+    @property
+    def json(self) -> JSON:
+        return self._json
+
     def lookup(self, path: str, config: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
@@ -97,7 +101,7 @@ class Config:
             path_components_left = path_components[0:min(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
-                # Yes this is a little tricky; and note we _lookup in parent but expand in current context.
+                # This is a little tricky; and note we lookup in parent but expand in current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
                 return self._expand_macros(self.lookup(path, config=config.parent, expand=False), config), config
