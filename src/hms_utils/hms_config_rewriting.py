@@ -50,36 +50,36 @@ class Config:
     def json(self) -> JSON:
         return self._json
 
-    def lookup(self, path: str, config: Optional[JSON] = None,
+    def lookup(self, path: str, context: Optional[JSON] = None,
                expand: bool = True, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, config, simple=simple, noinherit=noinherit)
+        value, context = self._lookup(path, context, simple=simple, noinherit=noinherit)
         return value if ((value is None) or (expand is False)) else self._expand_macros(value, context)
 
-    def _lookup(self, path: str, config: Optional[JSON] = None,
+    def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
-        if (config is None) or (not isinstance(config, JSON)):
-            config = self._json
+        if (context is None) or (not isinstance(context, JSON)):
+            context = self._json
         value = None
         if not (path_components := self.unpack_path(path)):
             # No or invalid path.
-            return value, config
+            return value, context
         if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
             if len(path_components) == 1:
                 # Trivial case of just the root path ("/").
-                return value, config
-            config = config.root
+                return value, context
+            context = context.root
             path_components = path_components[1:]
         for path_component_index, path_component in enumerate(path_components):
-            if (value := config.get(path_component)) is None:
+            if (value := context.get(path_component)) is None:
                 break
             if isinstance(value, JSON):
                 # Found a JSON in the path so recurse down to it.
-                config = value
+                context = value
             elif path_component_index < (len(path_components) - 1):
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
-        if (value is None) and (noinherit is not True) and config.parent:
+        if (value is None) and (noinherit is not True) and context.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
             # Disable this behavior with the noinherit flag. And if the simple flag
@@ -109,8 +109,8 @@ class Config:
                 # This is a little tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                return self._lookup(path, config=config.parent)[0], config
-        return value, config
+                return self._lookup(path, context=context.parent)[0], context
+        return value, context
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
         if isinstance(value, str):
@@ -145,7 +145,7 @@ class Config:
         return value
 
     def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
-        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, config=context)
+        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
         if (resolved_macro_value is None) and self._custom_macro_lookup:
             resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
         return resolved_macro_value, resolved_macro_context
