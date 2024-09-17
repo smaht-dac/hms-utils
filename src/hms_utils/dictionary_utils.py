@@ -1,6 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 
 def print_dictionary_tree(data: dict,
@@ -180,6 +180,31 @@ class JSON(dict):
             context = context.parent
             context_parent = context_parent.parent
         return context_path
+
+    def merge(self, secondary: JSON, path_separator: str = "/") -> JSON:
+        # Merges the given JSON object into this JSON object; but do not overwrite
+        # anything in this JSON object; anything that would otherwise overwrite is ignored.
+        merged_config, _, _ = JSON._merge(self, secondary, path_separator=path_separator)
+        return merged_config
+
+    @staticmethod
+    def _merge(primary: JSON, secondary: JSON, path_separator: str = "/") -> Tuple[dict, list, list]:
+        if not (isinstance(primary, dict) or isinstance(secondary, dict)):
+            return None, None, None
+        merged = deepcopy(primary) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
+        def merge(primary: dict, secondary: dict, path: str = "") -> None:  # noqa
+            nonlocal unmerged_secrets, path_separator
+            for key, value in secondary.items():
+                key_path = f"{path}{path_separator}{key}" if path else key
+                if key not in primary:
+                    primary[key] = secondary[key]
+                    merged_secrets.append(key_path)
+                elif isinstance(primary[key], dict) and isinstance(secondary[key], dict):
+                    merge(primary[key], secondary[key], path=key_path)
+                else:
+                    unmerged_secrets.append(key_path)
+        merge(merged, secondary)
+        return merged, merged_secrets, unmerged_secrets
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))

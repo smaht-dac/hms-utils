@@ -46,6 +46,9 @@ class Config:
                          else (lambda message: print(f"WARNING: {message}", file=sys.stderr, flush=True)
                                if warning is True else lambda message: None))
 
+    def merge(self, json: JSON) -> None:
+        self._json = self._json.merge(json)
+
     @property
     def json(self) -> JSON:
         return self._json
