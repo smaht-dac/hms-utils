@@ -41,10 +41,9 @@ class Config:
         self._json = config
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
-        self._ignore_missing_macro = True
-        self._warning = (warning if callable(warning)
-                         else (lambda message: print(f"WARNING: {message}", file=sys.stderr, flush=True)
-                               if warning is True else lambda message: None))
+        self._ignore_missing_macros = True
+        self._ignore_circular_macros = True
+        self._warning = (warning if callable(warning) else (self._warn if warning is True else lambda _, __=None: _))
 
     def merge(self, json: JSON) -> None:
         if isinstance(json, JSON):
@@ -110,7 +109,7 @@ class Config:
             path_components_left = path_components[0:max(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
             if (simple is not True) or len(path_components_right) == 1:
-                # This is a little tricky; and note we lookup in parent but return current context.
+                # This is a bit tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
                 return self._lookup(path, context=context.parent)[0], context
@@ -127,6 +126,7 @@ class Config:
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
         if not (isinstance(value, str) and value):
             return value
+        expanding_macros = set()
         missing_macro_found = False
         while True:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
@@ -137,16 +137,27 @@ class Config:
                     self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}")
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
-            elif self._ignore_missing_macro:
-                value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
-                                      f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
-                missing_macro_found = True
+                if macro_value in expanding_macros:
+                    self._warning(f"Circular macro definition found: {macro_value}", not self._ignore_circular_macros)
+                    value = self._hide_macros(value, expanding_macros)
+                    missing_macro_found = True
+                expanding_macros.add(macro_value)
             else:
-                raise Exception(f"Macro not found: {macro_value}")
+                self._warning(f"Macro not found: {macro_value}", not self._ignore_missing_macros)
+                value = self._hide_macros(value, macro_value)
+                missing_macro_found = True
         if missing_macro_found:
-            value = value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
-            value = value.replace(Config._MACRO_HIDE_END, Config._MACRO_END)
+            value = self._unhide_macros(value)
         return value
+
+    def _hide_macros(self, value: str, macro_values: Union[str, List[str]]) -> str:
+        for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
+            return value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                 f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+
+    def _unhide_macros(self, value: str) -> str:
+        return (value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
+                     .replace(Config._MACRO_HIDE_END, Config._MACRO_END))
 
     def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
         resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
@@ -209,6 +220,11 @@ class Config:
             context_path.append(path)
         return f"{path_separator}{path_separator.join(context_path)}"
 
+    def _warn(self, message: str, exception: bool = False) -> None:
+        print(f"WARNING: {message}", file=sys.stderr, flush=True)
+        if exception is True:
+            raise Exception(message)
+
 
 class ConfigWithAwsMacroExpander(Config):
 
@@ -254,3 +270,97 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+
+config = Config({
+    "abc": {
+        "def": "${auth0/secret}_${env}"
+    },
+    "main": "main_value"
+})
+
+secrets = Config({
+    "env": 'some_env',
+    "abc": "some_abc",
+    "common": "iamcommon_${../auth0/env}",
+    "auth0": {
+        "secret": "some_secret_${common}_${main}_${def/foo}",
+        "env": "4dn"
+     },
+    "def": {
+        'foo': 123
+    }
+})
+
+# config.import_config(secrets)
+# m = Config(merge(config.json, secrets.json))
+# print(json.dumps(m.json, indent=4))
+# print(m.lookup("/abc/def"))
+
+# m = config.json.merge(secrets.json)
+# secrets.merge(config.json)
+# config.merge(secrets.json)
+# print(json.dumps(config.json, indent=4))
+# print(json.dumps(secrets.json, indent=4))
+# print(config.lookup("abc/def"))
+
+
+# config.merge(secrets.json)
+# print(json.dumps(config.json, indent=4))
+# x = config.lookup("/abc/def")
+# print(x)
+
+config = Config({
+    "abc": {
+        "def": "${auth0/secret}"
+    },
+    "auth0": {
+        "secret": "some_secret_${common}_${main}_${def}",
+    },
+    "def": "asdf"
+})
+x = config.lookup("/abc/def")
+print(x)
+
+config = Config({
+    "abc": {
+        "def": "${abc}"
+    }
+})
+x = config.lookup("/abc/def")
+print(x)
+
+config = Config({
+    "abc": "${abc}"
+})
+x = config.lookup("abc")
+print(x)
+
+config = Config({
+    "abc": {
+        "def": "${auth0/secret}"
+    },
+    "auth0": {
+        "secret": "some_secret_${def}",
+    }
+})
+x = config.lookup("abc/def")
+print(x)
+
+
+config = Config({
+    "abc": "${auth0/secret}",
+    "auth0": {
+        "secret": "some_secret_${abc}",
+    }
+})
+x = config.lookup("abc")
+print(x)
+
+
+config = Config({
+    "abc": "${auth0}",
+    "auth0": "some_secret_${abcx}"
+})
+x = config.lookup("abc")
+print(x)
