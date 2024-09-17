@@ -1,4 +1,5 @@
 import os
+import pytest
 from unittest.mock import patch
 from hms_utils.hms_config_rewriting import Config
 
@@ -170,18 +171,45 @@ def test_hms_config_rewrite_g():
 
 def test_hms_config_rewrite_h():
 
-    # Circular ...
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "secret": "some_secret_${def}_${main}_${def}",
+        },
+        "def": "asdf"
+    }, exception=True)
+    with pytest.raises(Exception):  # circular
+        config.lookup("/abc/def")
+
+    config = Config({
+        "abc": {
+            "def": "${abc}"
+        }
+    }, exception=True)
+    with pytest.raises(Exception):  # primitive type - TODO (should be circular)
+        config.lookup("/abc/def")
 
     config = Config({
         "abc": {
             "def": "${auth0/secret}"
         },
         "auth0": {
-            "secret": "some_secret_${common}_${main}_${def}",
-        },
-        "def": "asdf"
-    })
-    assert config.lookup("/abc/def")  # TODO
+            "secret": "some_secret_${def}",
+        }
+    }, exception=True)
+    with pytest.raises(Exception):  # circular
+        config.lookup("abc/def")
+
+    config = Config({
+        "abc": "${auth0/secret}",
+        "auth0": {
+            "secret": "some_secret_${abc}",
+        }
+    }, exception=True)
+    with pytest.raises(Exception):  # circular
+        config.lookup("abc")
 
 
 # ----------------------------------------------------------------------------------------------------------------------

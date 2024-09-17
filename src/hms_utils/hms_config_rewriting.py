@@ -27,7 +27,7 @@ class Config:
 
     def __init__(self, config: JSON, path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 warning: Optional[Union[Callable, bool]] = None) -> None:
+                 warning: Optional[Union[Callable, bool]] = None, exception: bool = False) -> None:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if not isinstance(config, JSON):
@@ -43,7 +43,11 @@ class Config:
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
         self._ignore_missing_macros = True
         self._ignore_circular_macros = True
+        self._ignore_structured_macros = True
         self._warning = (warning if callable(warning) else (self._warn if warning is True else lambda _, __=None: _))
+        self._exception = exception is True
+        if self._exception:
+            self._warning = self._warn
 
     def merge(self, json: JSON) -> None:
         if isinstance(json, JSON):
@@ -134,7 +138,8 @@ class Config:
             resolved_macro_value, resolved_macro_context = self._lookup_macro(macro_value, context=context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
-                    self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}")
+                    self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}",
+                                  not self._ignore_structured_macros)
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
@@ -223,7 +228,7 @@ class Config:
 
     def _warn(self, message: str, exception: bool = False) -> None:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
-        if exception is True:
+        if (exception is True) or (self._exception is True):
             raise Exception(message)
 
 
