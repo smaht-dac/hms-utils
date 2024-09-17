@@ -132,10 +132,13 @@ class Config:
             return value
         expanding_macros = []
         missing_macro_found = False
+        resolved_macro_context = None
         while True:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
                 break
-            resolved_macro_value, resolved_macro_context = self._lookup_macro(macro_value, context=context)
+            # This is a bit tricky with the context.
+            resolved_macro_value, resolved_macro_context = self._lookup_macro(macro_value,
+                                                                              context=resolved_macro_context or context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}",

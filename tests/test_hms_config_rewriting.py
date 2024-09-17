@@ -172,6 +172,30 @@ def test_hms_config_rewrite_g():
 def test_hms_config_rewrite_h():
 
     config = Config({
+        "auth0": {
+            "env": "4dn",
+            "client": "some_auth0_client_${env}",
+        },
+        "target": "${auth0/client}"
+    })
+    assert config.lookup("target") == "some_auth0_client_4dn"
+
+    config = Config({
+        "auth0": {
+            "env": "4dn",
+            "client": "some_auth0_client_${env}",
+        },
+        "target": {
+            "env": "smaht",
+            "client": "${auth0/client}"
+        }
+    })
+    assert config.lookup("target/client") == "some_auth0_client_smaht"
+
+
+def test_hms_config_rewrite_i():
+
+    config = Config({
         "abc": {
             "def": "${auth0/secret}"
         },
