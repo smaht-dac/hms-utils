@@ -116,7 +116,9 @@ class Config:
                 # This is a bit tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                return self._lookup(path, context=context.parent)[0], context
+                # return self._lookup(path, context=context.parent)[0], context
+                lookup_value, lookup_context = self._lookup(path, context=context.parent)
+                return lookup_value, context
         return value, context
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
@@ -279,3 +281,36 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+
+if False:
+
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
+    # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
+    x = config.lookup("abc/def")
+    print(x)
+
+if False:
+
+    config = Config({
+        "abc": {
+            "def": "${/auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
+    # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
+    x = config.lookup("abc/def")
+    print(x)

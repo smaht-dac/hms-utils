@@ -236,6 +236,47 @@ def test_hms_config_rewrite_i():
         config.lookup("abc")
 
 
+def test_hms_config_rewrite_tricky_a():
+
+    config = Config({
+        "abc": {
+            "main": "smaht",
+            "def": "${auth0/secret}",
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    assert config.lookup("abc/def") == "iamsecret_smaht"
+
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
+    # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
+    assert config.lookup("abc/def") == "iamsecret_${main}"
+
+    config = Config({
+        "abc": {
+            "def": "${/auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    # However here the /auth0/secret (with leading slash) look is in the auth0 context
+    # so does not find auth0/main from auth0/secret value.
+    assert config.lookup("abc/def") == "iamsecret_4dn"
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # ADAPTED FROM test_hms_config.py ...
 # ----------------------------------------------------------------------------------------------------------------------
