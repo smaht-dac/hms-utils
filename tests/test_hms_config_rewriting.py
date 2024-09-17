@@ -151,6 +151,39 @@ def test_hms_config_rewrite_f():
     assert config.lookup("foursight/smaht/XAuth0Secret") == "${auth0/local/xsecret}"
 
 
+def test_hms_config_rewrite_g():
+
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "some_secret_${main}_${auth0/main}",
+        }
+    })
+    # TODO: Do not like that fact that auth0/main is not found
+    # for ${main} within auth0/secret - it is not because the
+    # the context is abc/def ... need multiple contexts maybe
+    assert config.lookup("/abc/def") == "some_secret_${main}_4dn"
+
+
+def test_hms_config_rewrite_h():
+
+    # Circular ...
+
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "secret": "some_secret_${common}_${main}_${def}",
+        },
+        "def": "asdf"
+    })
+    assert config.lookup("/abc/def")  # TODO
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # ADAPTED FROM test_hms_config.py ...
 # ----------------------------------------------------------------------------------------------------------------------

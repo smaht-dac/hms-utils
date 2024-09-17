@@ -126,7 +126,7 @@ class Config:
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
         if not (isinstance(value, str) and value):
             return value
-        expanding_macros = set()
+        expanding_macros = []
         missing_macro_found = False
         while True:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
@@ -141,7 +141,8 @@ class Config:
                     self._warning(f"Circular macro definition found: {macro_value}", not self._ignore_circular_macros)
                     value = self._hide_macros(value, expanding_macros)
                     missing_macro_found = True
-                expanding_macros.add(macro_value)
+                else:
+                    expanding_macros.append(macro_value)
             else:
                 self._warning(f"Macro not found: {macro_value}", not self._ignore_missing_macros)
                 value = self._hide_macros(value, macro_value)
@@ -270,97 +271,3 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
-
-
-config = Config({
-    "abc": {
-        "def": "${auth0/secret}_${env}"
-    },
-    "main": "main_value"
-})
-
-secrets = Config({
-    "env": 'some_env',
-    "abc": "some_abc",
-    "common": "iamcommon_${../auth0/env}",
-    "auth0": {
-        "secret": "some_secret_${common}_${main}_${def/foo}",
-        "env": "4dn"
-     },
-    "def": {
-        'foo': 123
-    }
-})
-
-# config.import_config(secrets)
-# m = Config(merge(config.json, secrets.json))
-# print(json.dumps(m.json, indent=4))
-# print(m.lookup("/abc/def"))
-
-# m = config.json.merge(secrets.json)
-# secrets.merge(config.json)
-# config.merge(secrets.json)
-# print(json.dumps(config.json, indent=4))
-# print(json.dumps(secrets.json, indent=4))
-# print(config.lookup("abc/def"))
-
-
-# config.merge(secrets.json)
-# print(json.dumps(config.json, indent=4))
-# x = config.lookup("/abc/def")
-# print(x)
-
-config = Config({
-    "abc": {
-        "def": "${auth0/secret}"
-    },
-    "auth0": {
-        "secret": "some_secret_${common}_${main}_${def}",
-    },
-    "def": "asdf"
-})
-x = config.lookup("/abc/def")
-print(x)
-
-config = Config({
-    "abc": {
-        "def": "${abc}"
-    }
-})
-x = config.lookup("/abc/def")
-print(x)
-
-config = Config({
-    "abc": "${abc}"
-})
-x = config.lookup("abc")
-print(x)
-
-config = Config({
-    "abc": {
-        "def": "${auth0/secret}"
-    },
-    "auth0": {
-        "secret": "some_secret_${def}",
-    }
-})
-x = config.lookup("abc/def")
-print(x)
-
-
-config = Config({
-    "abc": "${auth0/secret}",
-    "auth0": {
-        "secret": "some_secret_${abc}",
-    }
-})
-x = config.lookup("abc")
-print(x)
-
-
-config = Config({
-    "abc": "${auth0}",
-    "auth0": "some_secret_${abcx}"
-})
-x = config.lookup("abc")
-print(x)
