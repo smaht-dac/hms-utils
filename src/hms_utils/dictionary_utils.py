@@ -125,9 +125,10 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
 
 
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
-# within the main dictionary. Should be able to use EXACTLY like a dict after creating with JSON(dict);
-# including copying and setting properties to either other dictionaires or JSON objects.
-# Also has a "root" property on each sub-dictionary referring to the main/root one.
+# within the main dictionary. Should be able to use EXACTLY like a dicttionary type after creating with
+# JSON(dict); including copying and setting properties to any type including either other dictionaies
+# or JSON objects. Also has a "root" property on each sub-dictionary referring to the main/root one;
+# this just walks up the parent properties to the top (where parent is of course None).
 #
 class JSON(dict):
 
@@ -170,6 +171,7 @@ class JSON(dict):
 
     @property
     def context_path(self) -> Optional[str]:
+        # FYI we only actually use this (in hms_utils) for diagnostic messages.
         context = self
         context_path = []
         context_parent = context.parent

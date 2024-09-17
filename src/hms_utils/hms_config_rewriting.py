@@ -47,7 +47,8 @@ class Config:
                                if warning is True else lambda message: None))
 
     def merge(self, json: JSON) -> None:
-        self._json = self._json.merge(json)
+        if isinstance(json, JSON):
+            self._json = self._json.merge(json)
 
     @property
     def json(self) -> JSON:
