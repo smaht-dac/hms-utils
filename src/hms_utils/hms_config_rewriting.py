@@ -137,13 +137,10 @@ class Config:
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
                 lookup_value, lookup_context = self._lookup(path, context=context.parent)
-                if Config._POSSIBLE_TRICKY_FIX:
-                    if isinstance(lookup_context, list):
-                        return lookup_value, [context, *lookup_context]
-                    else:
-                        return lookup_value, [context, lookup_context]
-                else:
-                    return lookup_value, context
+                if Config._POSSIBLE_TRICKY_FIX and (lookup_value is not None):
+                    context = ([context, *lookup_context]
+                               if isinstance(lookup_context, list) else [context, lookup_context])
+                return lookup_value, context
         return value, context
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
