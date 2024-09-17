@@ -14,6 +14,7 @@ from hms_utils.misc_utils import is_primitive_type
 
 class Config:
 
+    _POSSIBLE_TRICKY_FIX = True
     _PATH_SEPARATOR = "/"
     _PATH_COMPONENT_PARENT = ".."
     _PATH_COMPONENT_CURRENT = "."
@@ -64,6 +65,12 @@ class Config:
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+        # TODO: _POSSIBLE_TRICKY_FIX ...
+        context_alternate = None
+        if isinstance(context, list):
+            context_alternate = context[1]
+            context = context[0]
+        # ... TODO: _POSSIBLE_TRICKY_FIX
         if (context is None) or (not isinstance(context, JSON)):
             context = self._json
         value = None
@@ -86,6 +93,17 @@ class Config:
                 # Found a terminal (non-JSON) in the path but it is not the last component.
                 value = None
                 break
+        if Config._POSSIBLE_TRICKY_FIX and (value is None) and isinstance(context_alternate, JSON):
+            for path_component_index, path_component in enumerate(path_components):
+                if (value := context_alternate.get(path_component)) is None:
+                    break
+                if isinstance(value, JSON):
+                    # Found a JSON in the path so recurse down to it.
+                    context_alternate = value
+                elif path_component_index < (len(path_components) - 1):
+                    # Found a terminal (non-JSON) in the path but it is not the last component.
+                    value = None
+                    break
         if (value is None) and (noinherit is not True) and context.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
@@ -116,9 +134,11 @@ class Config:
                 # This is a bit tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
-                # return self._lookup(path, context=context.parent)[0], context
                 lookup_value, lookup_context = self._lookup(path, context=context.parent)
-                return lookup_value, context
+                if Config._POSSIBLE_TRICKY_FIX:
+                    return lookup_value, [context, lookup_context]
+                else:
+                    return lookup_value, context
         return value, context
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
@@ -281,36 +301,3 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
-
-
-if False:
-
-    config = Config({
-        "abc": {
-            "def": "${auth0/secret}"
-        },
-        "auth0": {
-            "main": "4dn",
-            "secret": "iamsecret_${main}",
-        }
-    })
-    # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
-    # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
-    x = config.lookup("abc/def")
-    print(x)
-
-if False:
-
-    config = Config({
-        "abc": {
-            "def": "${/auth0/secret}"
-        },
-        "auth0": {
-            "main": "4dn",
-            "secret": "iamsecret_${main}",
-        }
-    })
-    # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
-    # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
-    x = config.lookup("abc/def")
-    print(x)
