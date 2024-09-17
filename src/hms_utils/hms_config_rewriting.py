@@ -66,6 +66,7 @@ class Config:
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
         # TODO: _POSSIBLE_TRICKY_FIX ...
+        # If we do stick with this we should make this a list of any length.
         context_alternate = None
         if isinstance(context, list):
             context_alternate = context[1]
@@ -94,6 +95,7 @@ class Config:
                 value = None
                 break
         if Config._POSSIBLE_TRICKY_FIX and (value is None) and isinstance(context_alternate, JSON):
+            # If we do stick with this fix need to make this alternate context thing a proper list of any length.
             for path_component_index, path_component in enumerate(path_components):
                 if (value := context_alternate.get(path_component)) is None:
                     break
@@ -136,7 +138,10 @@ class Config:
                 path = self.repack_path(path_components, root=path_root)
                 lookup_value, lookup_context = self._lookup(path, context=context.parent)
                 if Config._POSSIBLE_TRICKY_FIX:
-                    return lookup_value, [context, lookup_context]
+                    if isinstance(lookup_context, list):
+                        return lookup_value, [context, *lookup_context]
+                    else:
+                        return lookup_value, [context, lookup_context]
                 else:
                     return lookup_value, context
         return value, context

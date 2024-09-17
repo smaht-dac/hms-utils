@@ -255,6 +255,18 @@ def test_hms_config_rewrite_tricky_a():
 
     config = Config({
         "abc": {
+            "main": "smaht",
+            "def": "${/auth0/secret}",  # not root
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "iamsecret_${main}",
+        }
+    })
+    assert config.lookup("abc/def") == "iamsecret_4dn"
+
+    config = Config({
+        "abc": {
             "def": "${auth0/secret}"
         },
         "auth0": {
