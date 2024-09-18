@@ -163,8 +163,8 @@ class Config:
                                                                               context=resolved_macro_context or context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
-                    self._warning(f"Macro must resolve to primitive type: {self.context_path(context, macro_value)}",
-                                  not self._ignore_structured_macros)
+                    self._warning(f"Macro must resolve to primitive type:"
+                                  f"{self.context_path(context, macro_value)}", not self._ignore_structured_macros)
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
