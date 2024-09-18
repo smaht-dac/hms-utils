@@ -295,6 +295,27 @@ def test_hms_config_rewrite_tricky_a():
     assert config.lookup("abc/def") == "iamsecret_4dn"
 
 
+def test_hms_config_rewrite_tricky_b():
+
+    config = Config({
+        "alfa": "alfa_value_${charlie/bravo_sub}",
+        "alfa2": "alfa_value_${charlie/bravo_sub2}",
+        "outer_env": "4dn",
+        "env": "cgap",
+        "bravo": {
+            "charlie": {
+                "env": "smaht",
+                "bravo_sub": "bravo_sub_value_${env}_${outer_env}_${delta/delta_sub}",
+                "bravo_sub2": "bravo_sub_value_${/env}_${outer_env}_${delta/delta_sub}"
+            },
+            "delta": {
+                "delta_sub": "delta_sub_value"
+            }
+        },
+    })
+    assert config.lookup("/bravo/alfa", simple=True) == "alfa_value_bravo_sub_value_smaht_4dn_delta_sub_value"
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # ADAPTED FROM test_hms_config.py ...
 # ----------------------------------------------------------------------------------------------------------------------

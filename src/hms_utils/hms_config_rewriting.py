@@ -304,6 +304,43 @@ class ConfigWithAwsMacroExpander(Config):
 
 
 if True:
+    print('xxx')
+    config = Config({
+        "foo": "foo_value_${goo}",
+        "goo": "123",
+        "bravo": {
+            "charlie": {
+                "bravo_sub": "bravo_sub_value_${/foo}_${delta}",
+            },
+            "delta": "delta_value"
+        },
+    })
+    x = config.lookup("/bravo/charlie/bravo_sub", simple=True)  # == "alfa_value"
+    #x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    print(x)
+
+
+if False:
+    config = Config({
+        "alfa": "alfa_value_${charlie/bravo_sub}",
+        "outer_env": "4dn",
+        "env": "cgap",
+        "bravo": {
+            "charlie": {
+                "env": "smaht",
+                "bravo_sub": "bravo_sub_value_${/env}_${outer_env}_${delta/delta_sub}",
+                # "bravo_sub": "bravo_sub_value_${env}_${outer_env}_${delta/delta_sub}",
+            },
+            "delta": {
+                "delta_sub": "delta_sub_value"
+            }
+        },
+    })
+    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    print(x)
+
+
+if False:
     config = Config({
         "abc": {
             "def": "${auth0/secret}"
@@ -317,7 +354,7 @@ if True:
     print(x)
 
 
-if True:
+if False:
     config = Config({
         "alfa": "alfa_macro_value_a_alpha_inter_${aws_profile}",
         "bravo": {
@@ -328,7 +365,7 @@ if True:
     x = config.lookup("bravo/bravo_sub_with_alfa_macro")  # == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"
     print(x)
 
-if True:
+if False:
     config = Config({
         "alfa": "alfa_value",
         "bravo": {
@@ -340,4 +377,31 @@ if True:
     # print(x)
 
     x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    print(x)
+
+
+if False:
+    print('xxx')
+    config = Config({
+        "alfa": "alfa_value_${charlie/bravo_sub}",
+        "alfa2": "alfa_value_${charlie/bravo_sub2}",
+        "outer_env": "4dn",
+        "env": "cgap",
+        "bravo": {
+            "charlie": {
+                "env": "smaht",
+                "bravo_sub": "bravo_sub_value_${env}_${outer_env}_${delta/delta_sub}",
+                "bravo_sub2": "bravo_sub_value_${/env}_${outer_env}_${delta/delta_sub}"
+            },
+            "delta": {
+                "delta_sub": "delta_sub_value"
+            }
+        },
+    })
+    # x = config.lookup("/bravo/alfa", noinherit=True)
+    # print(x)
+
+    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    print(x)
+    x = config.lookup("/bravo/alfa2", simple=True)  # == "alfa_value"
     print(x)
