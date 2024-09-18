@@ -38,7 +38,7 @@ class Config:
                         config = json.load(f)
                 except Exception:
                     pass
-            config = JSON(config) if isinstance(config, dict) else {}
+            config = JSON(config) if isinstance(config, dict) else JSON({})
         self._json = config
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
@@ -65,47 +65,44 @@ class Config:
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
-        # TODO: _POSSIBLE_TRICKY_FIX ...
-        # If we do stick with this we should make this a list of any length.
-        context_alternate = None
-        if isinstance(context, list):
-            context_alternate = context[1]
-            context = context[0]
-        # ... TODO: _POSSIBLE_TRICKY_FIX
-        if (context is None) or (not isinstance(context, JSON)):
-            context = self._json
-        value = None
-        if not (path_components := self.unpack_path(path)):
-            # No or invalid path.
-            return value, context
-        if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
-            if len(path_components) == 1:
-                # Trivial case of just the root path ("/").
-                return value, context
-            context = context.root
-            path_components = path_components[1:]
-        for path_component_index, path_component in enumerate(path_components):
-            if (value := context.get(path_component)) is None:
-                break
-            if isinstance(value, JSON):
-                # Found a JSON in the path so recurse down to it.
-                context = value
-            elif path_component_index < (len(path_components) - 1):
-                # Found a terminal (non-JSON) in the path but it is not the last component.
-                value = None
-                break
-        if Config._POSSIBLE_TRICKY_FIX and (value is None) and isinstance(context_alternate, JSON):
-            # If we do stick with this fix need to make this alternate context thing a proper list of any length.
+
+        def lookup_path_components(path_components: List[str], context: JSON) -> Tuple[Optional[Any], JSON]:
+            value = None
             for path_component_index, path_component in enumerate(path_components):
-                if (value := context_alternate.get(path_component)) is None:
+                if (value := context.get(path_component)) is None:
                     break
                 if isinstance(value, JSON):
                     # Found a JSON in the path so recurse down to it.
-                    context_alternate = value
+                    context = value
                 elif path_component_index < (len(path_components) - 1):
                     # Found a terminal (non-JSON) in the path but it is not the last component.
                     value = None
                     break
+            return value, context, path_component_index
+
+        secondary_contexts = []
+        if context is None:
+            context = self._json
+        elif isinstance(context, list) and context:
+            secondary_contexts = context[1:]
+            context = context[0]
+        elif not isinstance(context, JSON):
+            context = self._json
+
+        value = None
+
+        if not (path_components := self.unpack_path(path)):
+            return value, context
+        if path_root := (path_components[0] == Config._PATH_COMPONENT_ROOT):
+            if not (path_components := path_components[1:]):
+                return value, context
+            context = context.root
+
+        value, context, path_component_index = lookup_path_components(path_components, context)
+        if (value is None) and secondary_contexts:
+            for secondary_context in secondary_contexts:
+                value, _, _ = lookup_path_components(path_components, secondary_context)
+
         if (value is None) and (noinherit is not True) and context.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
@@ -141,6 +138,7 @@ class Config:
                     context = ([context, *lookup_context]
                                if isinstance(lookup_context, list) else [context, lookup_context])
                 return lookup_value, context
+
         return value, context
 
     def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
@@ -303,3 +301,43 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+
+if True:
+    config = Config({
+        "abc": {
+            "def": "${auth0/secret}"
+        },
+        "auth0": {
+            "main": "4dn",
+            "secret": "some_secret_${main}",
+        }
+    })
+    x = config.lookup("/abc/def")  # == "some_secret_4dn_4dn"
+    print(x)
+
+
+if True:
+    config = Config({
+        "alfa": "alfa_macro_value_a_alpha_inter_${aws_profile}",
+        "bravo": {
+            "aws_profile": "4dn",
+            "bravo_sub_with_alfa_macro": "${alfa}_xyzzy",
+        }
+    })
+    x = config.lookup("bravo/bravo_sub_with_alfa_macro")  # == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"
+    print(x)
+
+if True:
+    config = Config({
+        "alfa": "alfa_value",
+        "bravo": {
+            "bravo_sub": "bravo_sub_value"
+        },
+        "delta": "delta_value"
+    })
+    # x = config.lookup("/bravo/alfa", noinherit=True)
+    # print(x)
+
+    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    print(x)
