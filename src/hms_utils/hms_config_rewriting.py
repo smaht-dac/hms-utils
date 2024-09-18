@@ -14,7 +14,7 @@ from hms_utils.misc_utils import is_primitive_type
 
 class Config:
 
-    _POSSIBLE_TRICKY_FIX = True
+    _TRICKY_FIX = True
     _PATH_SEPARATOR = "/"
     _PATH_COMPONENT_PARENT = ".."
     _PATH_COMPONENT_CURRENT = "."
@@ -134,7 +134,7 @@ class Config:
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
                 lookup_value, lookup_context = self._lookup(path, context=context.parent)
-                if Config._POSSIBLE_TRICKY_FIX and (lookup_value is not None):
+                if Config._TRICKY_FIX and (lookup_value is not None):
                     context = ([context, *lookup_context]
                                if isinstance(lookup_context, list) else [context, lookup_context])
                 return lookup_value, context

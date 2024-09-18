@@ -166,7 +166,7 @@ def test_hms_config_rewrite_g():
     # TODO: Do not like that fact that auth0/main is not found
     # for ${main} within auth0/secret - it is not because the
     # the context is abc/def ... need multiple contexts maybe
-    if Config._POSSIBLE_TRICKY_FIX:
+    if Config._TRICKY_FIX:
         assert config.lookup("/abc/def") == "some_secret_4dn_4dn"
     else:
         assert config.lookup("/abc/def") == "some_secret_${main}_4dn"
@@ -276,7 +276,7 @@ def test_hms_config_rewrite_tricky_a():
     })
     # TODO: the auth0/secret lookup is in the abc/def context so does not find auth0/main
     # from auth0/secret value; would much rather abc/def give iamsecret_4dn but tricky.
-    if Config._POSSIBLE_TRICKY_FIX:
+    if Config._TRICKY_FIX:
         assert config.lookup("abc/def") == "iamsecret_4dn"
     else:
         assert config.lookup("abc/def") == "iamsecret_${main}"
