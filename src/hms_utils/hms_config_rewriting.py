@@ -316,7 +316,7 @@ if True:
         },
     })
     x = config.lookup("/bravo/charlie/bravo_sub", simple=True)  # == "alfa_value"
-    #x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
+    # x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
     print(x)
 
 
