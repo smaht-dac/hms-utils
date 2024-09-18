@@ -61,7 +61,7 @@ class Config:
     def lookup(self, path: str, context: Optional[JSON] = None,
                noexpand: bool = False, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, context, simple=simple, noinherit=noinherit)
-        return value if ((value is None) or (noexpand is True)) else self._expand_macros(value, context)
+        return value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
@@ -141,20 +141,21 @@ class Config:
 
         return value, context
 
-    def _expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
+    def expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
         if isinstance(value, str):
             value = self._expand_macros_within_string(value, context)
         elif isinstance(value, JSON):
             for key in value:
-                value[key] = self._expand_macros(value[key], value)
+                value[key] = self.expand_macros(value[key], value)
         return value
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
 
         def hide_macros(value: str, macro_values: Union[str, List[str]]) -> str:
             for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
-                return value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
-                                     f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+                value = value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                      f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+            return value
 
         def unhide_macros(value: str) -> str:
             return (value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
@@ -171,8 +172,8 @@ class Config:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
                 break
             # This is a bit tricky with the context.
-            resolved_macro_value, resolved_macro_context = self._lookup_macro(macro_value,
-                                                                              context=resolved_macro_context or context)
+            resolved_macro_value, resolved_macro_context = self.lookup_macro(macro_value,
+                                                                             context=resolved_macro_context or context)
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type:"
@@ -193,7 +194,7 @@ class Config:
             value = unhide_macros(value)
         return value
 
-    def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Tuple[Any, JSON]:
+    def lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Tuple[Any, JSON]:
         if self.is_absolute_path(macro_value):
             return self.lookup(macro_value), context
         resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
