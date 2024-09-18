@@ -313,7 +313,20 @@ def test_hms_config_rewrite_tricky_b():
             }
         },
     })
-    assert config.lookup("/bravo/alfa", simple=True) == "alfa_value_bravo_sub_value_smaht_4dn_delta_sub_value"
+    assert config.lookup("/bravo/alfa") == "alfa_value_bravo_sub_value_smaht_4dn_delta_sub_value"
+    assert config.lookup("/bravo/alfa2") == "alfa_value_bravo_sub_value_cgap_4dn_delta_sub_value"
+
+    config = Config({
+        "foo": "foo_value_${goo}",
+        "goo": "123",
+        "bravo": {
+            "charlie": {
+                "bravo_sub": "bravo_sub_value_${/foo}_${delta}",
+            },
+            "delta": "delta_value"
+        },
+    })
+    assert config.lookup("/bravo/charlie/bravo_sub") == "bravo_sub_value_foo_value_123_delta_value"
 
 
 # ----------------------------------------------------------------------------------------------------------------------

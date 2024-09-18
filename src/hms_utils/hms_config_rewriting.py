@@ -190,7 +190,9 @@ class Config:
         return (value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
                      .replace(Config._MACRO_HIDE_END, Config._MACRO_END))
 
-    def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Any:
+    def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Tuple[Any, JSON]:
+        if self.is_absolute_path(macro_value):
+            return self.lookup(macro_value), context
         resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
         if (resolved_macro_value is None) and self._custom_macro_lookup:
             resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
@@ -202,8 +204,11 @@ class Config:
     def repack_path(self, path_components: List[str], root: bool = False) -> str:
         return Config._repack_path(path_components, root=root, path_separator=self._path_separator)
 
-    def normalize_path(self, path: str) -> List[str]:
+    def normalize_path(self, path: str) -> str:
         return self.repack_path(self.unpack_path(path))
+
+    def is_absolute_path(self, path: str) -> bool:
+        return isinstance(path, str) and path.startswith(self._path_separator)
 
     def context_path(self, context: JSON, path: Optional[str] = None) -> Optional[str]:
         return Config._context_path(context, path, path_separator=self._path_separator)
@@ -236,10 +241,6 @@ class Config:
             root = True
             path_components = path_components[1:]
         return (path_separator if root else "") + path_separator.join(path_components)
-
-    @staticmethod
-    def _normalize_path(path: str, path_separator: Optional[str] = None) -> List[str]:
-        return Config._repack_path(Config._unpack_path(path, path_separator), path_separator)
 
     @staticmethod
     def _context_path(context: JSON, path: Optional[str] = None, path_separator: Optional[str] = None) -> Optional[str]:
@@ -301,107 +302,3 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
-
-
-if True:
-    print('xxx')
-    config = Config({
-        "foo": "foo_value_${goo}",
-        "goo": "123",
-        "bravo": {
-            "charlie": {
-                "bravo_sub": "bravo_sub_value_${/foo}_${delta}",
-            },
-            "delta": "delta_value"
-        },
-    })
-    x = config.lookup("/bravo/charlie/bravo_sub", simple=True)  # == "alfa_value"
-    # x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
-    print(x)
-
-
-if False:
-    config = Config({
-        "alfa": "alfa_value_${charlie/bravo_sub}",
-        "outer_env": "4dn",
-        "env": "cgap",
-        "bravo": {
-            "charlie": {
-                "env": "smaht",
-                "bravo_sub": "bravo_sub_value_${/env}_${outer_env}_${delta/delta_sub}",
-                # "bravo_sub": "bravo_sub_value_${env}_${outer_env}_${delta/delta_sub}",
-            },
-            "delta": {
-                "delta_sub": "delta_sub_value"
-            }
-        },
-    })
-    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
-    print(x)
-
-
-if False:
-    config = Config({
-        "abc": {
-            "def": "${auth0/secret}"
-        },
-        "auth0": {
-            "main": "4dn",
-            "secret": "some_secret_${main}",
-        }
-    })
-    x = config.lookup("/abc/def")  # == "some_secret_4dn_4dn"
-    print(x)
-
-
-if False:
-    config = Config({
-        "alfa": "alfa_macro_value_a_alpha_inter_${aws_profile}",
-        "bravo": {
-            "aws_profile": "4dn",
-            "bravo_sub_with_alfa_macro": "${alfa}_xyzzy",
-        }
-    })
-    x = config.lookup("bravo/bravo_sub_with_alfa_macro")  # == "alfa_macro_value_a_alpha_inter_4dn_xyzzy"
-    print(x)
-
-if False:
-    config = Config({
-        "alfa": "alfa_value",
-        "bravo": {
-            "bravo_sub": "bravo_sub_value"
-        },
-        "delta": "delta_value"
-    })
-    # x = config.lookup("/bravo/alfa", noinherit=True)
-    # print(x)
-
-    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
-    print(x)
-
-
-if False:
-    print('xxx')
-    config = Config({
-        "alfa": "alfa_value_${charlie/bravo_sub}",
-        "alfa2": "alfa_value_${charlie/bravo_sub2}",
-        "outer_env": "4dn",
-        "env": "cgap",
-        "bravo": {
-            "charlie": {
-                "env": "smaht",
-                "bravo_sub": "bravo_sub_value_${env}_${outer_env}_${delta/delta_sub}",
-                "bravo_sub2": "bravo_sub_value_${/env}_${outer_env}_${delta/delta_sub}"
-            },
-            "delta": {
-                "delta_sub": "delta_sub_value"
-            }
-        },
-    })
-    # x = config.lookup("/bravo/alfa", noinherit=True)
-    # print(x)
-
-    x = config.lookup("/bravo/alfa", simple=True)  # == "alfa_value"
-    print(x)
-    x = config.lookup("/bravo/alfa2", simple=True)  # == "alfa_value"
-    print(x)
