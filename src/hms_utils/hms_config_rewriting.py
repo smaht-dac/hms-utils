@@ -150,11 +150,23 @@ class Config:
         return value
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
+
+        def hide_macros(value: str, macro_values: Union[str, List[str]]) -> str:
+            for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
+                return value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
+                                     f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
+
+        def unhide_macros(value: str) -> str:
+            return (value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
+                         .replace(Config._MACRO_HIDE_END, Config._MACRO_END))
+
         if not (isinstance(value, str) and value):
             return value
+
         expanding_macros = []
         missing_macro_found = False
         resolved_macro_context = None
+
         while True:
             if not ((match := Config._MACRO_PATTERN.search(value)) and (macro_value := match.group(1))):
                 break
@@ -169,26 +181,17 @@ class Config:
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
                     self._warning(f"Circular macro definition found: {macro_value}", not self._ignore_circular_macros)
-                    value = self._hide_macros(value, expanding_macros)
+                    value = hide_macros(value, expanding_macros)
                     missing_macro_found = True
                 else:
                     expanding_macros.append(macro_value)
             else:
                 self._warning(f"Macro not found: {macro_value}", not self._ignore_missing_macros)
-                value = self._hide_macros(value, macro_value)
+                value = hide_macros(value, macro_value)
                 missing_macro_found = True
         if missing_macro_found:
-            value = self._unhide_macros(value)
+            value = unhide_macros(value)
         return value
-
-    def _hide_macros(self, value: str, macro_values: Union[str, List[str]]) -> str:
-        for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
-            return value.replace(f"{Config._MACRO_START}{macro_value}{Config._MACRO_END}",
-                                 f"{Config._MACRO_HIDE_START}{macro_value}{Config._MACRO_HIDE_END}")
-
-    def _unhide_macros(self, value: str) -> str:
-        return (value.replace(Config._MACRO_HIDE_START, Config._MACRO_START)
-                     .replace(Config._MACRO_HIDE_END, Config._MACRO_END))
 
     def _lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Tuple[Any, JSON]:
         if self.is_absolute_path(macro_value):
