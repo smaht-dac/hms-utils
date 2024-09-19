@@ -58,13 +58,13 @@ class Config:
     def json(self) -> JSON:
         return self._json
 
-    def lookup(self, path: str, context: Optional[JSON] = None,
-               noexpand: bool = False, simple: bool = False, noinherit: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, context, simple=simple, noinherit=noinherit)
+    def lookup(self, path: str, context: Optional[JSON] = None, noexpand: bool = False,
+               inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
+        value, context = self._lookup(path, context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         return value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
-                simple: bool = False, noinherit: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
+                inherit_simple: bool = False, inherit_none: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
 
         def lookup_path_components(path_components: List[str], context: JSON) -> Tuple[Optional[Any], JSON]:
             value = None
@@ -103,10 +103,10 @@ class Config:
             for secondary_context in secondary_contexts:
                 value, _, _ = lookup_path_components(path_components, secondary_context)
 
-        if (value is None) and (noinherit is not True) and context.parent:
+        if (value is None) and (inherit_none is not True) and context.parent:
             #
             # Search for the remaining path up through parents simulating inheritance.
-            # Disable this behavior with the noinherit flag. And if the simple flag
+            # Disable this behavior with the inherit_none flag. And if inherit_simple
             # is set then we only do this behavior for the last component of a path.
             # For example if we have this hierarchy:
             #
@@ -122,14 +122,14 @@ class Config:
             # identity_value, because it is visible within the /portal/smaht/wolf context; and if
             # we lookup /portal/wolf/auth/client we would get the value for /portal/auth/client,
             # auth_client_value, because it - /portal/auth - is also visible with that context.
-            # Now if the simple flag is set then the first case gets the same result, but the latter
-            # case - /portal/smaht/wolf/auth/client will return None because we would be looking for
-            # a path with more than one component - auth/client - within the inherited/parent contexts.
-            # The simple case is in case it turns out the that non-simple case is not very intuitive.
+            # Now if the inherit_simple flag is set then the first case gets the same result, but the
+            # latter case - /portal/smaht/wolf/auth/client will return None because we would be looking
+            # for a path with more than one component - auth/client - within the inherited/parent contexts.
+            # The inherit_simple case is in case it turns out the that non-simple case is not very intuitive.
             #
             path_components_left = path_components[0:max(0, path_component_index - 1)]
             path_components_right = path_components[path_component_index:]
-            if (simple is not True) or len(path_components_right) == 1:
+            if (inherit_simple is not True) or len(path_components_right) == 1:
                 # This is a bit tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
                 path = self.repack_path(path_components, root=path_root)
@@ -306,3 +306,16 @@ class ConfigWithAwsMacroExpander(Config):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+
+config = Config({
+    "abc": {
+        "def": "def_value"
+    },
+    "ghi": {
+        "jk": "jk_value"
+    }
+})
+
+x = config.lookup("ghi/abc/def", inherit_simple=False)
+print(x)

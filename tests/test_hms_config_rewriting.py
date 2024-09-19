@@ -53,8 +53,8 @@ def test_hms_config_rewrite_a():
     assert config.lookup("bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/alfa") == "alfa_value"
-    assert config.lookup("/bravo/alfa", noinherit=True) is None
-    assert config.lookup("/bravo/alfa", simple=True) == "alfa_value"
+    assert config.lookup("/bravo/alfa", inherit_none=True) is None
+    assert config.lookup("/bravo/alfa", inherit_simple=True) == "alfa_value"
 
 
 def test_hms_config_rewrite_c():
@@ -77,23 +77,23 @@ def test_hms_config_rewrite_c():
         "echo": "echo_value"
     })
 
-    simple = False
-    assert config.lookup("/bravo/bravo_sub_two", simple=simple) == "bravo_sub_two_value"
-    assert config.lookup("/bravo/echo", simple=simple) == "echo_value"
-    assert config.lookup("/bravo/alfa", simple=simple) == "alfa_value"
-    assert config.lookup("/bravo/delta/echo", simple=simple) == "delta_echo_value"
-    assert config.lookup("/delta/echo", simple=simple) == "delta_echo_value"
-    assert config.lookup("/delta/alfa", simple=simple) == "alfa_value"
-    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) == {
+    inherit_simple = False
+    assert config.lookup("/bravo/bravo_sub_two", inherit_simple=inherit_simple) == "bravo_sub_two_value"
+    assert config.lookup("/bravo/echo", inherit_simple=inherit_simple) == "echo_value"
+    assert config.lookup("/bravo/alfa", inherit_simple=inherit_simple) == "alfa_value"
+    assert config.lookup("/bravo/delta/echo", inherit_simple=inherit_simple) == "delta_echo_value"
+    assert config.lookup("/delta/echo", inherit_simple=inherit_simple) == "delta_echo_value"
+    assert config.lookup("/delta/alfa", inherit_simple=inherit_simple) == "alfa_value"
+    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", inherit_simple=inherit_simple) == {
             "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
             "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__alfa_value"}
 
-    simple = True
-    assert config.lookup("/bravo/bravo_sub_two", simple=simple) == "bravo_sub_two_value"
-    assert config.lookup("/bravo/echo", simple=simple) == "echo_value"
-    assert config.lookup("/bravo/alfa", simple=simple) == "alfa_value"
-    assert config.lookup("/bravo/delta/echo", simple=simple) is None
-    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", simple=simple) is None
+    inherit_simple = True
+    assert config.lookup("/bravo/bravo_sub_two", inherit_simple=inherit_simple) == "bravo_sub_two_value"
+    assert config.lookup("/bravo/echo", inherit_simple=inherit_simple) == "echo_value"
+    assert config.lookup("/bravo/alfa", inherit_simple=inherit_simple) == "alfa_value"
+    assert config.lookup("/bravo/delta/echo", inherit_simple=inherit_simple) is None
+    assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", inherit_simple=inherit_simple) is None
 
 
 def test_hms_config_rewrite_d():
