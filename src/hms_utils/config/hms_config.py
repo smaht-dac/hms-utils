@@ -44,22 +44,28 @@ class Config:
         self._ignore_structured_macros = True
         self._warning = (warning if callable(warning) else (self._warn if warning is True else lambda _, __=None: _))
         self._exception = exception is True
+        if self._exception:
+            self._warning = self._warn
+        self.tag(tag)
+
+    @property
+    def json(self) -> JSON:
+        return self._json
+
+    def tag(self, tag: Optional[Tuple[str, Any]] = None) -> None:
         if isinstance(tag, tuple) and (len(tag) == 2):
             if isinstance(tag_name := tag[0], str) and (tag_name := tag_name.strip()):
                 if self._json.tag(tag_name, tag[1]):
                     setattr(self, tag_name, tag[1])
-        if self._exception:
-            self._warning = self._warn
+        elif isinstance(tag, str) and (tag := tag.strip()):
+            if self._json.tag(tag, True):
+                setattr(self, tag, True)
 
     def merge(self, json: Union[JSON, dict]) -> None:
         if isinstance(json, dict):
             json = JSON(json)
         if isinstance(json, JSON):
             self._json = self._json.merge(json)
-
-    @property
-    def json(self) -> JSON:
-        return self._json
 
     def lookup(self, path: str, context: Optional[JSON] = None, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
@@ -245,6 +251,7 @@ config = Config({
         "jkl": "jkl_value_${/abc/def}_${abc/def}"
     }
 }, tag=("secret", True))
+# }, tag="secret")
 
 x = config.lookup("/ghi/jkl")
 print(x)
