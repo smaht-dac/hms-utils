@@ -61,9 +61,11 @@ class Config:
             if self._json.tag(tag, True):
                 setattr(self, tag, True)
 
-    def merge(self, json: Union[JSON, dict]) -> None:
+    def merge(self, json: Union[JSON, dict, Config]) -> None:
         if isinstance(json, dict):
             json = JSON(json)
+        elif isinstance(json, Config):
+            json = json._json
         if isinstance(json, JSON):
             self._json = self._json.merge(json)
 
@@ -241,3 +243,26 @@ class Config:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
         if (exception is True) or (self._exception is True):
             raise Exception(message)
+
+
+config = Config({
+    "abc": {
+        "def": "def_value"
+    },
+    "ghi": {
+        "jkl": "jkl_value_${/abc/def}_${abc/def}"
+    }
+})
+
+secrets = Config({
+    "auth0": {
+        "local": "auth0_local_value"
+    }
+}, tag=("secret", True))
+
+config.merge(secrets)
+x = config.lookup("/ghi/jkl")
+print(x)
+x = config.lookup("/auth0")
+print(x)
+print(x.secret)

@@ -161,8 +161,6 @@ class JSON(dict):
             if isinstance(child, dict):
                 if not isinstance(child, JSON):
                     child = JSON(child, _default=False)
-                    for tag in self.root._tags:
-                        setattr(child, tag, getattr(self, tag))
                 child.parent = parent
                 super(JSON, parent).__setitem__(key, child)  # bypass override below
                 self._initialize(child)
@@ -234,11 +232,12 @@ class JSON(dict):
     def __setitem__(self, key, value) -> None:
         if isinstance(value, dict) and id(value.parent) != id(self):
             if isinstance(value, JSON):
-                value = deepcopy(value)
+                copied_value = deepcopy(value)
+                for tag in value.root._tags:
+                    setattr(copied_value, tag, getattr(value, tag))
+                value = copied_value
             else:
                 value = JSON(value)
-                for tag in self.root._tags:
-                    setattr(value, tag, getattr(self, tag))
             value.parent = self
         super().__setitem__(key, value)
 
