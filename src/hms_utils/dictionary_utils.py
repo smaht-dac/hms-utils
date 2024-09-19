@@ -3,7 +3,7 @@ from copy import deepcopy
 import io
 import json
 import os
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 
 def print_dictionary_tree(data: dict,
@@ -133,7 +133,6 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
             with io.open(file, "r") as f:
                 return json.load(f)
         except Exception as e:
-            import pdb ; pdb.set_trace()  # noqa
             if raise_exception is True:
                 raise e
         return None
@@ -162,19 +161,11 @@ class JSON(dict):
             if isinstance(child, dict):
                 if not isinstance(child, JSON):
                     child = JSON(child, _default=False)
+                    for tag in self.root._tags:
+                        setattr(child, tag, getattr(self, tag))
                 child.parent = parent
-                # child.root = lambda child=child: JSON._root(child)
                 super(JSON, parent).__setitem__(key, child)  # bypass override below
                 self._initialize(child)
-
-    def __setitem__(self, key, value) -> None:
-        if isinstance(value, dict) and id(value.parent) != id(self):
-            if isinstance(value, JSON):
-                value = deepcopy(value)
-            else:
-                value = JSON(value)
-            value.parent = self
-        super().__setitem__(key, value)
 
     @property
     def root(self) -> Optional[JSON]:
@@ -197,6 +188,23 @@ class JSON(dict):
             context = context.parent
             context_parent = context_parent.parent
         return context_path
+
+    def tag(self, tag: str, value: Any) -> bool:
+        if tag == "parent":
+            return False
+        setattr(self, tag, value)
+        for child in self:
+            if isinstance(self[child], JSON):
+                self[child].tag(tag, value)
+        return True
+
+    @property
+    def _tags(self) -> List[str]:
+        tags = []
+        for attribute in vars(self):
+            if attribute != "parent":
+                tags.append(attribute)
+        return tags
 
     def merge(self, secondary: JSON, path_separator: str = "/") -> JSON:
         # Merges the given JSON object into this JSON object; but do not overwrite
@@ -222,6 +230,17 @@ class JSON(dict):
                     unmerged_secrets.append(key_path)
         merge(merged, secondary)
         return merged, merged_secrets, unmerged_secrets
+
+    def __setitem__(self, key, value) -> None:
+        if isinstance(value, dict) and id(value.parent) != id(self):
+            if isinstance(value, JSON):
+                value = deepcopy(value)
+            else:
+                value = JSON(value)
+                for tag in self.root._tags:
+                    setattr(value, tag, getattr(self, tag))
+            value.parent = self
+        super().__setitem__(key, value)
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))

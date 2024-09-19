@@ -23,7 +23,9 @@ class Config:
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _TRICKY_FIX = True
 
-    def __init__(self, config: JSON, path_separator: Optional[str] = None,
+    def __init__(self, config: JSON,
+                 tag: Optional[Tuple[str, Any]] = None,
+                 path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None, exception: bool = False) -> None:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
@@ -42,6 +44,10 @@ class Config:
         self._ignore_structured_macros = True
         self._warning = (warning if callable(warning) else (self._warn if warning is True else lambda _, __=None: _))
         self._exception = exception is True
+        if isinstance(tag, tuple) and (len(tag) == 2):
+            if isinstance(tag_name := tag[0], str) and (tag_name := tag_name.strip()):
+                if self._json.tag(tag_name, tag[1]):
+                    setattr(self, tag_name, tag[1])
         if self._exception:
             self._warning = self._warn
 
@@ -238,7 +244,10 @@ config = Config({
     "ghi": {
         "jkl": "jkl_value_${/abc/def}_${abc/def}"
     }
-})
+}, tag=("secret", True))
 
 x = config.lookup("/ghi/jkl")
 print(x)
+print(f"[{config.json.secret}]")
+print(config.json["abc"].secret)
+print(config.json["ghi"].secret)
