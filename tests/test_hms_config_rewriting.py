@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch
-from hms_utils.hms_config_rewriting import Config
+from hms_utils.config.hms_config import Config
 
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
