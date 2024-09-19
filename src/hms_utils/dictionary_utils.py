@@ -186,7 +186,7 @@ class JSON(dict):
 
     @property
     def context_path(self) -> Optional[str]:
-        # FYI we only actually use this (in hms_utils) for diagnostic messages.
+        # FYI we only actually use this (in hms_config) for diagnostic messages.
         context = self
         context_path = []
         context_parent = context.parent

@@ -4,6 +4,7 @@ import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.dictionary_utils import JSON, load_json_file
 from hms_utils.misc_utils import is_primitive_type
+from hms_utils.config.utils import repack_path, unpack_path
 
 # UNDER DEVELOPMENT: Basically rewriting hms_config to be tighter based on lessons learned.
 
@@ -11,8 +12,8 @@ from hms_utils.misc_utils import is_primitive_type
 class Config:
 
     _PATH_SEPARATOR = "/"
-    _PATH_COMPONENT_PARENT = ".."
     _PATH_COMPONENT_CURRENT = "."
+    _PATH_COMPONENT_PARENT = ".."
     _PATH_COMPONENT_ROOT = _PATH_SEPARATOR
     _MACRO_START = "${"
     _MACRO_END = "}"
@@ -44,7 +45,9 @@ class Config:
         if self._exception:
             self._warning = self._warn
 
-    def merge(self, json: JSON) -> None:
+    def merge(self, json: Union[JSON, dict]) -> None:
+        if isinstance(json, dict):
+            json = JSON(json)
         if isinstance(json, JSON):
             self._json = self._json.merge(json)
 
@@ -197,10 +200,11 @@ class Config:
         return resolved_macro_value, resolved_macro_context
 
     def unpack_path(self, path: str) -> List[str]:
-        return Config._unpack_path(path, path_separator=self._path_separator)
+        return unpack_path(path, path_separator=self._path_separator,
+                           path_current=Config._PATH_COMPONENT_CURRENT, path_parent=Config._PATH_COMPONENT_PARENT)
 
     def repack_path(self, path_components: List[str], root: bool = False) -> str:
-        return Config._repack_path(path_components, root=root, path_separator=self._path_separator)
+        return repack_path(path_components, root=root, path_separator=self._path_separator)
 
     def normalize_path(self, path: str) -> str:
         return self.repack_path(self.unpack_path(path))
@@ -210,35 +214,6 @@ class Config:
 
     def context_path(self, context: JSON, path: Optional[str] = None) -> Optional[str]:
         return Config._context_path(context, path, path_separator=self._path_separator)
-
-    @staticmethod
-    def _unpack_path(path: str, path_separator: Optional[str] = None) -> List[str]:
-        if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
-            path_separator = Config._PATH_SEPARATOR
-        path_components = []
-        if isinstance(path, str) and (path := path.strip()):
-            if path.startswith(Config._PATH_COMPONENT_ROOT):
-                path = path[len(Config._PATH_COMPONENT_ROOT):]
-                path_components.append(Config._PATH_COMPONENT_ROOT)
-            for path_component in path.split(path_separator):
-                if ((path_component := path_component.strip()) and (path_component != Config._PATH_COMPONENT_CURRENT)):
-                    if path_component == Config._PATH_COMPONENT_PARENT:
-                        if (len(path_components) > 0) and (path_components != [Config._PATH_COMPONENT_ROOT]):
-                            path_components = path_components[:-1]
-                        continue
-                    path_components.append(path_component)
-        return path_components
-
-    @staticmethod
-    def _repack_path(path_components: List[str], root: bool = False, path_separator: Optional[str] = None) -> str:
-        if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
-            path_separator = Config._PATH_SEPARATOR
-        if not (isinstance(path_components, list) and path_components):
-            path_components = []
-        if path_components[0] == Config._PATH_COMPONENT_ROOT:
-            root = True
-            path_components = path_components[1:]
-        return (path_separator if root else "") + path_separator.join(path_components)
 
     @staticmethod
     def _context_path(context: JSON, path: Optional[str] = None, path_separator: Optional[str] = None) -> Optional[str]:
@@ -254,3 +229,16 @@ class Config:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
         if (exception is True) or (self._exception is True):
             raise Exception(message)
+
+
+config = Config({
+    "abc": {
+        "def": "def_value"
+    },
+    "ghi": {
+        "jkl": "jkl_value_${/abc/def}_${abc/def}"
+    }
+})
+
+x = config.lookup("/ghi/jkl")
+print(x)
