@@ -13,7 +13,6 @@ from hms_utils.misc_utils import is_primitive_type
 
 class Config:
 
-    _TRICKY_FIX = True
     _PATH_SEPARATOR = "/"
     _PATH_COMPONENT_PARENT = ".."
     _PATH_COMPONENT_CURRENT = "."
@@ -24,6 +23,7 @@ class Config:
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _TRICKY_FIX = True
 
     def __init__(self, config: JSON, path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
