@@ -37,6 +37,7 @@ class Config:
                 raise Exception("Must create Config object with dictionary, JSON, or file path.")
             config = JSON(config) if isinstance(config, dict) else JSON({})
         self._json = config
+        self._imports = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
         self._ignore_missing_macros = True
@@ -68,6 +69,20 @@ class Config:
             json = json._json
         if isinstance(json, JSON):
             self._json = self._json.merge(json)
+
+    def imports(self, imports: Union[List[Union[dict, JSON, Config]], Union[dict, JSON, Config]]) -> None:
+        if isinstance(imports, (dict, JSON, Config)):
+            imports = [imports]
+        if isinstance(imports, list):
+            for import_item in imports:
+                if isinstance(import_item, dict):
+                    import_item = JSON(dict)
+                elif isinstance(import_item, Config):
+                    import_item = import_item.json
+                if isinstance(import_item, JSON):
+                    if self._imports is None:
+                        self._imports = []
+                    self._imports.append(Config(import_item))
 
     def lookup(self, path: str, context: Optional[JSON] = None, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
@@ -207,10 +222,17 @@ class Config:
 
     def lookup_macro(self, macro_value: str, context: Optional[JSON] = None) -> Tuple[Any, JSON]:
         if self.is_absolute_path(macro_value):
-            return self.lookup(macro_value), context
-        resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
-        if (resolved_macro_value is None) and self._custom_macro_lookup:
-            resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
+            resolved_macro_value = self.lookup(macro_value)
+            resolved_macro_context = context
+        else:
+            resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
+            if (resolved_macro_value is None) and self._custom_macro_lookup:
+                resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
+        if (resolved_macro_value is None) and self._imports:
+            for import_item in self._imports:
+                resolved_macro_value, resolved_macro_context = import_item.lookup_macro(macro_value)
+                if resolved_macro_value is not None:
+                    break
         return resolved_macro_value, resolved_macro_context
 
     def unpack_path(self, path: str) -> List[str]:
