@@ -1,5 +1,8 @@
 from __future__ import annotations
 from copy import deepcopy
+import io
+import json
+import os
 from typing import Callable, List, Optional, Tuple, Union
 
 
@@ -122,6 +125,18 @@ def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
     for key in sorted(nonleafs.keys()):
         sorted_data[key] = sort_dictionary(data[key])
     return sorted_data
+
+
+def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
+    if isinstance(file, str) and os.path.isfile(file):
+        try:
+            with io.open(file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            import pdb ; pdb.set_trace()  # noqa
+            if raise_exception is True:
+                raise e
+        return None
 
 
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary

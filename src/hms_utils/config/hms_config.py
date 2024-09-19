@@ -1,11 +1,8 @@
 from __future__ import annotations
-import io
-import json
-import os
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
-from hms_utils.dictionary_utils import JSON
+from hms_utils.dictionary_utils import JSON, load_json_file
 from hms_utils.misc_utils import is_primitive_type
 
 # UNDER DEVELOPMENT: Basically rewriting hms_config to be tighter based on lessons learned.
@@ -31,12 +28,10 @@ class Config:
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if not isinstance(config, JSON):
-            if isinstance(config, str) and os.path.isfile(config):
-                try:
-                    with io.open(config, "r") as f:
-                        config = json.load(f)
-                except Exception:
-                    pass
+            if isinstance(config, str):
+                config = load_json_file(config)
+            elif not isinstance(config, dict):
+                raise Exception("Must create Config object with dictionary, JSON, or file path.")
             config = JSON(config) if isinstance(config, dict) else JSON({})
         self._json = config
         self._path_separator = path_separator
