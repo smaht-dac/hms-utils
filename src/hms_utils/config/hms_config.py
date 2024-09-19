@@ -241,20 +241,3 @@ class Config:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
         if (exception is True) or (self._exception is True):
             raise Exception(message)
-
-
-config = Config({
-    "abc": {
-        "def": "def_value"
-    },
-    "ghi": {
-        "jkl": "jkl_value_${/abc/def}_${abc/def}"
-    }
-}, tag=("secret", True))
-# }, tag="secret")
-
-x = config.lookup("/ghi/jkl")
-print(x)
-print(f"[{config.json.secret}]")
-print(config.json["abc"].secret)
-print(config.json["ghi"].secret)
