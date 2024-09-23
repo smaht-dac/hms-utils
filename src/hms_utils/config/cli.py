@@ -70,6 +70,12 @@ def parse_args(argv: List[str]) -> object:
         return config_dir
 
     def get_configs(config_dir: str) -> List[str]:
+        # We allow one or more files to be listed after --config or --secrets. Only the first file
+        # in the list may NOT end in a ".json" suffix (as a argument not end in that, or and argument
+        # starting with a dash, signifies the and of this list). If a file name contains "secret",
+        # or is prepended with a special "secret:" or "secrets:" prefix, or if it is listed afer
+        # the --secrets option, then it is assumed to contain secrets, which is really just ensures
+        # that the values therein won't displayed by default when listing the contents of the file.
         nonlocal argv
         def verify_config(config_file: str, config_dir: str, secret: bool = False) -> Config:
             if secret is True:
@@ -105,13 +111,6 @@ def parse_args(argv: List[str]) -> object:
                 argi_config = argi - 1
                 if not ((argi < len(argv)) and (config_file := argv[argi])):
                     _usage()
-                # Allow one or more files to be listed after --config or --secrets. Only the first file
-                # in a list of --config or --secrets files may NOT end in a ".json" suffix (as a argument
-                # not end in that, or and argument starting with a dash, signifies the and of this list).
-                # If a file name contains the string "secret", or is prepended with the special "secret:"
-                # or "secrets:" prefix, or if it is listed afer the --secrets option then it is assumed to
-                # contain secrets; which is really just ensures that the values therein will not be displayed
-                # by default when listing the contents of the file.
                 configs.append(verify_config(config_file, config_dir, secret=config_secret))
                 argi += 1
                 while argi < len(argv):
