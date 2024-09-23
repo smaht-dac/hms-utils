@@ -24,6 +24,8 @@ class Config:
     _TRICKY_FIX = True
 
     def __init__(self, config: JSON,
+                 name: Optional[str] = None,
+                 secret: bool = False,
                  tag: Optional[Tuple[str, Any]] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
@@ -37,6 +39,8 @@ class Config:
                 raise Exception("Must create Config object with dictionary, JSON, or file path.")
             config = JSON(config) if isinstance(config, dict) else JSON({})
         self._json = config
+        self._name = name if isinstance(name, str) and name else None
+        self._secret = secret is True
         self._imports = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
@@ -52,6 +56,14 @@ class Config:
     @property
     def json(self) -> JSON:
         return self._json
+
+    @property
+    def name(self) -> Optional[str]:
+        return self._name
+
+    @property
+    def secret(self) -> bool:
+        return self._secret
 
     def tag(self, tag: Optional[Tuple[str, Any]] = None) -> None:
         if isinstance(tag, tuple) and (len(tag) == 2):
