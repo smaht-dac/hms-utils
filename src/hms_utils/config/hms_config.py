@@ -25,7 +25,7 @@ class Config:
 
     def __init__(self, config: JSON,
                  name: Optional[str] = None,
-                 secret: bool = False,
+                 secrets: bool = False,
                  tag: Optional[Tuple[str, Any]] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
@@ -40,7 +40,7 @@ class Config:
             config = JSON(config) if isinstance(config, dict) else JSON({})
         self._json = config
         self._name = name if isinstance(name, str) and name else None
-        self._secret = secret is True
+        self._secrets = secrets is True
         self._imports = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
@@ -62,8 +62,8 @@ class Config:
         return self._name
 
     @property
-    def secret(self) -> bool:
-        return self._secret
+    def secrets(self) -> bool:
+        return self._secrets
 
     def tag(self, tag: Optional[Tuple[str, Any]] = None) -> None:
         if isinstance(tag, tuple) and (len(tag) == 2):
@@ -74,27 +74,42 @@ class Config:
             if self._json.tag(tag, True):
                 setattr(self, tag, True)
 
-    def merge(self, json: Union[JSON, dict, Config]) -> None:
-        if isinstance(json, dict):
-            json = JSON(json)
-        elif isinstance(json, Config):
-            json = json._json
-        if isinstance(json, JSON):
-            self._json = self._json.merge(json)
+    def merge(self, data: Union[List[Union[dict, JSON, Config]],
+                                Union[dict, JSON, Config]]) -> Tuple[List[str], List[str], List[str]]:
+        merged_secret_paths = [] ; merged_paths = [] ; unmerged_paths = []  # noqa
+        if isinstance(data, (dict, JSON, Config)):
+            data = [data]
+        if isinstance(data, list):
+            for item in data:
+                secrets = False
+                if isinstance(item, dict):
+                    item = JSON(item)
+                elif isinstance(item, Config):
+                    secrets = item.secrets
+                    item = item._json
+                if isinstance(item, JSON):
+                    self._json, item_merged_paths, item_unmerged_paths = (
+                        # JSON.merge(self._json, item, path_separator=self._path_separator))
+                        self._json.merge(item, path_separator=self._path_separator))
+                    if secrets:
+                        merged_secret_paths.extend(item_merged_paths)
+                    merged_paths.extend(item_merged_paths)
+                    unmerged_paths.extend(item_unmerged_paths)
+        return merged_secret_paths, merged_paths, unmerged_paths
 
-    def imports(self, imports: Union[List[Union[dict, JSON, Config]], Union[dict, JSON, Config]]) -> None:
-        if isinstance(imports, (dict, JSON, Config)):
-            imports = [imports]
-        if isinstance(imports, list):
-            for import_item in imports:
-                if isinstance(import_item, dict):
-                    import_item = JSON(dict)
-                elif isinstance(import_item, Config):
-                    import_item = import_item.json
-                if isinstance(import_item, JSON):
+    def imports(self, data: Union[List[Union[dict, JSON, Config]], Union[dict, JSON, Config]]) -> None:
+        if isinstance(data, (dict, JSON, Config)):
+            data = [data]
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    item = JSON(dict)
+                elif isinstance(item, Config):
+                    item = item.json
+                if isinstance(item, JSON):
                     if self._imports is None:
                         self._imports = []
-                    self._imports.append(Config(import_item))
+                    self._imports.append(Config(item))
 
     def lookup(self, path: str, context: Optional[JSON] = None, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:

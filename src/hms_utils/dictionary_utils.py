@@ -61,7 +61,7 @@ def print_dictionary_tree(data: dict,
 
 def print_dictionary_list(data: dict,
                           path_separator: str = "/",
-                          prefix: str = None,
+                          prefix: Optional[str] = None,
                           key_modifier: Optional[Callable] = None,
                           value_modifier: Optional[Callable] = None,
                           value_annotator: Optional[Callable] = None) -> None:
@@ -71,6 +71,8 @@ def print_dictionary_list(data: dict,
         value_annotator = None
     if not callable(value_modifier):
         value_modifier = None
+    if not isinstance(prefix, str):
+        prefix = ""
     def traverse(data: dict, path: str = "") -> None:  # noqa
         nonlocal path_separator, key_modifier, value_annotator, value_modifier
         for key in data:
@@ -115,6 +117,9 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
 
 
 def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
+    """
+    Sorts the given dictionary and returns the result; does not change the given dictionary.
+    """
     if not isinstance(data, dict):
         return data
     sorted_data = {}
@@ -204,30 +209,40 @@ class JSON(dict):
                 tags.append(attribute)
         return tags
 
-    def merge(self, secondary: JSON, path_separator: str = "/") -> JSON:
-        # Merges the given JSON object into this JSON object; but do not overwrite
-        # anything in this JSON object; anything that would otherwise overwrite is ignored.
-        merged_config, _, _ = JSON._merge(self, secondary, path_separator=path_separator)
-        return merged_config
+    def sort(self) -> JSON:
+        pass
+
+    def merge(self, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
+        # Merges the given secondary JSON object into a COPY of this JSON object; but does not overwrite
+        # anything in this JSON object; anything that would otherwise overwrite is ignored. Returns a tuple
+        # with (left-to-right) the (new) merged dictionary, a list of paths which were actually merged from
+        # the secondary, and a list of paths which were not merged from the secondary, i.e. because they would
+        # have overwritten that item in the copy of this JSON object; path delimiter is the given path_separator.
+        return JSON._merge(self, secondary, path_separator=path_separator)
 
     @staticmethod
-    def _merge(primary: JSON, secondary: JSON, path_separator: str = "/") -> Tuple[dict, list, list]:
+    def _merge(primary: JSON, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
+        # Merges the given secondary JSON object into a COPY of the given primary JSON object; but does not
+        # overwrite anything in the primary JSON object; anything that would otherwise overwrite is ignored.
+        # Returns a tuple with (in left-right order) the (new) merged dictionary, list of paths which were
+        # actually merged from the secondary, and a list of paths which were not merged from the secondary,
+        # i.e. because they would have overwritten in the primary; path delimiter is the given path_separator.
         if not (isinstance(primary, dict) or isinstance(secondary, dict)):
             return None, None, None
-        merged = deepcopy(primary) ; merged_secrets = [] ; unmerged_secrets = []  # noqa
+        merged = deepcopy(primary) ; merged_paths = [] ; unmerged_paths = []  # noqa
         def merge(primary: dict, secondary: dict, path: str = "") -> None:  # noqa
-            nonlocal unmerged_secrets, path_separator
+            nonlocal unmerged_paths, path_separator
             for key, value in secondary.items():
                 key_path = f"{path}{path_separator}{key}" if path else key
                 if key not in primary:
                     primary[key] = secondary[key]
-                    merged_secrets.append(key_path)
+                    merged_paths.append(key_path)
                 elif isinstance(primary[key], dict) and isinstance(secondary[key], dict):
                     merge(primary[key], secondary[key], path=key_path)
                 else:
-                    unmerged_secrets.append(key_path)
+                    unmerged_paths.append(key_path)
         merge(merged, secondary)
-        return merged, merged_secrets, unmerged_secrets
+        return merged, merged_paths, unmerged_paths
 
     def __setitem__(self, key, value) -> None:
         if isinstance(value, dict) and id(value.parent) != id(self):
