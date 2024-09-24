@@ -4,6 +4,7 @@ import io
 import json
 import os
 from typing import Any, Callable, List, Optional, Tuple, Union
+from hms_utils.misc_utils import is_primitive_type
 
 
 def print_dictionary_tree(data: dict,
@@ -151,6 +152,8 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
 #
 class JSON(dict):
 
+    _SECRET_VALUE_PREFIX = "@@@___secret__@@@:"
+
     def __init__(self, data: Optional[Union[dict, JSON]] = None, _initializing: bool = False) -> None:
         if isinstance(data, JSON):
             data = deepcopy(dict(data)) if _initializing is not True else dict(data)
@@ -169,6 +172,10 @@ class JSON(dict):
                 child.parent = parent
                 super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
                 self._initialize(child)
+#           elif is_primitive_type(child):
+#               if False:
+#                   child  = f"{JSON._SECRET_VALUE_PREFIX}{child}"
+#               super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
 
     @property
     def root(self) -> Optional[JSON]:
@@ -244,7 +251,7 @@ class JSON(dict):
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
 
-    def __setitem__(self, key, value) -> None:
+    def __setitem__(self, key: Any, value: Any) -> None:
         if isinstance(value, dict) and id(value.parent) != id(self):
             if isinstance(value, JSON):
                 copied_value = deepcopy(value)
@@ -255,6 +262,28 @@ class JSON(dict):
                 value = JSON(value)
             value.parent = self
         super().__setitem__(key, value)
+
+    def todo__getitem__(self, key: Any) -> Any:
+        if isinstance(value := super().__getitem__(key), str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
+            return value[len(JSON._SECRET_VALUE_PREFIX):]
+        return value
+
+    def todo_get(self, key: Any, show: bool = False) -> Any:
+        if isinstance(value := super().__getitem__(key), str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
+            if show is True:
+                return value[len(JSON._SECRET_VALUE_PREFIX):]
+            return "********"
+        return value
+
+    @staticmethod
+    def secret(value: Any) -> bool:
+        return isinstance(value, str) and value.startswith(JSON._SECRET_VALUE_PREFIX)
+
+    @staticmethod
+    def unsecret(value: Any) -> bool:
+        if isinstance(value, str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
+            return value[len(JSON._SECRET_VALUE_PREFIX):]
+        return value
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))

@@ -25,6 +25,7 @@ SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
 
 def main():
 
+    parse_args(sys.argv)
     sys.exit(0)
 
 
