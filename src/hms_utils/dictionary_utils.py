@@ -151,23 +151,23 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
 #
 class JSON(dict):
 
-    def __init__(self, data: Optional[Union[dict, JSON]] = None, _default: bool = True) -> None:
+    def __init__(self, data: Optional[Union[dict, JSON]] = None, _initializing: bool = False) -> None:
         if isinstance(data, JSON):
-            data = deepcopy(dict(data)) if _default is True else dict(data)
+            data = deepcopy(dict(data)) if _initializing is not True else dict(data)
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
         self.parent = None
-        self._initialize(self) if _default is True else None
+        self._initialize(self) if _initializing is not True else None
 
     def _initialize(self, parent: JSON) -> None:
         for key in parent:
             child = parent[key]
             if isinstance(child, dict):
                 if not isinstance(child, JSON):
-                    child = JSON(child, _default=False)
+                    child = JSON(child, _initializing=True)
                 child.parent = parent
-                super(JSON, parent).__setitem__(key, child)  # bypass override below
+                super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
                 self._initialize(child)
 
     @property
