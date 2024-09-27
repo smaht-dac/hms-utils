@@ -118,6 +118,8 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
 
 
 def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
+    import pdb ; pdb.set_trace()  # noqa
+    pass
     """
     Sorts the given dictionary and returns the result; does not change the given dictionary.
     """
@@ -152,30 +154,35 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
 #
 class JSON(dict):
 
-    _SECRET_VALUE_PREFIX = "@@@___secret__@@@:"
+    _SECRET_VALUE = "cxxxxxxxxxxx********rz"
+    _SECRET_VALUE_START = "@@@__secret_start__@@@["
+    _SECRET_VALUE_END = "]@@@__secret_end__@@@"
 
-    def __init__(self, data: Optional[Union[dict, JSON]] = None, _initializing: bool = False) -> None:
+    def __init__(self, data: Optional[Union[dict, JSON]] = None,
+                 secrets: bool = False, _initializing: bool = False) -> None:
         if isinstance(data, JSON):
             data = deepcopy(dict(data)) if _initializing is not True else dict(data)
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
         self.parent = None
+        self.secrets = secrets is True
         self._initialize(self) if _initializing is not True else None
 
     def _initialize(self, parent: JSON) -> None:
         for key in parent:
-            child = parent[key]
+            # child = parent[key]
+            child = super(JSON, parent).__getitem__(key)
             if isinstance(child, dict):
                 if not isinstance(child, JSON):
                     child = JSON(child, _initializing=True)
                 child.parent = parent
+                child.secrets = parent.secrets
                 super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
                 self._initialize(child)
-#           elif is_primitive_type(child):
-#               if False:
-#                   child  = f"{JSON._SECRET_VALUE_PREFIX}{child}"
-#               super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
+            elif self.secrets and is_primitive_type(child):
+                child = f"{JSON._SECRET_VALUE_START}{str(child)}{JSON._SECRET_VALUE_END}"
+                super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
 
     @property
     def root(self) -> Optional[JSON]:
@@ -261,29 +268,82 @@ class JSON(dict):
             else:
                 value = JSON(value)
             value.parent = self
+        elif self.secrets and is_primitive_type(value):
+            value = f"{JSON._SECRET_VALUE_START}{str(value)}{JSON._SECRET_VALUE_END}"
         super().__setitem__(key, value)
 
-    def todo__getitem__(self, key: Any) -> Any:
-        if isinstance(value := super().__getitem__(key), str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
-            return value[len(JSON._SECRET_VALUE_PREFIX):]
+    def __getitem__(self, key: Any) -> Any:
+        value = super().__getitem__(key)
+        if isinstance(value, str):
+            return JSON.decode(value, show=False)
         return value
 
-    def todo_get(self, key: Any, show: bool = False) -> Any:
-        if isinstance(value := super().__getitem__(key), str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
-            if show is True:
-                return value[len(JSON._SECRET_VALUE_PREFIX):]
-            return "********"
-        return value
+    def get(self, key: Any, default: Any = None) -> Any:
+        return self.__getitem__(key) if key in self else default
+
+    def items(self):
+        for key, value in super().items():
+            if isinstance(value, dict) and (not isinstance(value, JSON)):
+                value = JSON(value)
+                self[key] = value
+            yield key, value
+
+    def values(self):
+        for value in super().values():
+            if isinstance(value, dict) and not (isinstance(value, JSON)):
+                value = JSON(value)
+            yield value
+
+    def decoded(self, show: bool = False) -> JSON:
+        if not self.secrets:
+            return self
+        def decode(data: dict):  # noqa
+            for key in data:
+                value = data[key]
+                if isinstance(value, dict):
+                    decode(value)
+                else:
+                    data[key] = JSON.decode(value)
+        copy = deepcopy(self)
+        decode(copy)
+        return copy
 
     @staticmethod
-    def secret(value: Any) -> bool:
-        return isinstance(value, str) and value.startswith(JSON._SECRET_VALUE_PREFIX)
-
-    @staticmethod
-    def unsecret(value: Any) -> bool:
-        if isinstance(value, str) and value.startswith(JSON._SECRET_VALUE_PREFIX):
-            return value[len(JSON._SECRET_VALUE_PREFIX):]
+    def decode(value: Any, show: bool = False) -> bool:
+        if isinstance(value, str):
+            # We do not handle nested secret values; no need for our purposes.
+            while True:
+                if (start := value.find(JSON._SECRET_VALUE_START)) < 0:
+                    break
+                prefix = value[:start]
+                tmp = value[start + len(JSON._SECRET_VALUE_START):]
+                if (end := tmp.find(JSON._SECRET_VALUE_END)) < 0:
+                    break  # malformed
+                suffix = tmp[end + len(JSON._SECRET_VALUE_END):]
+                secret = tmp[:end] if show is True else JSON._SECRET_VALUE
+                value = prefix + secret + suffix
         return value
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
+
+
+data = JSON({
+    "abc": "def",
+    "ghi": {
+        "jkl": "mno",
+        "pqr": "stu"
+    }
+}, secrets=True)
+data['xyz'] = '123'
+#print(data)
+#print(data.decoded(show=False))
+#print(data.decoded(show=True))
+
+
+#print(JSON.decode("abcd[efghi]jk[xyzzy]l", show=True))
+#print(JSON.decode("abc[d[x]r[y]ef]ghi", show=False))
+#abcdxefghi
+#print(data)
+
+print_dictionary_tree(data)

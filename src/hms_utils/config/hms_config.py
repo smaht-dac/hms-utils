@@ -30,6 +30,7 @@ class Config:
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None, exception: bool = False) -> None:
+        self._secrets = secrets is True
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if not isinstance(config, JSON):
@@ -37,10 +38,9 @@ class Config:
                 config = load_json_file(config)
             elif not isinstance(config, dict):
                 raise Exception("Must create Config object with dictionary, JSON, or file path.")
-            config = JSON(config) if isinstance(config, dict) else JSON({})
+            config = JSON(config, secrets=self._secrets) if isinstance(config, dict) else JSON({})
         self._json = config
         self._name = name if isinstance(name, str) and name else None
-        self._secrets = secrets is True
         self._imports = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None

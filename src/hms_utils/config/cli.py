@@ -131,18 +131,22 @@ def parse_args(argv: List[str]) -> object:
     configs = get_configs(config_dir)
     # imports = get_configs(config_dir, imports=True)
 
-    print(f"config_dir: [{config_dir}]")
-    print(f"configs: {configs}")
-    for config in configs:
-        print(f"configs.name: {config.name}")
-        print(f"configs.secrets: {config.secrets}")
-    print(argv)
+#   print(f"config_dir: [{config_dir}]")
+#   print(f"configs: {configs}")
+#   for config in configs:
+#       print(f"configs.name: {config.name}")
+#       print(f"configs.secrets: {config.secrets}")
+#   print(argv)
 
     merged_secret_paths, merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
 
     if True:
-        print_config_tree(config, merged_secret_paths)
         print_config_list(config, merged_secret_paths)
+
+    import pdb ; pdb.set_trace()  # noqa
+    xxx = config.lookup('identity/xyzzy')
+    print(xxx)
+    pass
 
 
 def print_config_tree(config: Config, secret_paths: Optional[List[str]]) -> None:
@@ -153,18 +157,21 @@ def print_config_tree(config: Config, secret_paths: Optional[List[str]]) -> None
             return chars.rarrow
         return chars.rarrow_hollow
 
-    print_dictionary_tree(sort_dictionary(config.json), arrow_indicator=tree_arrow_indicator)
+    #print_dictionary_tree(sort_dictionary(config.json), arrow_indicator=tree_arrow_indicator)
+    print_dictionary_tree(config.json, arrow_indicator=tree_arrow_indicator)
 
 
 def print_config_list(config: Config, secret_paths: Optional[List[str]]) -> None:
 
     def value_modifier(path: str, value: Any) -> Optional[str]:
+        return value
         nonlocal secret_paths
         if path in secret_paths:
-            return "********"
+            return OBFUSCATED_VALUE
         return value
 
-    print_dictionary_list(sort_dictionary(config.json), value_modifier=value_modifier)
+    #print_dictionary_list(sort_dictionary(config.json), value_modifier=value_modifier)
+    print_dictionary_list(config.json, value_modifier=value_modifier)
 
 
 def _warning(message: str) -> None:
