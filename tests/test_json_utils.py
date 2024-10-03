@@ -1,8 +1,8 @@
-from hms_utils.parented_json import ParentedJSON as JSON
+from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.dictionary_utils import sort_dictionary
 
 
-def test_parented_json():
+def test_dictionary_parented_json():
 
     data = {
         "alfa": "alfa_value",

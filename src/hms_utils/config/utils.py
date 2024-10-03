@@ -1,8 +1,11 @@
 from typing import List, Optional
 
 
-def unpack_path(path: str, path_separator: Optional[str] = None,
-                path_current: Optional[str] = None, path_parent: Optional[str] = None) -> List[str]:
+def unpack_path(path: str,
+                path_separator: Optional[str] = None,
+                path_current: Optional[str] = None,
+                path_parent: Optional[str] = None,
+                noroot: bool = False) -> List[str]:
     if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
         path_separator = "/"
     if not (isinstance(path_current, str) and (path_current := path_current.strip())):
@@ -21,6 +24,8 @@ def unpack_path(path: str, path_separator: Optional[str] = None,
                         path_components = path_components[:-1]
                     continue
                 path_components.append(path_component)
+    if (noroot is True) and path_components and path_components[0] == path_separator:
+        path_components = path_components[1:]
     return path_components
 
 
