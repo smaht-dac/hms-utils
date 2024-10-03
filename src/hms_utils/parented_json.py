@@ -72,7 +72,7 @@ class JSON(dict):
         return context_path
 
     @property
-    def context_path(self, path_separator: Optional[Union[str, bool]] = None) -> Optional[str]:
+    def context_path(self) -> Optional[str]:
         return self.path(path_separator=False, path_rooted=False)
 
     def get(self, key: Any, default: Any = None) -> Any:
