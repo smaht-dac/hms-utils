@@ -5,7 +5,7 @@ from hms_utils.chars import chars
 from hms_utils.dictionary_print_utils import print_dictionary_tree
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.misc_utils import is_primitive_type
-from hms_utils.config.utils import repack_path, unpack_path
+from hms_utils.config.utils import unpack_path
 
 
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
@@ -182,17 +182,17 @@ class JSON(dict):
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         def root_indicator() -> str:
-            return f"\b\b{chars.rarrow} root {chars.dot} id: {id(config)}"
-        def parent_annotator(parent: JSON) -> str:
+            return f"\b\b{chars.rarrow} root {chars.dot} id: {id(self)}"
+        def parent_annotator(parent: JSON) -> str:  # noqa
             nonlocal self, check
             annotation = (f" {chars.dot} id: {id(parent)} {chars.dot_hollow}"
-                    f"{f' parent: {id(parent.parent)}' if parent.parent else ''}")
+                          f"{f' parent: {id(parent.parent)}' if parent.parent else ''}")
             if check is True:
                 path = parent.path(path_separator=True, path_rooted=True)
                 checked_value, _ = self._lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(parent) else chars.xmark}"
             return annotation
-        def value_annotator(parent: JSON, key: Any, value: Any) -> str:
+        def value_annotator(parent: JSON, key: Any, value: Any) -> str:  # noqa
             nonlocal self, check
             annotation = f" {chars.dot} parent: {id(parent)}"
             if (verbose is True) or (check is True):
@@ -203,7 +203,7 @@ class JSON(dict):
                 checked_value, _ = self._lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
-        print_dictionary_tree(config,
+        print_dictionary_tree(self,
                               root_indicator=root_indicator,
                               parent_annotator=parent_annotator,
                               value_annotator=value_annotator, indent=2)
@@ -212,7 +212,7 @@ class JSON(dict):
         if (not isinstance(path, str)) or (not path):
             return None, self
         if (not isinstance(path_separator, str)) or (not path_separator):
-            path_separator =  "/"
+            path_separator = "/"
         if not (path_components := unpack_path(path, path_separator=path_separator)):
             return None, self
         if path_components[0] == path_separator:
@@ -233,33 +233,3 @@ class JSON(dict):
 
 
 DictionaryParented = JSON
-
-if True:
-    import os
-    config = JSON({
-        "alfa": "alfa_value",
-        "bravo": {
-            "bravo_sub": "bravo_sub_value",
-            "bravo_sub_two": "bravo_sub_two_value",
-            "bravo_sub_three": {
-                "bravo_sub_sub": {
-                    "bravo_sub_sub_sub": "bravo_sub_sub_sub_value",
-                    "bravo_sub_sub_sub_two": "bravo_sub_sub_sub_two_value__${alfa}"
-                 }
-            }
-        },
-        "delta": {
-            "echo": "delta_echo_value"
-        },
-        "echo": "echo_value"
-    })
-    def root_indicator() -> str:
-        return f"\b\b{chars.rarrow} root {chars.dot} id: {id(config)}"
-    def value_annotator(parent: JSON, key: Any, value: Any) -> str:
-        return f" {chars.dot} parent: {id(parent)} {chars.dot_hollow} path: {parent.path(path=key, path_separator=True, path_rooted=True)}"
-    def parent_annotator(parent: JSON) -> str:
-        return f" {chars.dot} id: {id(parent)} {chars.dot_hollow}{f' parent: {id(parent.parent)}' if parent.parent else ''}"
-        pass
-    #print_dictionary_tree(config, value_annotator=value_annotator, parent_annotator=parent_annotator, root_indicator=root_indicator, indent=2)
-    #print_dictionary_tree(config, arrow_indicator=arrow_indicator, key_modifier=key_modifier, value_annotator=value_annotator, value_modifier=value_modifier)
-    config._dump_for_testing(verbose=True, check=True)
