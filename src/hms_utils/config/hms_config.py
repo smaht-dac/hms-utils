@@ -70,10 +70,10 @@ class Config:
     def secrets(self) -> bool:
         return self._secrets
 
-    def merge(self, data: Union[List[Union[dict, JSON, Config]],
-                                Union[dict, JSON, Config]]) -> Tuple[List[str], List[str], List[str]]:
+    def merge(self, data: Union[Union[dict, Config],
+                                List[Union[dict, Config]]]) -> Tuple[List[str], List[str], List[str]]:
         merged_secret_paths = [] ; merged_paths = [] ; unmerged_paths = []  # noqa
-        if isinstance(data, (dict, JSON, Config)):
+        if isinstance(data, (dict, Config)):
             data = [data]
         if isinstance(data, list):
             for item in data:
@@ -85,7 +85,6 @@ class Config:
                     item = item._json
                 if isinstance(item, JSON):
                     self._json, item_merged_paths, item_unmerged_paths = (
-                        # JSON.merge(self._json, item, path_separator=self._path_separator))
                         self._json.merge(item, path_separator=self._path_separator))
                     if secrets:
                         merged_secret_paths.extend(item_merged_paths)
@@ -93,8 +92,8 @@ class Config:
                     unmerged_paths.extend(item_unmerged_paths)
         return merged_secret_paths, merged_paths, unmerged_paths
 
-    def imports(self, data: Union[List[Union[dict, JSON, Config]], Union[dict, JSON, Config]]) -> None:
-        if isinstance(data, (dict, JSON, Config)):
+    def imports(self, data: Union[List[Union[dict, Config]], Union[dict, Config]]) -> None:
+        if isinstance(data, (dict, Config)):
             data = [data]
         if isinstance(data, list):
             for item in data:
@@ -107,9 +106,9 @@ class Config:
                         self._imports = []
                     self._imports.append(Config(item))
 
-    def lookup(self, path: str, context: Optional[JSON] = None, noexpand: bool = False,
+    def lookup(self, path: str, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, context, inherit_simple=inherit_simple, inherit_none=inherit_none)
+        value, context = self._lookup(path, self._json, inherit_simple=inherit_simple, inherit_none=inherit_none)
         return value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
 
     def _lookup(self, path: str, context: Optional[JSON] = None,

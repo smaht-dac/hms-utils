@@ -536,7 +536,7 @@ def test_hms_config_g():
     secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
     config = Config(config_file)
     secrets = Config(secrets_file)
-    config.merge(secrets.json)
+    config.merge(secrets)
 
     value = config.lookup("foursight/smaht/wolf/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == "ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209"
