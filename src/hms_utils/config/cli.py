@@ -144,8 +144,8 @@ def parse_args(argv: List[str]) -> object:
         print_config_list(config, merged_secret_paths)
 
     import pdb ; pdb.set_trace()  # noqa
-    xxx = config.lookup('identity/xyzzy')
-    print(xxx)
+    # xxx = config.lookup('identity/xyzzy')
+    # print(xxx)
     pass
 
 

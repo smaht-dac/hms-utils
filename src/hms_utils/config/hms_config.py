@@ -2,7 +2,8 @@ from __future__ import annotations
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
-from hms_utils.dictionary_utils import JSON, load_json_file
+from hms_utils.dictionary_utils import load_json_file
+from hms_utils.json_utils import JSON
 from hms_utils.misc_utils import is_primitive_type
 from hms_utils.config.utils import repack_path, unpack_path
 
@@ -21,25 +22,25 @@ class Config:
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _SECRET_VALUE = "cxxxxxxxxxxx********rz"
+    _SECRET_VALUE_START = "@@@__secret_start__@@@["
+    _SECRET_VALUE_END = "]@@@__secret_end__@@@"
     _TRICKY_FIX = True
 
-    def __init__(self, config: JSON,
+    def __init__(self, config: Union[dict, str],
                  name: Optional[str] = None,
                  secrets: bool = False,
-                 tag: Optional[Tuple[str, Any]] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None, exception: bool = False) -> None:
         self._secrets = secrets is True
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
-        if not isinstance(config, JSON):
-            if isinstance(config, str):
-                config = load_json_file(config)
-            elif not isinstance(config, dict):
-                raise Exception("Must create Config object with dictionary, JSON, or file path.")
-            config = JSON(config, secrets=self._secrets) if isinstance(config, dict) else JSON({})
-        self._json = config
+        if isinstance(config, str):
+            config = load_json_file(config)
+        elif not isinstance(config, dict):
+            raise Exception("Must create Config object with dictionary, JSON, or file path.")
+        self._json = JSON(config)
         self._name = name if isinstance(name, str) and name else None
         self._imports = None
         self._path_separator = path_separator
@@ -51,7 +52,6 @@ class Config:
         self._exception = exception is True
         if self._exception:
             self._warning = self._warn
-        self.tag(tag)
 
     @property
     def json(self) -> JSON:
@@ -64,15 +64,6 @@ class Config:
     @property
     def secrets(self) -> bool:
         return self._secrets
-
-    def tag(self, tag: Optional[Tuple[str, Any]] = None) -> None:
-        if isinstance(tag, tuple) and (len(tag) == 2):
-            if isinstance(tag_name := tag[0], str) and (tag_name := tag_name.strip()):
-                if self._json.tag(tag_name, tag[1]):
-                    setattr(self, tag_name, tag[1])
-        elif isinstance(tag, str) and (tag := tag.strip()):
-            if self._json.tag(tag, True):
-                setattr(self, tag, True)
 
     def merge(self, data: Union[List[Union[dict, JSON, Config]],
                                 Union[dict, JSON, Config]]) -> Tuple[List[str], List[str], List[str]]:

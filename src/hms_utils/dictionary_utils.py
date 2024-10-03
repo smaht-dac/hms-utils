@@ -3,7 +3,7 @@ from copy import deepcopy
 import io
 import json
 import os
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
 from hms_utils.misc_utils import is_primitive_type
 
 
@@ -117,21 +117,23 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
     return data
 
 
-def sort_dictionary(data: dict, leafs_first: bool = False) -> dict:
-    import pdb ; pdb.set_trace()  # noqa
-    pass
+def sort_dictionary(data: dict, reverse: bool = False, leafs_first: bool = False) -> dict:
     """
     Sorts the given dictionary and returns the result; does not change the given dictionary.
     """
     if not isinstance(data, dict):
         return data
     sorted_data = {}
-    leafs = {key: value for key, value in data.items() if not isinstance(value, dict)}
-    nonleafs = {key: value for key, value in data.items() if isinstance(value, dict)}
-    for key in sorted(leafs.keys()):
-        sorted_data[key] = sort_dictionary(data[key])
-    for key in sorted(nonleafs.keys()):
-        sorted_data[key] = sort_dictionary(data[key])
+    if leafs_first is True:
+        leafs = {key: value for key, value in data.items() if not isinstance(value, dict)}
+        nonleafs = {key: value for key, value in data.items() if isinstance(value, dict)}
+        for key in sorted(leafs.keys(), reverse=reverse is True):
+            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=leafs_first)
+        for key in sorted(nonleafs.keys(), reverse=reverse is True):
+            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=leafs_first)
+    else:
+        for key in sorted(data.keys(), reverse=reverse is True):
+            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=False)
     return sorted_data
 
 
@@ -154,74 +156,56 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
 #
 class JSON(dict):
 
-    _SECRET_VALUE = "cxxxxxxxxxxx********rz"
-    _SECRET_VALUE_START = "@@@__secret_start__@@@["
-    _SECRET_VALUE_END = "]@@@__secret_end__@@@"
-
     def __init__(self, data: Optional[Union[dict, JSON]] = None,
-                 secrets: bool = False, _initializing: bool = False) -> None:
+                 read_value: Optional[Callable] = None,
+                 write_value: Optional[Callable] = None,
+                 _initializing: bool = False) -> None:
         if isinstance(data, JSON):
             data = deepcopy(dict(data)) if _initializing is not True else dict(data)
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
-        self.parent = None
-        self.secrets = secrets is True
-        self._initialize(self) if _initializing is not True else None
+        self._initialized = False
+        self._parent = None
+        self._write_value = write_value if callable(write_value) else lambda value: value
+        self._read_value = read_value if callable(read_value) else lambda value: value
 
-    def _initialize(self, parent: JSON) -> None:
-        for key in parent:
-            # child = parent[key]
-            child = super(JSON, parent).__getitem__(key)
-            if isinstance(child, dict):
-                if not isinstance(child, JSON):
-                    child = JSON(child, _initializing=True)
-                child.parent = parent
-                child.secrets = parent.secrets
-                super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
-                self._initialize(child)
-            elif self.secrets and is_primitive_type(child):
-                child = f"{JSON._SECRET_VALUE_START}{str(child)}{JSON._SECRET_VALUE_END}"
-                super(JSON, parent).__setitem__(key, child)  # bypass __setitem__ override
+    @property
+    def parent(self) -> Optional[JSON]:
+        return self._parent
+
+    def items(self) -> Iterator[Tuple[Any, Any]]:
+        self._initialize()
+        for key, value in super().items():
+            if isinstance(value, dict) and (not isinstance(value, JSON)):
+                value = JSON(value)
+            yield key, value
+
+    def values(self) -> Iterator[Any]:
+        self._initialize()
+        return super().values()
 
     @property
     def root(self) -> Optional[JSON]:
         node = self
         while True:
-            if node.parent is None:
+            if node._parent is None:
                 return node
-            node = node.parent
+            node = node._parent
 
     @property
     def context_path(self) -> Optional[str]:
         # FYI we only actually use this (in hms_config) for diagnostic messages.
         context = self
         context_path = []
-        context_parent = context.parent
+        context_parent = context._parent
         while context_parent:
             for key in context_parent:
                 if context_parent[key] == context:
                     context_path.insert(0, key)
-            context = context.parent
-            context_parent = context_parent.parent
+            context = context._parent
+            context_parent = context_parent._parent
         return context_path
-
-    def tag(self, tag: str, value: Any) -> bool:
-        if tag == "parent":
-            return False
-        setattr(self, tag, value)
-        for child in self:
-            if isinstance(self[child], JSON):
-                self[child].tag(tag, value)
-        return True
-
-    @property
-    def _tags(self) -> List[str]:
-        tags = []
-        for attribute in vars(self):
-            if attribute != "parent":
-                tags.append(attribute)
-        return tags
 
     def sort(self) -> JSON:
         pass
@@ -233,6 +217,53 @@ class JSON(dict):
         # the secondary, and a list of paths which were not merged from the secondary, i.e. because they would
         # have overwritten that item in the copy of this JSON object; path delimiter is the given path_separator.
         return JSON._merge(self, secondary, path_separator=path_separator)
+
+    def _initialize(self, parent: Optional[JSON] = None) -> None:
+        if self._initialized is False:
+            self._initialized = None
+            if not parent:
+                parent = self
+            for key, value in parent.items():
+                # value = super(JSON, parent).__getitem__(key)
+                if isinstance(value, dict):
+                    if not isinstance(value, JSON):
+                        value = JSON(value, _initializing=True)
+                    value._parent = parent
+                    super(JSON, parent).__setitem__(key, value)
+                    self._initialize(value)
+            self._initialized = True
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._initialize()
+        if isinstance(value, dict):
+            if id(value._parent) != id(self):
+                if isinstance(value, JSON):
+                    copied_value = deepcopy(value)
+                    value = copied_value
+                else:
+                    value = JSON(value)
+                value._parent = self
+        else:
+            value = self._write_value(value)
+        super().__setitem__(key, value)
+
+    def __getitem__(self, key: Any) -> Any:
+        self._initialize()
+        value = super().__getitem__(key)
+        if not isinstance(value, dict):
+            value = self._read_value(value)
+        return value
+
+    def __delitem__(self, key: Any) -> None:
+        self._initialize()
+        super().__delitem__(key)
+
+    def __iter__(self) -> Iterator[Any]:
+        self._initialize()
+        return super().__iter__()
+
+    def __deepcopy__(self, memo) -> JSON:
+        return JSON(deepcopy(dict(self), memo))
 
     @staticmethod
     def _merge(primary: JSON, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
@@ -257,93 +288,3 @@ class JSON(dict):
                     unmerged_paths.append(key_path)
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        if isinstance(value, dict) and id(value.parent) != id(self):
-            if isinstance(value, JSON):
-                copied_value = deepcopy(value)
-                for tag in value.root._tags:
-                    setattr(copied_value, tag, getattr(value, tag))
-                value = copied_value
-            else:
-                value = JSON(value)
-            value.parent = self
-        elif self.secrets and is_primitive_type(value):
-            value = f"{JSON._SECRET_VALUE_START}{str(value)}{JSON._SECRET_VALUE_END}"
-        super().__setitem__(key, value)
-
-    def __getitem__(self, key: Any) -> Any:
-        value = super().__getitem__(key)
-        if isinstance(value, str):
-            return JSON.decode(value, show=False)
-        return value
-
-    def get(self, key: Any, default: Any = None) -> Any:
-        return self.__getitem__(key) if key in self else default
-
-    def items(self):
-        for key, value in super().items():
-            if isinstance(value, dict) and (not isinstance(value, JSON)):
-                value = JSON(value)
-                self[key] = value
-            yield key, value
-
-    def values(self):
-        for value in super().values():
-            if isinstance(value, dict) and not (isinstance(value, JSON)):
-                value = JSON(value)
-            yield value
-
-    def decoded(self, show: bool = False) -> JSON:
-        if not self.secrets:
-            return self
-        def decode(data: dict):  # noqa
-            for key in data:
-                value = data[key]
-                if isinstance(value, dict):
-                    decode(value)
-                else:
-                    data[key] = JSON.decode(value)
-        copy = deepcopy(self)
-        decode(copy)
-        return copy
-
-    @staticmethod
-    def decode(value: Any, show: bool = False) -> bool:
-        if isinstance(value, str):
-            # We do not handle nested secret values; no need for our purposes.
-            while True:
-                if (start := value.find(JSON._SECRET_VALUE_START)) < 0:
-                    break
-                prefix = value[:start]
-                tmp = value[start + len(JSON._SECRET_VALUE_START):]
-                if (end := tmp.find(JSON._SECRET_VALUE_END)) < 0:
-                    break  # malformed
-                suffix = tmp[end + len(JSON._SECRET_VALUE_END):]
-                secret = tmp[:end] if show is True else JSON._SECRET_VALUE
-                value = prefix + secret + suffix
-        return value
-
-    def __deepcopy__(self, memo) -> JSON:
-        return JSON(deepcopy(dict(self), memo))
-
-
-data = JSON({
-    "abc": "def",
-    "ghi": {
-        "jkl": "mno",
-        "pqr": "stu"
-    }
-}, secrets=True)
-data['xyz'] = '123'
-#print(data)
-#print(data.decoded(show=False))
-#print(data.decoded(show=True))
-
-
-#print(JSON.decode("abcd[efghi]jk[xyzzy]l", show=True))
-#print(JSON.decode("abc[d[x]r[y]ef]ghi", show=False))
-#abcdxefghi
-#print(data)
-
-print_dictionary_tree(data)
