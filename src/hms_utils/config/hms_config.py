@@ -22,9 +22,11 @@ class Config:
     _MACRO_HIDE_START = "@@@__["
     _MACRO_HIDE_END = "]__@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
-    _SECRET_VALUE = "cxxxxxxxxxxx********rz"
+    _SECRET_VALUE = "********"
     _SECRET_VALUE_START = "@@@__secret_start__@@@["
     _SECRET_VALUE_END = "]@@@__secret_end__@@@"
+    _SECRET_VALUE_START_LENGTH = len(_SECRET_VALUE_START)
+    _SECRET_VALUE_END_LENGTH = len(_SECRET_VALUE_END)
     _TRICKY_FIX = True
 
     def __init__(self, config: Union[dict, str],
@@ -273,3 +275,44 @@ class Config:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
         if (exception is True) or (self._exception is True):
             raise Exception(message)
+
+    @staticmethod
+    def _secret_encoded(value: str) -> str:
+        if (not isinstance(value, str)) or (not value):
+            return ""
+        secret_encoded = ""
+        start = 0
+        while True:
+            if not (match := Config._MACRO_PATTERN.search(value[start:])):
+                secret_encoded += value[start:]
+                break
+            match_start = match.start()
+            match_end = match.end()
+            non_macro_part = value[start:start + match_start]
+            macro_part = value[start + match_start:start + match_end]
+            secret_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}{macro_part}"
+            start += match_end
+        return secret_encoded
+
+    @staticmethod
+    def _secret_plaintext(secret_encoded: str) -> str:
+        if (not isinstance(secret_encoded, str)) or (not secret_encoded):
+            return ""
+        return secret_encoded.replace(Config._SECRET_VALUE_START, "").replace(Config._SECRET_VALUE_END, "")
+
+    @staticmethod
+    def _secret_obfuscated(secret_encoded: str, obfuscated_value: Optional[str] = None) -> str:
+        if (not isinstance(secret_encoded, str)) or (not secret_encoded):
+            return ""
+        if (not isinstance(obfuscated_value, str)) or (not obfuscated_value):
+            obfuscated_value = Config._SECRET_VALUE
+        while True:
+            if (start := secret_encoded.find(Config._SECRET_VALUE_START)) < 0:
+                break
+            if (end := secret_encoded.find(Config._SECRET_VALUE_END)) < start:
+                break
+            obfuscated = obfuscated_value if end > start + Config._SECRET_VALUE_START_LENGTH else ""
+            secret_encoded = (
+                secret_encoded[0:start] + obfuscated +
+                secret_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
+        return secret_encoded
