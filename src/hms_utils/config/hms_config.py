@@ -100,7 +100,7 @@ class Config:
                 if isinstance(item, dict):
                     item = JSON(dict)
                 elif isinstance(item, Config):
-                    item = item.json
+                    item = item._json
                 if isinstance(item, JSON):
                     if self._imports is None:
                         self._imports = []
