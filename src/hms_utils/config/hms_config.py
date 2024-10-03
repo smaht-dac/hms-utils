@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
@@ -35,14 +36,16 @@ class Config:
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None, exception: bool = False) -> None:
-        self._secrets = secrets is True
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = Config._PATH_SEPARATOR
         if isinstance(config, str):
+            if (secrets is not True) and ("secret" in os.path.basename(config)):
+                secrets = True
             config = load_json_file(config)
         elif not isinstance(config, dict):
             raise Exception("Must create Config object with dictionary, JSON, or file path.")
-        self._json = JSON(config)
+        self._secrets = secrets is True
+        self._json = JSON(config, rvalue=Config._secrets_encoded if self.secrets else None)
         self._name = name if isinstance(name, str) and name else None
         self._imports = None
         self._path_separator = path_separator
@@ -277,7 +280,7 @@ class Config:
             raise Exception(message)
 
     @staticmethod
-    def _secret_encoded(value: str) -> str:
+    def _secrets_encoded(value: str) -> str:
         if (not isinstance(value, str)) or (not value):
             return ""
         secret_encoded = ""
@@ -288,20 +291,24 @@ class Config:
                 break
             match_start = match.start()
             match_end = match.end()
-            non_macro_part = value[start:start + match_start]
             macro_part = value[start + match_start:start + match_end]
-            secret_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}{macro_part}"
+            if non_macro_part := value[start:start + match_start]:
+                secret_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}"
+            secret_encoded += macro_part
+            if "[]" in secret_encoded:
+                import pdb ; pdb.set_trace()  # noqa
+                pass
             start += match_end
         return secret_encoded
 
     @staticmethod
-    def _secret_plaintext(secret_encoded: str) -> str:
+    def _secrets_plaintext(secret_encoded: str) -> str:
         if (not isinstance(secret_encoded, str)) or (not secret_encoded):
             return ""
         return secret_encoded.replace(Config._SECRET_VALUE_START, "").replace(Config._SECRET_VALUE_END, "")
 
     @staticmethod
-    def _secret_obfuscated(secret_encoded: str, obfuscated_value: Optional[str] = None) -> str:
+    def _secrets_obfuscated(secret_encoded: str, obfuscated_value: Optional[str] = None) -> str:
         if (not isinstance(secret_encoded, str)) or (not secret_encoded):
             return ""
         if (not isinstance(obfuscated_value, str)) or (not obfuscated_value):

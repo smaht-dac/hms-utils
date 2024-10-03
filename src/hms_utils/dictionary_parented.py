@@ -16,7 +16,7 @@ from hms_utils.config.utils import unpack_path
 #
 class JSON(dict):
 
-    def __init__(self, data: Optional[Union[dict, JSON]] = None, read_value: Optional[Callable] = None) -> None:
+    def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
             data = data._asdict()
         elif not isinstance(data, dict):
@@ -24,7 +24,7 @@ class JSON(dict):
         super().__init__(data)
         self._initialized = False
         self._parent = None
-        self._rvalue = read_value if callable(read_value) else None
+        self._rvalue = rvalue if callable(rvalue) else None
 
     def _initialize(self, parent: Optional[JSON] = None) -> None:
         if self._initialized is False:
@@ -35,7 +35,7 @@ class JSON(dict):
                 value = super(JSON, parent).__getitem__(key)
                 if isinstance(value, dict):
                     if not isinstance(value, JSON):
-                        value = JSON(value)
+                        value = JSON(value, rvalue=self._rvalue)
                     value._parent = parent
                     super(JSON, parent).__setitem__(key, value)
                     self._initialize(value)
