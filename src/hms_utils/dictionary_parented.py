@@ -39,6 +39,14 @@ class JSON(dict):
                     value._parent = parent
                     super(JSON, parent).__setitem__(key, value)
                     self._initialize(value)
+                elif isinstance(value, list):
+                    # Just for completeness do any dictionaries nested within lists.
+                    parent[key] = []
+                    for element in value:
+                        if isinstance(element, dict) and (not isinstance(element, JSON)):
+                            parent[key].append(JSON(element))
+                        else:
+                            parent[key].append(element)
             self._initialized = True
 
     @property
