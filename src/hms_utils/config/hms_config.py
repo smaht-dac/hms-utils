@@ -3,7 +3,7 @@ import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.dictionary_utils import load_json_file
-from hms_utils.json_utils import JSON
+from hms_utils.parented_json import ParentedJSON as JSON
 from hms_utils.misc_utils import is_primitive_type
 from hms_utils.config.utils import repack_path, unpack_path
 

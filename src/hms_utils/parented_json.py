@@ -125,9 +125,9 @@ class JSON(dict):
     def merge(self, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
         # Merges the given secondary JSON object into a COPY of this JSON object; but does not overwrite
         # anything in this JSON object; anything that would otherwise overwrite is ignored. Returns a tuple
-        # with (left-to-right) the (new) merged dictionary, a list of paths which were actually merged from
-        # the secondary, and a list of paths which were not merged from the secondary, i.e. because they would
-        # have overwritten that item in the copy of this JSON object; path delimiter is the given path_separator.
+        # with (left-to-right) the (new) merged dictionary, a list of paths which were actually merged from the
+        # secondary, and a list of paths which were not merged from the secondary, i.e. because they would have
+        # overwritten that item in the copy of this JSON object; path delimiter is the given path_separator.
         return JSON._merge(self, secondary, path_separator=path_separator)
 
     @staticmethod
@@ -178,3 +178,6 @@ class JSON(dict):
         if not self._rvalue:
             return super().__repr__()
         return repr(self._asdict())
+
+
+ParentedJSON = JSON
