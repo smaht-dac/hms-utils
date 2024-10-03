@@ -38,6 +38,10 @@ def test_json_utils():
         assert id(json["bravo"]["delta"].root) == id(json)
         assert json.root == json and id(json.root) == id(json)
         assert json["bravo"]["golf"]["hotel"].context_path == ["bravo", "golf", "hotel"]
+        assert json["bravo"]["golf"]["hotel"].path() == ["bravo", "golf", "hotel"]
+        assert json["bravo"]["golf"]["hotel"].path(path_separator=True) == "bravo/golf/hotel"
+        assert json["bravo"]["golf"]["hotel"].path(path_separator=True, path_rooted=True) == "/bravo/golf/hotel"
+        assert json["bravo"]["golf"]["hotel"].path(path_separator=".") == "bravo.golf.hotel"
 
     json = JSON(data)
     assert_some_basic_truths(json)

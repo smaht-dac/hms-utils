@@ -15,13 +15,13 @@ class JSON(dict):
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, read_value: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
-            data = data._dictize()
+            data = data._asdict()
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
         self._initialized = False
         self._parent = None
-        self._lvalue = read_value if callable(read_value) else None
+        self._rvalue = read_value if callable(read_value) else None
 
     def _initialize(self, parent: Optional[JSON] = None) -> None:
         if self._initialized is False:
@@ -50,8 +50,7 @@ class JSON(dict):
                 return node
             node = node._parent
 
-    @property
-    def context_path(self) -> Optional[str]:
+    def path(self, path_separator: Optional[Union[str, bool]] = None, path_rooted: bool = False) -> Optional[str]:
         # FYI we only actually use this (in hms_config) for diagnostic messages.
         context = self
         context_path = []
@@ -62,7 +61,19 @@ class JSON(dict):
                     context_path.insert(0, key)
             context = context._parent
             context_parent = context_parent._parent
+        if path_separator is True:
+            path_separator = "/"
+        elif (path_separator is False) or (not isinstance(path_separator, str)):
+            path_separator = None
+        if path_separator:
+            if path_rooted is True:
+                return path_separator + path_separator.join(context_path)
+            return path_separator.join(context_path)
         return context_path
+
+    @property
+    def context_path(self, path_separator: Optional[Union[str, bool]] = None) -> Optional[str]:
+        return self.path(path_separator=False, path_rooted=False)
 
     def get(self, key: Any, default: Any = None) -> Any:
         if key not in self:
@@ -72,8 +83,8 @@ class JSON(dict):
     def __getitem__(self, key: Any) -> Any:
         self._initialize()
         value = super().__getitem__(key)
-        if self._lvalue and (not isinstance(value, dict)):
-            value = self._lvalue(value)
+        if self._rvalue and (not isinstance(value, dict)):
+            value = self._rvalue(value)
         return value
 
     def items(self) -> Iterator[Tuple[Any, Any]]:
@@ -104,10 +115,6 @@ class JSON(dict):
     def __iter__(self) -> Iterator[Any]:
         self._initialize()
         return super().__iter__()
-
-    def __delitem__(self, key: Any) -> None:
-        self._initialize()
-        super().__delitem__(key)
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
@@ -147,27 +154,27 @@ class JSON(dict):
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
 
-    def _dictize(self, lvalue: Union[bool, Callable] = False) -> dict:
-        if lvalue is True:
-            lvalue = self._lvalue
-        elif (lvalue is False) or (not callable(lvalue)):
-            lvalue = lambda value: value  # noqa
-        def dictize(value) -> str:  # noqa
+    def _asdict(self, rvalue: Union[bool, Callable] = False) -> dict:
+        if rvalue is True:
+            rvalue = self._rvalue
+        elif (rvalue is False) or (not callable(rvalue)):
+            rvalue = lambda value: value  # noqa
+        def asdict(value) -> str:  # noqa
             if isinstance(value, dict):
-                return {key: dictize(value) for key, value in value.items()}
+                return {key: asdict(value) for key, value in value.items()}
             elif isinstance(value, list):
-                return [dictize(element) for element in value]
+                return [asdict(element) for element in value]
             elif is_primitive_type(value):
-                return lvalue(value)
+                return rvalue(value)
             return value
-        return dictize(self)
+        return asdict(self)
 
     def __str__(self) -> str:
-        if not self._lvalue:
+        if not self._rvalue:
             return super().__str__()
-        return str(self._dictize())
+        return str(self._asdict())
 
     def __repr__(self) -> str:
-        if not self._lvalue:
+        if not self._rvalue:
             return super().__repr__()
-        return repr(self._dictize())
+        return repr(self._asdict())
