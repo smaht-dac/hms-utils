@@ -50,7 +50,8 @@ class JSON(dict):
                 return node
             node = node._parent
 
-    def path(self, path_separator: Optional[Union[str, bool]] = None, path_rooted: bool = False) -> Optional[str]:
+    def path(self, path_separator: Optional[Union[str, bool]] = None,
+             path_rooted: bool = False, path: Optional[str] = None) -> Union[List[str], str]:
         # FYI we only actually use this (in hms_config) for diagnostic messages.
         context = self
         context_path = []
@@ -61,6 +62,8 @@ class JSON(dict):
                     context_path.insert(0, key)
             context = context._parent
             context_parent = context_parent._parent
+        if isinstance(path, str) and path:
+            context_path.append(path)
         if path_separator is True:
             path_separator = "/"
         elif (path_separator is False) or (not isinstance(path_separator, str)):
@@ -72,7 +75,7 @@ class JSON(dict):
         return context_path
 
     @property
-    def context_path(self) -> Optional[str]:
+    def context_path(self) -> str:
         return self.path(path_separator=False, path_rooted=False)
 
     def get(self, key: Any, default: Any = None) -> Any:

@@ -266,18 +266,8 @@ class Config:
     def is_absolute_path(self, path: str) -> bool:
         return isinstance(path, str) and path.startswith(self._path_separator)
 
-    def context_path(self, context: JSON, path: Optional[str] = None) -> Optional[str]:
-        return Config._context_path(context, path, path_separator=self._path_separator)
-
-    @staticmethod
-    def _context_path(context: JSON, path: Optional[str] = None, path_separator: Optional[str] = None) -> Optional[str]:
-        if not (context_path := context.context_path):
-            return None
-        if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
-            path_separator = Config._PATH_SEPARATOR
-        if isinstance(path, str):
-            context_path.append(path)
-        return f"{path_separator}{path_separator.join(context_path)}"
+    def context_path(self, context: JSON, path: Optional[str] = None) -> str:
+        return context.path(path_separator=self._path_separator, path_rooted=True, path=path)
 
     def _warn(self, message: str, exception: bool = False) -> None:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)

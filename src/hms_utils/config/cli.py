@@ -10,7 +10,8 @@ from hms_utils.dictionary_utils import (
     print_dictionary_list,
     print_dictionary_tree
 )
-from hms_utils.config.hms_config import Config
+# from hms_utils.config.hms_config import Config
+from hms_utils.config.hms_config_aws import ConfigWithAwsMacroExpander as Config
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
