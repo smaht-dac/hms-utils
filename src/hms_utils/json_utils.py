@@ -151,8 +151,8 @@ class JSON(dict):
         if lvalue is True:
             lvalue = self._lvalue
         elif (lvalue is False) or (not callable(lvalue)):
-            lvalue = lambda value: value
-        def dictize(value) -> str:
+            lvalue = lambda value: value  # noqa
+        def dictize(value) -> str:  # noqa
             if isinstance(value, dict):
                 return {key: dictize(value) for key, value in value.items()}
             elif isinstance(value, list):

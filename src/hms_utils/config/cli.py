@@ -8,7 +8,7 @@ from typing import Any, List, Optional
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import (
     print_dictionary_list,
-    print_dictionary_tree, sort_dictionary
+    print_dictionary_tree
 )
 from hms_utils.config.hms_config import Config
 
@@ -157,7 +157,6 @@ def print_config_tree(config: Config, secret_paths: Optional[List[str]]) -> None
             return chars.rarrow
         return chars.rarrow_hollow
 
-    #print_dictionary_tree(sort_dictionary(config.json), arrow_indicator=tree_arrow_indicator)
     print_dictionary_tree(config.json, arrow_indicator=tree_arrow_indicator)
 
 
@@ -170,7 +169,6 @@ def print_config_list(config: Config, secret_paths: Optional[List[str]]) -> None
             return OBFUSCATED_VALUE
         return value
 
-    #print_dictionary_list(sort_dictionary(config.json), value_modifier=value_modifier)
     print_dictionary_list(config.json, value_modifier=value_modifier)
 
 

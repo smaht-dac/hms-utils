@@ -4,7 +4,6 @@ import io
 import json
 import os
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
-from hms_utils.misc_utils import is_primitive_type
 
 
 def print_dictionary_tree(data: dict,
