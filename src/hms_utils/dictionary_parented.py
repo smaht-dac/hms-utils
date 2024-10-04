@@ -18,7 +18,7 @@ class JSON(dict):
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
-            data = data._asdict()
+            data = data.asdict()
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
@@ -40,13 +40,14 @@ class JSON(dict):
                     super(JSON, parent).__setitem__(key, value)
                     self._initialize(value)
                 elif isinstance(value, list):
-                    # Just for completeness do any dictionaries nested within lists.
-                    parent[key] = []
+                    # Just for completeness do any dictionari= es nested within lists.
+                    parent_key_value = []
                     for element in value:
                         if isinstance(element, dict) and (not isinstance(element, JSON)):
-                            parent[key].append(JSON(element))
+                            parent_key_value.append(JSON(element))
                         else:
-                            parent[key].append(element)
+                            parent_key_value.append(element)
+                    super().__setitem__(key, parent_key_value)
             self._initialized = True
 
     @property
@@ -97,7 +98,7 @@ class JSON(dict):
     def __getitem__(self, key: Any) -> Any:
         self._initialize()
         value = super().__getitem__(key)
-        if self._rvalue and (not isinstance(value, dict)):
+        if self._rvalue and (not isinstance(value, dict)) and is_primitive_type(value):
             value = self._rvalue(value)
         return value
 
@@ -168,7 +169,7 @@ class JSON(dict):
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
 
-    def _asdict(self, rvalue: Union[bool, Callable] = False) -> dict:
+    def asdict(self, rvalue: Union[bool, Callable] = False) -> dict:
         if rvalue is True:
             rvalue = self._rvalue
         elif (rvalue is False) or (not callable(rvalue)):
@@ -186,7 +187,7 @@ class JSON(dict):
     def __str__(self) -> str:
         if not self._rvalue:
             return super().__str__()
-        return str(self._asdict())
+        return str(self.asdict())
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         def root_indicator() -> str:

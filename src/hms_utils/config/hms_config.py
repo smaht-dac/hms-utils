@@ -282,43 +282,75 @@ class Config:
     def _secrets_encoded(value: str) -> str:
         if (not isinstance(value, str)) or (not value):
             return ""
-        secret_encoded = ""
+        secrets_encoded = ""
         start = 0
         while True:
             if not (match := Config._MACRO_PATTERN.search(value[start:])):
-                secret_encoded += value[start:]
+                secrets_encoded += value[start:]
                 break
             match_start = match.start()
             match_end = match.end()
             macro_part = value[start + match_start:start + match_end]
             if non_macro_part := value[start:start + match_start]:
-                secret_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}"
-            secret_encoded += macro_part
-            if "[]" in secret_encoded:
-                import pdb ; pdb.set_trace()  # noqa
-                pass
+                secrets_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}"
+            secrets_encoded += macro_part
             start += match_end
-        return secret_encoded
+        return secrets_encoded
 
     @staticmethod
-    def _secrets_plaintext(secret_encoded: str) -> str:
-        if (not isinstance(secret_encoded, str)) or (not secret_encoded):
+    def _secrets_plaintext(secrets_encoded: str) -> str:
+        if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return ""
-        return secret_encoded.replace(Config._SECRET_VALUE_START, "").replace(Config._SECRET_VALUE_END, "")
+        return secrets_encoded.replace(Config._SECRET_VALUE_START, "").replace(Config._SECRET_VALUE_END, "")
 
     @staticmethod
-    def _secrets_obfuscated(secret_encoded: str, obfuscated_value: Optional[str] = None) -> str:
-        if (not isinstance(secret_encoded, str)) or (not secret_encoded):
+    def _secrets_obfuscated(secrets_encoded: str, obfuscated_value: Optional[str] = None) -> str:
+        if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return ""
         if (not isinstance(obfuscated_value, str)) or (not obfuscated_value):
             obfuscated_value = Config._SECRET_VALUE
         while True:
-            if (start := secret_encoded.find(Config._SECRET_VALUE_START)) < 0:
+            if (start := secrets_encoded.find(Config._SECRET_VALUE_START)) < 0:
                 break
-            if (end := secret_encoded.find(Config._SECRET_VALUE_END)) < start:
+            if (end := secrets_encoded.find(Config._SECRET_VALUE_END)) < start:
                 break
             obfuscated = obfuscated_value if end > start + Config._SECRET_VALUE_START_LENGTH else ""
-            secret_encoded = (
-                secret_encoded[0:start] + obfuscated +
-                secret_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
-        return secret_encoded
+            secrets_encoded = (
+                secrets_encoded[0:start] + obfuscated +
+                secrets_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
+        return secrets_encoded
+
+
+if True:
+    x = Config("../../../tests/data/config.json")
+    secrets = Config("../../../tests/data/secrets.json")
+    x.merge(secrets)
+    # x = Config("../../../tests/data/secrets.json")
+    #print(x.json)
+    #print(x.json['auth0']['xyzzy'])
+    #print(Config._secrets_obfuscated(x.json['auth0']['xyzzy']))
+    #print(Config._secrets_plaintext(x.json['auth0']['xyzzy']))
+    x.json._dump_for_testing(verbose=True, check=True)
+    def vm(value):
+        return value
+    y = JSON(x.json, rvalue=vm)
+    y._dump_for_testing(verbose=True, check=True)
+    #z = load_json_file("../../../tests/data/secrets.json")
+    #import json
+    #print(json.dumps(z, indent=4))
+
+
+if False:
+    value = "${rst}"
+    value = "abc_${def}_ghi_${jkl}_mno_${pq}${rst}_xyz"
+    print(value)
+
+    secrets_encoded = Config._secrets_encoded(value)
+    print(secrets_encoded)
+
+    secrets_plaintext = Config._secrets_plaintext(secrets_encoded)
+    print(secrets_plaintext)
+    print(value == secrets_plaintext)
+
+    secrets_obfuscated = Config._secrets_obfuscated(secrets_encoded, obfuscated_value="xxxx")
+    print(secrets_obfuscated)
