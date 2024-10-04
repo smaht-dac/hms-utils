@@ -331,6 +331,18 @@ def test_hms_config_rewrite_tricky_b():
     assert config.lookup("/bravo/charlie/bravo_sub") == "bravo_sub_value_foo_value_123_delta_value"
 
 
+def test_hms_config_rewrite_secrets_a():
+
+    config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
+    secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
+    config = Config(config_file)
+    secrets = Config(secrets_file)
+    config.merge(secrets)
+    # x = config.data(None)
+    # y = config.data(True)
+    # z = config.data(False)
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # ADAPTED FROM test_hms_config.py ...
 # ----------------------------------------------------------------------------------------------------------------------
@@ -544,8 +556,17 @@ def test_hms_config_g():
     value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == "ssh-tunnel-elasticsearch-proxy-smaht-green-9208"
 
-    value = config.lookup("foursight/smaht/Auth0Secret")
+    value = config.lookup("foursight/smaht/Auth0Secret", show=True)
     assert value == "REDACTED_auth0_local_secret_value"
+
+    value = config.lookup("foursight/smaht/Auth0Secret")
+    assert value == Config._SECRET_VALUE
+
+    value = config.lookup("foursight/smaht/Auth0Secret", show=False)
+    assert value == Config._SECRET_VALUE
+
+    value = config.lookup("foursight/smaht/Auth0Secret", show=None)
+    assert value == f"{Config._SECRET_VALUE_START}str:REDACTED_auth0_local_secret_value{Config._SECRET_VALUE_END}"
 
     value = config.lookup("foursight/smaht/Auth0Client")
     assert value == "UfM_REDACTED_Hf9"

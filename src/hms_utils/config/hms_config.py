@@ -58,6 +58,13 @@ class Config:
         if self._exception:
             self._warning = self._warn
 
+    def data(self, show: Optional[bool] = False) -> JSON:
+        if show is True:
+            return JSON(self._json, rvalue=Config._secrets_plaintext)
+        elif show is False:
+            return JSON(self._json, rvalue=Config._secrets_obfuscated)
+        return self._json
+
     @property
     def json(self) -> JSON:
         return self._json
@@ -105,11 +112,13 @@ class Config:
                         self._imports = []
                     self._imports.append(Config(item))
 
-    def lookup(self, path: str, show: Optional[bool] = None, noexpand: bool = False,
+    def lookup(self, path: str, show: Optional[bool] = False, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, self._json, inherit_simple=inherit_simple, inherit_none=inherit_none)
         value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
-        if show is True:
+        if value is None:
+            return value
+        elif show is True:
             if isinstance(value, JSON):
                 return value.asdict(rvalue=Config._secrets_plaintext)
             else:
@@ -290,7 +299,7 @@ class Config:
             raise Exception(message)
 
     # All of this secrets stuff is just so that when obtaining values (print/dump or lookup), any
-    # strings which came from a "secret" configuration can be obfuscated by default, or # shown if desired.
+    # strings which came from a "secret" configuration can be obfuscated by default, or shown if desired.
 
     @staticmethod
     def _secrets_encoded(value: primitive_type) -> str:
@@ -302,13 +311,15 @@ class Config:
         start = 0
         while True:
             if not (match := Config._MACRO_PATTERN.search(value[start:])):
-                secrets_encoded += value[start:]
+                # secrets_encoded += value[start:]
+                if secret_part := value[start:]:
+                    secrets_encoded += f"{Config._SECRET_VALUE_START}str:{secret_part}{Config._SECRET_VALUE_END}"
                 break
             match_start = match.start()
             match_end = match.end()
             macro_part = value[start + match_start:start + match_end]
-            if non_macro_part := value[start:start + match_start]:
-                secrets_encoded += f"{Config._SECRET_VALUE_START}str:{non_macro_part}{Config._SECRET_VALUE_END}"
+            if secret_part := value[start:start + match_start]:
+                secrets_encoded += f"{Config._SECRET_VALUE_START}str:{secret_part}{Config._SECRET_VALUE_END}"
             secrets_encoded += macro_part
             start += match_end
         return secrets_encoded
@@ -362,6 +373,8 @@ class Config:
     def _dump_for_testing(self, show: bool = False, verbose: bool = False, check: bool = False) -> None:
         if show is True:
             json = JSON(self._json, rvalue=Config._secrets_plaintext)
-        else:
+        elif show is False:
             json = JSON(self._json, rvalue=Config._secrets_obfuscated)
+        else:
+            json = self._json
         json._dump_for_testing(verbose=verbose, check=check)

@@ -18,10 +18,8 @@ class JSON(dict):
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
-            if data._rvalue:
-                rvalue_from_data = data._rvalue
-                if callable(rvalue):
-                    rvalue_from_arg = rvalue
+            if rvalue_from_data := data._rvalue:
+                if callable(rvalue_from_arg := rvalue):
                     rvalue = lambda value: rvalue_from_arg(rvalue_from_data(value))  # noqa
                 else:
                     rvalue = rvalue_from_data
@@ -176,10 +174,17 @@ class JSON(dict):
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
 
-    def asdict(self, rvalue: Union[bool, Callable] = False) -> dict:
-        if rvalue is True:
-            rvalue = self._rvalue
-        elif (rvalue is False) or (not callable(rvalue)):
+    def asdict(self, rvalue: Union[bool, Callable] = True) -> dict:
+        if rvalue_from_self := self._rvalue:
+            if callable(rvalue_from_arg := rvalue):
+                rvalue = lambda value: rvalue_from_arg(rvalue_from_self(value))  # noqa
+            elif rvalue_from_arg is False:
+                rvalue = lambda value: value  # noqa
+            else:
+                rvalue = rvalue_from_self
+        elif callable(rvalue_from_arg := rvalue):
+            rvalue = rvalue_from_arg
+        else:
             rvalue = lambda value: value  # noqa
         def asdict(value) -> str:  # noqa
             if isinstance(value, dict):
@@ -194,6 +199,11 @@ class JSON(dict):
     def __str__(self) -> str:
         if not self._rvalue:
             return super().__str__()
+        return str(self.asdict())
+
+    def __repr__(self) -> str:
+        if not self._rvalue:
+            return super().__repr__()
         return str(self.asdict())
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
