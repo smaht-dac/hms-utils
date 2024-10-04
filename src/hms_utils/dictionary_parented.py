@@ -4,7 +4,7 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
 from hms_utils.chars import chars
 from hms_utils.dictionary_print_utils import print_dictionary_tree
 from hms_utils.dictionary_utils import sort_dictionary
-from hms_utils.misc_utils import is_primitive_type
+from hms_utils.type_utils import is_primitive_type
 from hms_utils.config.utils import unpack_path
 
 
@@ -105,7 +105,7 @@ class JSON(dict):
     def __getitem__(self, key: Any) -> Any:
         self._initialize()
         value = super().__getitem__(key)
-        if self._rvalue and (not isinstance(value, dict)) and is_primitive_type(value):
+        if self._rvalue and is_primitive_type(value):
             value = self._rvalue(value)
         return value
 

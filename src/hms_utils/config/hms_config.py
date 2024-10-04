@@ -6,7 +6,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.config.utils import repack_path, unpack_path
 from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
-from hms_utils.misc_utils import is_primitive_type
+from hms_utils.type_utils import is_primitive_type, primitive_type
 
 # UNDER DEVELOPMENT: Basically rewriting hms_config to be tighter based on lessons learned.
 
@@ -290,9 +290,11 @@ class Config:
             raise Exception(message)
 
     @staticmethod
-    def _secrets_encoded(value: str) -> str:
-        if (not isinstance(value, str)) or (not value):
+    def _secrets_encoded(value: primitive_type) -> str:
+        if not is_primitive_type(value):
             return ""
+        if (value_type := type(value).__name__) != "str":
+            return f"{Config._SECRET_VALUE_START}{value_type}:{value}{Config._SECRET_VALUE_END}"
         secrets_encoded = ""
         start = 0
         while True:
@@ -303,16 +305,39 @@ class Config:
             match_end = match.end()
             macro_part = value[start + match_start:start + match_end]
             if non_macro_part := value[start:start + match_start]:
-                secrets_encoded += f"{Config._SECRET_VALUE_START}{non_macro_part}{Config._SECRET_VALUE_END}"
+                secrets_encoded += f"{Config._SECRET_VALUE_START}str:{non_macro_part}{Config._SECRET_VALUE_END}"
             secrets_encoded += macro_part
             start += match_end
         return secrets_encoded
 
     @staticmethod
-    def _secrets_plaintext(secrets_encoded: str) -> str:
+    def _secrets_plaintext(secrets_encoded: str) -> primitive_type:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return ""
-        return secrets_encoded.replace(Config._SECRET_VALUE_START, "").replace(Config._SECRET_VALUE_END, "")
+        secret_value_typed = None
+        while True:
+            if (start := secrets_encoded.find(Config._SECRET_VALUE_START)) < 0:
+                break
+            if (end := secrets_encoded.find(Config._SECRET_VALUE_END)) < start:
+                break
+            secret_value = secrets_encoded[start + Config._SECRET_VALUE_START_LENGTH:end]
+            if secret_value.startswith("str:"):
+                secret_value = secret_value[4:]
+            elif secret_value.startswith("int:"):
+                secret_value = secret_value[4:]
+                secret_value_typed = int(secret_value)
+            elif secret_value.startswith("float:"):
+                secret_value = secret_value[6:]
+                secret_value_typed = float(secret_value)
+            elif secret_value.startswith("bool:"):
+                secret_value = secret_value[5:]
+                secret_value_typed = True if (secret_value.lower() == "true") else False
+            secrets_encoded = (
+                secrets_encoded[0:start] + secret_value +
+                secrets_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
+        if (secret_value_typed is not None) and (str(secret_value_typed) == secret_value):
+            return secret_value_typed
+        return secrets_encoded
 
     @staticmethod
     def _secrets_obfuscated(secrets_encoded: str, obfuscated_value: Optional[str] = None) -> str:
