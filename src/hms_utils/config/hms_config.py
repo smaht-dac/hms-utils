@@ -77,16 +77,15 @@ class Config:
             data = [data]
         if isinstance(data, list):
             for item in data:
-                secrets = False
                 if isinstance(item, dict):
                     item = JSON(item)
                 elif isinstance(item, Config):
-                    secrets = item.secrets
+                    self._secrets = item.secrets
                     item = item._json
                 if isinstance(item, JSON):
                     self._json, item_merged_paths, item_unmerged_paths = (
                         self._json.merge(item, path_separator=self._path_separator))
-                    if secrets:
+                    if self._secrets:
                         merged_secret_paths.extend(item_merged_paths)
                     merged_paths.extend(item_merged_paths)
                     unmerged_paths.extend(item_unmerged_paths)
@@ -106,10 +105,22 @@ class Config:
                         self._imports = []
                     self._imports.append(Config(item))
 
-    def lookup(self, path: str, noexpand: bool = False,
+    def lookup(self, path: str, show: Optional[bool] = None, noexpand: bool = False,
                inherit_simple: bool = False, inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, self._json, inherit_simple=inherit_simple, inherit_none=inherit_none)
-        return value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
+        value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
+        if show is True:
+            if isinstance(value, JSON):
+                return value.asdict(rvalue=Config._secrets_plaintext)
+            else:
+                return Config._secrets_plaintext(value)
+        elif show is False:
+            if isinstance(value, JSON):
+                return value.asdict(rvalue=Config._secrets_obfuscated)
+            else:
+                return Config._secrets_obfuscated(value)
+        else:
+            return value
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 inherit_simple: bool = False, inherit_none: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
@@ -319,3 +330,10 @@ class Config:
                 secrets_encoded[0:start] + obfuscated +
                 secrets_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
         return secrets_encoded
+
+    def _dump_for_testing(self, show: bool = False, verbose: bool = False, check: bool = False) -> None:
+        if show is True:
+            json = JSON(self._json, rvalue=Config._secrets_plaintext)
+        else:
+            json = JSON(self._json, rvalue=Config._secrets_obfuscated)
+        json._dump_for_testing(verbose=verbose, check=check)

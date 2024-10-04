@@ -18,6 +18,13 @@ class JSON(dict):
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
+            if data._rvalue:
+                rvalue_from_data = data._rvalue
+                if callable(rvalue):
+                    rvalue_from_arg = rvalue
+                    rvalue = lambda value: rvalue_from_arg(rvalue_from_data(value))  # noqa
+                else:
+                    rvalue = rvalue_from_data
             data = data.asdict()
         elif not isinstance(data, dict):
             data = {}
@@ -211,9 +218,6 @@ class JSON(dict):
             if check is True:
                 # checked_value, _ = self._lookup(path)
                 checked_value, _ = parent._lookup(path)
-                if id(checked_value) != id(value):
-                    import pdb ; pdb.set_trace()  # noqa
-                    pass
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
         print_dictionary_tree(self,
