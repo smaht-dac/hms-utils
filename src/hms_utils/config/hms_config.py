@@ -325,9 +325,9 @@ class Config:
         return secrets_encoded
 
     @staticmethod
-    def _secrets_plaintext(secrets_encoded: str) -> primitive_type:
+    def _secrets_plaintext(secrets_encoded: Any) -> primitive_type:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
-            return ""
+            return secrets_encoded
         secret_value_typed = None
         while True:
             if (start := secrets_encoded.find(Config._SECRET_VALUE_START)) < 0:
