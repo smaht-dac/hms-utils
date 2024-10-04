@@ -44,8 +44,8 @@ class JSON(dict):
                     value._parent = parent
                     super(JSON, parent).__setitem__(key, value)
                     self._initialize(value)
-                elif isinstance(value, list):
-                    # Just for completeness do any dictionari= es nested within lists.
+                elif isinstance(value, list) and False:
+                    # Just for completeness do any dictionaries nested within lists.
                     parent_key_value = []
                     for element in value:
                         if isinstance(element, dict) and (not isinstance(element, JSON)):
@@ -112,6 +112,8 @@ class JSON(dict):
         for key, value in super().items():
             if isinstance(value, dict) and (not isinstance(value, JSON)):
                 value = JSON(value)
+            if self._rvalue and is_primitive_type(value):
+                value = self._rvalue(value)
             yield key, value
 
     def values(self) -> Iterator[Any]:
@@ -187,9 +189,10 @@ class JSON(dict):
         else:
             rvalue = lambda value: value  # noqa
         def asdict(value) -> str:  # noqa
+            nonlocal rvalue
             if isinstance(value, dict):
                 return {key: asdict(value) for key, value in value.items()}
-            elif isinstance(value, list):
+            elif isinstance(value, list) and False:
                 return [asdict(element) for element in value]
             elif is_primitive_type(value):
                 return rvalue(value)
@@ -201,10 +204,10 @@ class JSON(dict):
             return super().__str__()
         return str(self.asdict())
 
-    def __repr__(self) -> str:
-        if not self._rvalue:
-            return super().__repr__()
-        return str(self.asdict())
+    # def __repr__(self) -> str:
+    #     if not self._rvalue:
+    #         return super().__repr__()
+    #     return str(self.asdict())
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         def root_indicator() -> str:

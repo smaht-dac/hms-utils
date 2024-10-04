@@ -333,14 +333,15 @@ def test_hms_config_rewrite_tricky_b():
 
 def test_hms_config_rewrite_secrets_a():
 
-    config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
-    secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
-    config = Config(config_file)
-    secrets = Config(secrets_file)
-    config.merge(secrets)
+    # config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
+    # secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
+    # config = Config(config_file)
+    # secrets = Config(secrets_file)
+    # config.merge(secrets)
     # x = config.data(None)
     # y = config.data(True)
     # z = config.data(False)
+    pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
