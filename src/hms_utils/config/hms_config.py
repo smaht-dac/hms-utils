@@ -289,6 +289,9 @@ class Config:
         if (exception is True) or (self._exception is True):
             raise Exception(message)
 
+    # All of this secrets stuff is just so that when obtaining values (print/dump or lookup), any
+    # strings which came from a "secret" configuration can be obfuscated by default, or # shown if desired.
+
     @staticmethod
     def _secrets_encoded(value: primitive_type) -> str:
         if not is_primitive_type(value):
