@@ -86,7 +86,6 @@ class Config:
                 if isinstance(item, dict):
                     item = JSON(item)
                 elif isinstance(item, Config):
-                    self._secrets = item.secrets
                     item = item._json
                 if isinstance(item, JSON):
                     self._json, item_merged_paths, item_unmerged_paths = (
@@ -375,3 +374,22 @@ class Config:
         else:
             json = self._json
         json._dump_for_testing(verbose=verbose, check=check)
+
+
+if True:
+    config = Config({
+        "alfa": "alfa_value"
+    })
+    secrets = Config({
+        "zafla": "abc",
+        "zdelta": [1, 2]
+    }, secrets=True)
+    config.merge(secrets)
+    print(config.json)
+    print(config.data())
+    print(config.data(True))
+    print(config.data(False))
+    print(config.data(None))
+    print(config.secrets)
+    print(config.lookup("zafla", show=True))
+    print(config.lookup("zdelta", show=True))
