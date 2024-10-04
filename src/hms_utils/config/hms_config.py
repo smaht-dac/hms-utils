@@ -319,38 +319,3 @@ class Config:
                 secrets_encoded[0:start] + obfuscated +
                 secrets_encoded[end + Config._SECRET_VALUE_END_LENGTH:])
         return secrets_encoded
-
-
-if True:
-    x = Config("../../../tests/data/config.json")
-    secrets = Config("../../../tests/data/secrets.json")
-    x.merge(secrets)
-    # x = Config("../../../tests/data/secrets.json")
-    #print(x.json)
-    #print(x.json['auth0']['xyzzy'])
-    #print(Config._secrets_obfuscated(x.json['auth0']['xyzzy']))
-    #print(Config._secrets_plaintext(x.json['auth0']['xyzzy']))
-    x.json._dump_for_testing(verbose=True, check=True)
-    def vm(value):
-        return value
-    y = JSON(x.json, rvalue=vm)
-    y._dump_for_testing(verbose=True, check=True)
-    #z = load_json_file("../../../tests/data/secrets.json")
-    #import json
-    #print(json.dumps(z, indent=4))
-
-
-if False:
-    value = "${rst}"
-    value = "abc_${def}_ghi_${jkl}_mno_${pq}${rst}_xyz"
-    print(value)
-
-    secrets_encoded = Config._secrets_encoded(value)
-    print(secrets_encoded)
-
-    secrets_plaintext = Config._secrets_plaintext(secrets_encoded)
-    print(secrets_plaintext)
-    print(value == secrets_plaintext)
-
-    secrets_obfuscated = Config._secrets_obfuscated(secrets_encoded, obfuscated_value="xxxx")
-    print(secrets_obfuscated)

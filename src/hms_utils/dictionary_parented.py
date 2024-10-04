@@ -209,7 +209,11 @@ class JSON(dict):
             if verbose is True:
                 annotation += f" {chars.dot_hollow} path: {path}"
             if check is True:
-                checked_value, _ = self._lookup(path)
+                # checked_value, _ = self._lookup(path)
+                checked_value, _ = parent._lookup(path)
+                if id(checked_value) != id(value):
+                    import pdb ; pdb.set_trace()  # noqa
+                    pass
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
         print_dictionary_tree(self,
