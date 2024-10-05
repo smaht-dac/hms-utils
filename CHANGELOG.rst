@@ -2,6 +2,11 @@
 hms-utils : CHANGE LOG
 ======================
 
+1.2.77
+======
+* 2024-10-05/dmichaels
+  - Finally virtually/almost done with rewrite of basic hms_utils.config stuff.
+
 1.2.72
 ======
 * 2024-09-11/dmichaels
