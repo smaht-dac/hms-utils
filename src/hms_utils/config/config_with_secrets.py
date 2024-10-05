@@ -69,9 +69,13 @@ class ConfigWithSecrets(ConfigBasic):
 
     def merge(self, data: Union[Union[dict, ConfigBasic],
                                 List[Union[dict, ConfigBasic]]]) -> Tuple[List[str], List[str]]:
-        result = super().merge(data)
-        self._secrets = data._secrets
-        return result
+        if isinstance(data, ConfigWithSecrets):
+            self._secrets = data._secrets
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, ConfigWithSecrets):
+                    self._secrets = item._secrets
+        return super().merge(data)
 
     # All of this marking of secrets stuff is just so that when obtaining values (for lookup/print/dump/display),
     # any strings which came from a "secret" configuration can be obfuscated by default, or shown if desired;

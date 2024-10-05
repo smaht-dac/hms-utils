@@ -11,7 +11,7 @@ from hms_utils.dictionary_utils import (
     print_dictionary_tree
 )
 # from hms_utils.config.hms_config import Config
-from hms_utils.config.hms_config_aws import ConfigWithAwsMacroExpander as Config
+from hms_utils.config.config import Config
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -139,7 +139,9 @@ def parse_args(argv: List[str]) -> object:
 #       print(f"configs.secrets: {config.secrets}")
 #   print(argv)
 
-    merged_secret_paths, merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
+    # merged_secret_paths, merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
+    merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
+    merged_secret_paths = []  # TODO
 
     if True:
         print_config_list(config, merged_secret_paths)
