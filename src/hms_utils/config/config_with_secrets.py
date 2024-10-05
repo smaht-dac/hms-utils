@@ -14,6 +14,15 @@ class ConfigWithSecrets(ConfigBasic):
     _SECRET_VALUE_START_LENGTH = len(_SECRET_VALUE_START)
     _SECRET_VALUE_END_LENGTH = len(_SECRET_VALUE_END)
 
+    _TYPE_NAME_STR = type("").__name__
+    _TYPE_NAME_INT = type(1).__name__
+    _TYPE_NAME_FLOAT = type(1.0).__name__
+    _TYPE_NAME_BOOL = type(True).__name__
+    _TYPE_NAME_LENGTH_STR = len(_TYPE_NAME_STR)
+    _TYPE_NAME_LENGTH_INT = len(_TYPE_NAME_INT)
+    _TYPE_NAME_LENGTH_FLOAT = len(_TYPE_NAME_FLOAT)
+    _TYPE_NAME_LENGTH_BOOL = len(_TYPE_NAME_BOOL)
+
     def __init__(self, config: Union[dict, str],
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
@@ -119,16 +128,16 @@ class ConfigWithSecrets(ConfigBasic):
             if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
             secret_value = secrets_encoded[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
-            if secret_value.startswith("str:"):
-                secret_value = secret_value[4:]
-            elif secret_value.startswith("int:"):
-                secret_value = secret_value[4:]
+            if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
+                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
+            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
+                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
                 secret_value_typed = int(secret_value)
-            elif secret_value.startswith("float:"):
-                secret_value = secret_value[6:]
+            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
+                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
                 secret_value_typed = float(secret_value)
-            elif secret_value.startswith("bool:"):
-                secret_value = secret_value[5:]
+            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
+                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
                 secret_value_typed = True if (secret_value.lower() == "true") else False
             secrets_encoded = (
                 secrets_encoded[0:start] + secret_value +
