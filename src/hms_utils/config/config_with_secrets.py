@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.type_utils import is_primitive_type, primitive_type
 from hms_utils.config.config_basic import ConfigBasic
@@ -22,7 +22,7 @@ class ConfigWithSecrets(ConfigBasic):
                  raise_exception: bool = False,
                  secrets: bool = False, **kwargs) -> None:
 
-        if (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(self.name))):
+        if (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(config))):
             self._secrets = True
         else:
             self._secrets = False
@@ -71,6 +71,12 @@ class ConfigWithSecrets(ConfigBasic):
                 else:
                     return ConfigWithSecrets._secrets_obfuscated(value)
         return value
+
+    def merge(self, data: Union[Union[dict, ConfigBasic],
+                                List[Union[dict, ConfigBasic]]]) -> Tuple[List[str], List[str]]:
+        result = super().merge(data)
+        self._secrets = data._secrets
+        return result
 
     # All of this secrets stuff is just so that when obtaining values (print/dump or lookup), any
     # strings which came from a "secret" configuration can be obfuscated by default, or shown if desired.
