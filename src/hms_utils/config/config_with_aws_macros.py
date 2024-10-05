@@ -22,16 +22,14 @@ class ConfigWithAwsMacros(ConfigBasic):
                  warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
                  noaws: bool = False, **kwargs) -> None:
-
+        self._noaws = noaws is True
+        self._raise_exception = raise_exception is True
         super().__init__(config,
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=self._lookup_macro_custom,
                          warning=warning,
                          raise_exception=raise_exception, **kwargs)
-
-        self._noaws = noaws is True
-        self._raise_exception = raise_exception is True
 
     def _lookup_macro_custom(self, macro_value: str, context: Optional[JSON] = None) -> Any:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):

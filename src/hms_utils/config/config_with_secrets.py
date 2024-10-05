@@ -21,12 +21,7 @@ class ConfigWithSecrets(ConfigBasic):
                  warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
                  secrets: bool = False, **kwargs) -> None:
-
-        if (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(config))):
-            self._secrets = True
-        else:
-            self._secrets = False
-
+        self._secrets = (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(config)))
         super().__init__(config=config,
                          name=name,
                          path_separator=path_separator,
