@@ -8,6 +8,7 @@ from typing import List, Optional
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
+from hms_utils.path_utils import is_current_or_parent_relative_path
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -93,8 +94,11 @@ def parse_args(argv: List[str]) -> object:
                 elif "secret" in config_file.lower():
                     secrets = True
             config_file = os.path.expanduser(config_file)
-            config_file = os.path.normpath(os.path.join(config_dir, config_file)
-                                           if not os.path.isabs(config_file) else config_file)
+            if is_current_or_parent_relative_path(config_file) and os.path.isfile(config_file):
+                config_file = os.path.normpath(os.path.join(os.getcwd(), config_file))
+            else:
+                config_file = os.path.normpath(os.path.join(config_dir, config_file)
+                                               if not os.path.isabs(config_file) else config_file)
             if not os.path.isfile(config_file):
                 _error(f"Configuration file does not exist: {config_file}")
             try:
@@ -112,8 +116,8 @@ def parse_args(argv: List[str]) -> object:
             arg = argv[argi] ; argi += 1  # noqa
             arg_merge_config = arg in ["--config", "-config", "--conf", "-conf"]
             arg_merge_secrets = arg in ["--secrets", "-secrets", "--secret", "-secret"]
-            arg_import_config = arg in ["--imports", "-imports", "--import", "-import"]
-            arg_import_secrets = arg in ["--import-secrets", "-import-secrets", "--import-secret", "-import-secret"]
+            arg_import_config = imports and arg in ["--imports", "-imports", "--import", "-import"]
+            arg_import_secrets = imports and arg in ["--import-secrets", "-import-secrets", "--import-secret", "-import-secret"]
             if arg_merge_config or arg_merge_secrets or arg_import_config or arg_import_secrets:
                 if not config_dir_option_specified:
                     config_dir = os.getcwd()
@@ -132,9 +136,15 @@ def parse_args(argv: List[str]) -> object:
                     argi += 1
                 if argi > 0:
                     del argv[argi_config:argi + 1]
-        if not configs and not imports:
+        if not configs:
             configs.append(verify_config(DEFAULT_CONFIG_FILE_NAME, config_dir, secrets=False))
             configs.append(verify_config(DEFAULT_SECRETS_FILE_NAME, config_dir, secrets=True))
+        if imports:
+            args.configs_for_import = configs
+        else:
+            args.config = configs[0]
+            args.configs_for_merge = configs[1:]
+            get_configs(config_dir, imports=True)
         return configs
 
     def get_lookup_paths() -> List[str]:
@@ -180,11 +190,13 @@ def parse_args(argv: List[str]) -> object:
                 args.debug = True
 
     config_dir = get_config_dir()
-    configs = get_configs(config_dir)
-    imports = get_configs(config_dir, imports=True)
-
+    get_configs(config_dir)
     get_lookup_paths()
     get_other_args()
+    merged_paths, unmerged_paths = args.config.merge(args.configs_for_merge)
+    args.config.imports(args.configs_for_import)
+
+    config = args.config
 
     #   print(f"config_dir: [{config_dir}]")
     #   print(f"configs: {configs}")
@@ -193,13 +205,13 @@ def parse_args(argv: List[str]) -> object:
     #       print(f"configs.secrets: {config.secrets}")
     #   print(argv)
 
-    config = configs[0]
-    configs_for_merge = configs[1:]
-    merged_paths, unmerged_paths = config.merge(configs_for_merge)
-    config.imports(imports)
+    # config = configs[0]
+    # configs_for_merge = configs[1:]
+    # merged_paths, unmerged_paths = config.merge(configs_for_merge)
+    # config.imports(imports)
 
     if args.identity:
-        config.aws_secrets_name = args.identity
+        args.config.aws_secrets_name = args.identity
 
     if args.dump:
         ConfigOutput.print_tree(config, show=False)

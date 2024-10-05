@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 
@@ -7,7 +8,7 @@ def unpack_path(path: str,
                 path_parent: Optional[str] = None,
                 noroot: bool = False) -> List[str]:
     if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
-        path_separator = "/"
+        path_separator = os.sep
     if not (isinstance(path_current, str) and (path_current := path_current.strip())):
         path_current = "."
     if not (isinstance(path_parent, str) and (path_parent := path_parent.strip())):
@@ -31,10 +32,14 @@ def unpack_path(path: str,
 
 def repack_path(path_components: List[str], path_separator: Optional[str] = None, path_rooted: bool = False) -> str:
     if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
-        path_separator = path_separator
+        path_separator = os.sep
     if not (isinstance(path_components, list) and path_components):
         path_components = []
     if path_components[0] == path_separator:
         path_rooted = True
         path_components = path_components[1:]
     return (path_separator if path_rooted else "") + path_separator.join(path_components)
+
+
+def is_current_or_parent_relative_path(path: str) -> bool:
+    return isinstance(path, str) and path.startswith(f".{os.sep}") or path.startswith(f"..{os.sep}")
