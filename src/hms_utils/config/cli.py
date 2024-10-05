@@ -186,26 +186,29 @@ def parse_args(argv: List[str]) -> object:
     get_lookup_paths()
     get_other_args()
 
-#   print(f"config_dir: [{config_dir}]")
-#   print(f"configs: {configs}")
-#   for config in configs:
-#       print(f"configs.name: {config.name}")
-#       print(f"configs.secrets: {config.secrets}")
-#   print(argv)
+    #   print(f"config_dir: [{config_dir}]")
+    #   print(f"configs: {configs}")
+    #   for config in configs:
+    #       print(f"configs.name: {config.name}")
+    #       print(f"configs.secrets: {config.secrets}")
+    #   print(argv)
 
     config = configs[0]
     configs_for_merge = configs[1:]
     merged_paths, unmerged_paths = config.merge(configs_for_merge)
-    # merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
     config.imports(imports)
 
     if args.identity:
         config.aws_secrets_name = args.identity
 
-    if True:
+    if args.dump:
         ConfigOutput.print_tree(config, show=False)
+
+    if args.list:
         ConfigOutput.print_list(config, show=False)
-        # config._dump_for_testing()
+
+    if args.debug:
+        config._dump_for_testing(check=args.verbose)
 
     if args.lookup_paths:
         for lookup_path in args.lookup_paths:
@@ -246,19 +249,20 @@ def _usage():
 
 
 if __name__ == "__main__":
-    testargv = [
-        "--config",
-        "~/.config/hms/secrets.json",
-        "~/.config/hms/config.json",
-        "--show",
-        "--verbose",
-        "--lookup",
-        "/auth0/client",
-        "/identity/smaht/foursight/wolf",
-        "--debug",
-        "--dump",
-        "asdfa",
-        "--identity",
-        "C4AppConfigFoursightSmahtDevelopment"
-    ]
-    main(testargv)
+    main()
+#   testargv = [
+#       "--config",
+#       "~/.config/hms/secrets.json",
+#       "~/.config/hms/config.json",
+#       "--show",
+#       "--verbose",
+#       "--lookup",
+#       "/auth0/client",
+#       "/identity/smaht/foursight/wolf",
+#       "--debug",
+#       "--dump",
+#       "asdfa",
+#       "--identity",
+#       "C4AppConfigFoursightSmahtDevelopment"
+#   ]
+#   main(testargv)
