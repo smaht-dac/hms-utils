@@ -7,8 +7,6 @@ from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.type_utils import is_primitive_type
 
-# UNDER DEVELOPMENT: Basically rewriting hms_config to be tighter based on lessons learned.
-
 
 class ConfigBasic:
 
