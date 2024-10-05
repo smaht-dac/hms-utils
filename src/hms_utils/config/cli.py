@@ -140,8 +140,8 @@ def parse_args(argv: List[str]) -> object:
     merged_secret_paths = []  # TODO
 
     if True:
-        ConfigOutput.print_config_tree(config, show=True, secret_paths=merged_secret_paths)
-        ConfigOutput.print_config_list(config, show=True, secret_paths=merged_secret_paths)
+        ConfigOutput.print_tree(config, show=True, secret_paths=merged_secret_paths)
+        ConfigOutput.print_list(config, show=True, secret_paths=merged_secret_paths)
 
     # import pdb ; pdb.set_trace()  # noqa
     # xxx = config.lookup('identity/xyzzy')
