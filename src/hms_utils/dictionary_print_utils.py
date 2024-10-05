@@ -62,7 +62,7 @@ def print_dictionary_tree(data: dict,
                 key_modification = key_modifier(key_path, key) if key_modifier else key
                 value_modification = value_modifier(key_path, value) if value_modifier else value
                 value_annotation = value_annotator(data, key, value) if value_annotator else ""
-                arrow_indication = arrow_indicator(key_path) if arrow_indicator else ""
+                arrow_indication = arrow_indicator(key_path, value) if arrow_indicator else ""
                 if key_modification:
                     key = key_modification
                 if value_modification:

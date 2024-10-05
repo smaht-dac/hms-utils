@@ -29,8 +29,12 @@ class ConfigWithSecrets(ConfigBasic):
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
-                 secrets: bool = False, **kwargs) -> None:
+                 secrets: bool = False,
+                 obfuscated_value: Optional[str] = None, **kwargs) -> None:
         self._secrets = (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(config)))
+        self._obfuscated_value = (obfuscated_value
+                                  if isinstance(obfuscated_value, str) and obfuscated_value
+                                  else ConfigWithSecrets._SECRET_OBFUSCATED_VALUE)
         super().__init__(config=config,
                          name=name,
                          path_separator=path_separator,
@@ -48,7 +52,7 @@ class ConfigWithSecrets(ConfigBasic):
             if show is True:
                 return JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
             elif show is False:
-                return JSON(self._json, rvalue=ConfigWithSecrets._secrets_obfuscated)
+                return JSON(self._json, rvalue=self._secrets_obfuscated)
         return super().data()
 
     @property
@@ -71,9 +75,9 @@ class ConfigWithSecrets(ConfigBasic):
                     return ConfigWithSecrets._secrets_plaintext(value)
             elif show is False:
                 if isinstance(value, JSON):
-                    return value.asdict(rvalue=ConfigWithSecrets._secrets_obfuscated)
+                    return value.asdict(rvalue=self._secrets_obfuscated)
                 else:
-                    return ConfigWithSecrets._secrets_obfuscated(value)
+                    return self._secrets_obfuscated(value)
         return value
 
     def merge(self, data: Union[Union[dict, ConfigBasic],
@@ -94,7 +98,7 @@ class ConfigWithSecrets(ConfigBasic):
     def _secrets_encoded(value: primitive_type) -> str:
         if not is_primitive_type(value):
             return ""
-        if (value_type := type(value).__name__) != "str":
+        if (value_type := type(value).__name__) != ConfigWithSecrets._TYPE_NAME_STR:
             return f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:{value}{ConfigWithSecrets._SECRET_VALUE_END}"
         secrets_encoded = ""
         start = 0
@@ -118,9 +122,11 @@ class ConfigWithSecrets(ConfigBasic):
         return secrets_encoded
 
     @staticmethod
-    def _secrets_plaintext(secrets_encoded: Any) -> primitive_type:
+    def _secrets_plaintext(secrets_encoded: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return secrets_encoded
+        if not callable(plaintext_value):
+            plaintext_value = None
         secret_value_typed = None
         while True:
             if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
@@ -139,6 +145,8 @@ class ConfigWithSecrets(ConfigBasic):
             elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
                 secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
                 secret_value_typed = True if (secret_value.lower() == "true") else False
+            if callable(plaintext_value):
+                secret_value = plaintext_value(secret_value)
             secrets_encoded = (
                 secrets_encoded[0:start] + secret_value +
                 secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
@@ -146,19 +154,31 @@ class ConfigWithSecrets(ConfigBasic):
             return secret_value_typed
         return secrets_encoded
 
-    @staticmethod
-    def _secrets_obfuscated(secrets_encoded: str, obfuscated_value: Optional[str] = None) -> str:
+    def _secrets_obfuscated(self, secrets_encoded: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return ""
-        if (not isinstance(obfuscated_value, str)) or (not obfuscated_value):
-            obfuscated_value = ConfigWithSecrets._SECRET_OBFUSCATED_VALUE
+        if not (callable(obfuscated_value) or ((isinstance(obfuscated_value, str)) and obfuscated_value)):
+            obfuscated_value = self._obfuscated_value
         while True:
             if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
                 break
             if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
-            obfuscated = obfuscated_value if end > start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH else ""
+            if callable(obfuscated_value):
+                obfuscated = (obfuscated_value(self._obfuscated_value)
+                              if end > start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH else "")
+            else:
+                obfuscated = obfuscated_value if end > start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH else ""
             secrets_encoded = (
                 secrets_encoded[0:start] + obfuscated +
                 secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
         return secrets_encoded
+
+    def _contains_secrets(self, secrets_encoded: Any) -> bool:
+        if not isinstance(secrets_encoded, str):
+            return False
+        if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
+            return False
+        if secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END) < start:
+            return False
+        return True

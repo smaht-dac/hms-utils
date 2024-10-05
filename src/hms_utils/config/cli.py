@@ -4,14 +4,10 @@ import json
 import os
 import sys
 import traceback
-from typing import Any, List, Optional
+from typing import List, Optional
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import (
-    print_dictionary_list,
-    print_dictionary_tree
-)
-# from hms_utils.config.hms_config import Config
 from hms_utils.config.config import Config
+from hms_utils.config.config_output import ConfigOutput
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -144,35 +140,13 @@ def parse_args(argv: List[str]) -> object:
     merged_secret_paths = []  # TODO
 
     if True:
-        print_config_list(config, merged_secret_paths)
+        ConfigOutput.print_config_tree(config, show=True, secret_paths=merged_secret_paths)
+        ConfigOutput.print_config_list(config, show=True, secret_paths=merged_secret_paths)
 
     # import pdb ; pdb.set_trace()  # noqa
     # xxx = config.lookup('identity/xyzzy')
     # print(xxx)
     pass
-
-
-def print_config_tree(config: Config, secret_paths: Optional[List[str]]) -> None:
-
-    def tree_arrow_indicator(path: str) -> Optional[str]:
-        nonlocal secret_paths
-        if path in secret_paths:
-            return chars.rarrow
-        return chars.rarrow_hollow
-
-    print_dictionary_tree(config.json, arrow_indicator=tree_arrow_indicator)
-
-
-def print_config_list(config: Config, secret_paths: Optional[List[str]]) -> None:
-
-    def value_modifier(path: str, value: Any) -> Optional[str]:
-        return value
-        nonlocal secret_paths
-        if path in secret_paths:
-            return OBFUSCATED_VALUE
-        return value
-
-    print_dictionary_list(config.json, value_modifier=value_modifier)
 
 
 def _warning(message: str) -> None:
