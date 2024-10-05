@@ -35,6 +35,19 @@ def parse_args(argv: List[str]) -> object:
     class Args:
         config_file = DEFAULT_CONFIG_FILE_NAME
         secrets_file = DEFAULT_SECRETS_FILE_NAME
+        config = None
+        configs_for_merge = None
+        configs_for_import = None
+        lookup_paths = []
+        list = False
+        dump = False
+        show = False
+        noaws = False
+        identity = None
+        verbose = False
+        debug = False
+
+    args = Args()
 
     def get_default_config_dir() -> Optional[str]:
         return os.path.expanduser(DEFAULT_CONFIG_DIR)
@@ -68,7 +81,7 @@ def parse_args(argv: List[str]) -> object:
         # the --secrets option, then it is assumed to contain secrets, which is really just ensures
         # that the values therein won't displayed by default when listing the contents of the file.
         # Multiple --config or --secrets options can be used; so you have lots of options option-wise.
-        nonlocal argv
+        nonlocal argv, args
         def verify_config(config_file: str, config_dir: str, secrets: bool = False) -> Config:  # noqa
             if not secrets:
                 if config_file.startswith("secret:"):
@@ -124,9 +137,54 @@ def parse_args(argv: List[str]) -> object:
             configs.append(verify_config(DEFAULT_SECRETS_FILE_NAME, config_dir, secrets=True))
         return configs
 
+    def get_lookup_paths() -> List[str]:
+        nonlocal argv, args
+        lookup_paths = []
+        argi_lookup_paths = None
+        argi_end_lookup_paths = len(argv)
+        argi = 0
+        while argi < len(argv):
+            arg = argv[argi] ; argi += 1  # noqa
+            if arg in ["--lookup", "-lookup"]:
+                argi_lookup_paths = argi - 1
+                continue
+            elif arg.startswith("-") and argi_lookup_paths is not None:
+                argi_end_lookup_paths = argi - 1
+                break
+            elif argi_lookup_paths is not None:
+                lookup_paths.append(arg)
+        if argi_lookup_paths is not None:
+            del argv[argi_lookup_paths:argi_end_lookup_paths]
+        args.lookup_paths = lookup_paths
+
+    def get_other_args():
+        nonlocal argv, args
+        argi = 0
+        while argi < len(argv):
+            arg = argv[argi] ; argi += 1  # noqa
+            if arg in ["--show", "-show"]:
+                args.show = True
+            elif arg in ["--noaws", "-noaws"]:
+                args.noaws = True
+            elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
+                if not ((argi < len(argv)) and (identity := argv[argi].strip())):
+                    _usage()
+                args.identity = identity
+            elif arg in ["--list", "-list"]:
+                args.list = True
+            elif arg in ["--dump", "-dump"]:
+                args.dump = True
+            elif arg in ["--verbose", "-verbose"]:
+                args.verbose = True
+            elif arg in ["--debug", "-debug"]:
+                args.debug = True
+
     config_dir = get_config_dir()
     configs = get_configs(config_dir)
     imports = get_configs(config_dir, imports=True)
+
+    get_lookup_paths()
+    get_other_args()
 
 #   print(f"config_dir: [{config_dir}]")
 #   print(f"configs: {configs}")
@@ -135,13 +193,27 @@ def parse_args(argv: List[str]) -> object:
 #       print(f"configs.secrets: {config.secrets}")
 #   print(argv)
 
-    merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
+    config = configs[0]
+    configs_for_merge = configs[1:]
+    merged_paths, unmerged_paths = config.merge(configs_for_merge)
+    # merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
     config.imports(imports)
+
+    if args.identity:
+        config.aws_secrets_name = args.identity
 
     if True:
         ConfigOutput.print_tree(config, show=False)
         ConfigOutput.print_list(config, show=False)
         config._dump_for_testing()
+
+    if args.lookup_paths:
+        for lookup_path in args.lookup_paths:
+            value = config.lookup(lookup_path)
+            if args.verbose:
+                print(f"{lookup_path}: {value}")
+            else:
+                print(f"{value}")
 
     # import pdb ; pdb.set_trace()  # noqa
     # xxx = config.lookup('identity/xyzzy')
@@ -174,5 +246,19 @@ def _usage():
 
 
 if __name__ == "__main__":
-    testargv = ["--config", "~/.config/hms/secrets.json", "~/.config/hms/config.json"]
+    testargv = [
+        "--config",
+        "~/.config/hms/secrets.json",
+        "~/.config/hms/config.json",
+        "--show",
+        "--verbose",
+        "--lookup",
+        "/auth0/client",
+        "/identity/smaht/foursight/wolf",
+        "--debug",
+        "--dump",
+        "asdfa",
+        "--identity",
+        "C4AppConfigFoursightSmahtDevelopment"
+    ]
     main(testargv)

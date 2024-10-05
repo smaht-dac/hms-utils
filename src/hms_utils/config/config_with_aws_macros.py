@@ -21,7 +21,9 @@ class ConfigWithAwsMacros(ConfigBasic):
                  custom_macro_lookup: Optional[Callable] = None,
                  warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
+                 aws_secrets_name: Optional[str] = None,
                  noaws: bool = False, **kwargs) -> None:
+        self._aws_secrets_name = aws_secrets_name.strip() if isinstance(aws_secrets_name, str) else None
         self._noaws = noaws is True
         self._raise_exception = raise_exception is True
         super().__init__(config,
@@ -30,6 +32,14 @@ class ConfigWithAwsMacros(ConfigBasic):
                          custom_macro_lookup=self._lookup_macro_custom,
                          warning=warning,
                          raise_exception=raise_exception, **kwargs)
+
+    @property
+    def aws_secrets_name(self) -> Optional[str]:
+        return self._aws_secrets_name
+
+    @aws_secrets_name.setter
+    def aws_secrets_name(self, value: str) -> Optional[str]:
+        self._aws_secrets_name = value.strip() if isinstance(value, str) else None
 
     def _lookup_macro_custom(self, macro_value: str, context: Optional[JSON] = None) -> Any:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
@@ -43,7 +53,10 @@ class ConfigWithAwsMacros(ConfigBasic):
             secrets_name = secret_specifier[0:index]
         else:
             secret_name = secret_specifier
-            secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
+            if self._aws_secrets_name:
+                secrets_name = self._aws_secrets_name
+            else:
+                secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
         return self._aws_get_secret(secrets_name, secret_name) if secret_name and secrets_name else None
 
     def _aws_get_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:

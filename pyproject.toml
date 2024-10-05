@@ -38,6 +38,11 @@ hms-config-script = "hms_utils.hms_config:main_show_script_path"
 hms-config-export = "hms_utils.hms_config:main_show_script_path"
 hms-config-exports = "hms_utils.hms_config:main_show_script_path"
 hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
+
+hmsawsenv = "hms_utils.aws_env:main"
+hmsawsecs = "hms_utils.aws_ecs:main"
+hmsconfig = "hms_utils.config.config:main"
+
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
 update-portal-object = "hms_utils.portal.update_portal_object:main"
 view-portal-object = "hms_utils.portal.view_portal_object:main"
