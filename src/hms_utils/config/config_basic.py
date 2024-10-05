@@ -133,7 +133,7 @@ class ConfigBasic:
 
         if not (path_components := self.unpack_path(path)):
             return value, context
-        if path_root := (path_components[0] == ConfigBasic._PATH_COMPONENT_ROOT):
+        if path_rooted := (path_components[0] == ConfigBasic._PATH_COMPONENT_ROOT):
             if not (path_components := path_components[1:]):
                 return value, context
             context = context.root
@@ -172,7 +172,7 @@ class ConfigBasic:
             if (inherit_simple is not True) or len(path_components_right) == 1:
                 # This is a bit tricky; and note we lookup in parent but return current context.
                 path_components = path_components_left + path_components_right
-                path = self.repack_path(path_components, root=path_root)
+                path = self.repack_path(path_components, path_rooted=path_rooted)
                 lookup_value, lookup_context = self._lookup(path, context=context.parent)
                 if ConfigBasic._TRICKY_FIX and (lookup_value is not None):
                     context = ([context, *lookup_context]
@@ -255,8 +255,8 @@ class ConfigBasic:
                            path_current=ConfigBasic._PATH_COMPONENT_CURRENT,
                            path_parent=ConfigBasic._PATH_COMPONENT_PARENT)
 
-    def repack_path(self, path_components: List[str], root: bool = False) -> str:
-        return repack_path(path_components, root=root, path_separator=self._path_separator)
+    def repack_path(self, path_components: List[str], path_rooted: bool = False) -> str:
+        return repack_path(path_components, path_rooted=path_rooted, path_separator=self._path_separator)
 
     def normalize_path(self, path: str) -> str:
         return self.repack_path(self.unpack_path(path))

@@ -29,12 +29,12 @@ def unpack_path(path: str,
     return path_components
 
 
-def repack_path(path_components: List[str], path_separator: Optional[str] = None, root: bool = False) -> str:
+def repack_path(path_components: List[str], path_separator: Optional[str] = None, path_rooted: bool = False) -> str:
     if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
         path_separator = path_separator
     if not (isinstance(path_components, list) and path_components):
         path_components = []
     if path_components[0] == path_separator:
-        root = True
+        path_rooted = True
         path_components = path_components[1:]
-    return (path_separator if root else "") + path_separator.join(path_components)
+    return (path_separator if path_rooted else "") + path_separator.join(path_components)
