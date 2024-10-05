@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
-from hms_utils.config.utils import repack_path, unpack_path
+from hms_utils.path_utils import repack_path, unpack_path
 from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.type_utils import is_primitive_type
@@ -264,6 +264,8 @@ class ConfigBasic:
         return isinstance(path, str) and path.startswith(self._path_separator)
 
     def context_path(self, context: JSON, path: Optional[str] = None) -> str:
+        if not isinstance(context, JSON):
+            return ""
         return context.path(path_separator=self._path_separator, path_rooted=True, path=path)
 
     def _warn(self, message: str, raise_exception: bool = False) -> None:

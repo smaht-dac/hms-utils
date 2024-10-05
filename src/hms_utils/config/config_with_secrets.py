@@ -35,13 +35,16 @@ class ConfigWithSecrets(ConfigBasic):
                          raise_exception=raise_exception, **kwargs)
 
     def _create_json(self, data: dict) -> JSON:
+        if not self._secrets:
+            return super()._create_json(data)
         return JSON(data, rvalue=ConfigWithSecrets._secrets_encoded if self._secrets else None)
 
     def data(self, show: Optional[bool] = False) -> JSON:
-        if show is True:
-            return JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
-        elif show is False:
-            return JSON(self._json, rvalue=ConfigWithSecrets._secrets_obfuscated)
+        if self._secrets:
+            if show is True:
+                return JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
+            elif show is False:
+                return JSON(self._json, rvalue=ConfigWithSecrets._secrets_obfuscated)
         return super().data()
 
     @property
@@ -54,20 +57,20 @@ class ConfigWithSecrets(ConfigBasic):
                inherit_none: bool = False,
                show: Optional[bool] = False) -> Optional[Union[Any, JSON]]:
         value = super().lookup(path=path, noexpand=noexpand, inherit_simple=inherit_simple, inherit_none=inherit_none)
-        if value is None:
-            return value
-        elif show is True:
-            if isinstance(value, JSON):
-                return value.asdict(rvalue=ConfigWithSecrets._secrets_plaintext)
-            else:
-                return ConfigWithSecrets._secrets_plaintext(value)
-        elif show is False:
-            if isinstance(value, JSON):
-                return value.asdict(rvalue=ConfigWithSecrets._secrets_obfuscated)
-            else:
-                return ConfigWithSecrets._secrets_obfuscated(value)
-        else:
-            return value
+        if self._secrets:
+            if value is None:
+                return value
+            elif show is True:
+                if isinstance(value, JSON):
+                    return value.asdict(rvalue=ConfigWithSecrets._secrets_plaintext)
+                else:
+                    return ConfigWithSecrets._secrets_plaintext(value)
+            elif show is False:
+                if isinstance(value, JSON):
+                    return value.asdict(rvalue=ConfigWithSecrets._secrets_obfuscated)
+                else:
+                    return ConfigWithSecrets._secrets_obfuscated(value)
+        return value
 
     # All of this secrets stuff is just so that when obtaining values (print/dump or lookup), any
     # strings which came from a "secret" configuration can be obfuscated by default, or shown if desired.

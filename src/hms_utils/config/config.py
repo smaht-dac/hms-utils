@@ -23,12 +23,3 @@ class Config(ConfigWithSecrets, ConfigWithAwsMacros):
                          raise_exception=raise_exception,
                          secrets=secrets,
                          noaws=noaws, **kwargs)
-
-
-x = Config({
-    "abc": "def"
-}, secrets=True)
-print(x.json)
-print(x.data(show=True))
-print(x.data(show=False))
-print(x.secrets)

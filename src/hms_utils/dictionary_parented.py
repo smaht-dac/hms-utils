@@ -4,8 +4,8 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
 from hms_utils.chars import chars
 from hms_utils.dictionary_print_utils import print_dictionary_tree
 from hms_utils.dictionary_utils import sort_dictionary
+from hms_utils.path_utils import unpack_path
 from hms_utils.type_utils import is_primitive_type
-from hms_utils.config.utils import unpack_path
 
 
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
@@ -15,6 +15,8 @@ from hms_utils.config.utils import unpack_path
 # this just walks up the parent properties to the top (where parent is of course None).
 #
 class JSON(dict):
+
+    _PATH_SEPARATOR = "/"
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
@@ -82,7 +84,7 @@ class JSON(dict):
         if isinstance(path, str) and path:
             context_path.append(path)
         if path_separator is True:
-            path_separator = "/"
+            path_separator = JSON._PATH_SEPARATOR
         elif (path_separator is False) or (not isinstance(path_separator, str)):
             path_separator = None
         if path_separator:
@@ -92,7 +94,7 @@ class JSON(dict):
         return context_path
 
     @property
-    def context_path(self) -> str:
+    def context_path(self) -> List[str]:
         return self.path(path_separator=False, path_rooted=False)
 
     def get(self, key: Any, default: Any = None) -> Any:
@@ -144,16 +146,19 @@ class JSON(dict):
     def sorted(self, reverse: bool = False, leafs_first: bool = False) -> JSON:
         return JSON(sort_dictionary(self, reverse=reverse, leafs_first=leafs_first))
 
-    def merge(self, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
+    def merge(self, secondary: JSON, path_separator: Optional[str] = None) -> Tuple[dict, List[str], List[str]]:
         # Merges the given secondary JSON object into a COPY of this JSON object; but does not overwrite
         # anything in this JSON object; anything that would otherwise overwrite is ignored. Returns a tuple
         # with (left-to-right) the (new) merged dictionary, a list of paths which were actually merged from the
         # secondary, and a list of paths which were not merged from the secondary, i.e. because they would have
         # overwritten that item in the copy of this JSON object; path delimiter is the given path_separator.
+        if (not isinstance(path_separator, str)) or (not path_separator):
+            path_separator = JSON._PATH_SEPARATOR
         return JSON._merge(self, secondary, path_separator=path_separator)
 
     @staticmethod
-    def _merge(primary: JSON, secondary: JSON, path_separator: str = "/") -> Tuple[dict, List[str], List[str]]:
+    def _merge(primary: JSON, secondary: JSON,
+               path_separator: Optional[str] = None) -> Tuple[dict, List[str], List[str]]:
         # Merges the given secondary JSON object into a COPY of the given primary JSON object; but does not
         # overwrite anything in the primary JSON object; anything that would otherwise overwrite is ignored.
         # Returns a tuple with (in left-right order) the (new) merged dictionary, list of paths which were
@@ -161,6 +166,8 @@ class JSON(dict):
         # i.e. because they would have overwritten in the primary; path delimiter is the given path_separator.
         if not (isinstance(primary, dict) or isinstance(secondary, dict)):
             return None, None, None
+        if (not isinstance(path_separator, str)) or (not path_separator):
+            path_separator = JSON._PATH_SEPARATOR
         merged = deepcopy(primary) ; merged_paths = [] ; unmerged_paths = []  # noqa
         def merge(primary: dict, secondary: dict, path: str = "") -> None:  # noqa
             nonlocal unmerged_paths, path_separator
@@ -204,11 +211,6 @@ class JSON(dict):
             return super().__str__()
         return str(self.asdict())
 
-    # def __repr__(self) -> str:
-    #     if not self._rvalue:
-    #         return super().__repr__()
-    #     return str(self.asdict())
-
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         def root_indicator() -> str:
             return f"\b\b{chars.rarrow} root {chars.dot} id: {id(self)}"
@@ -229,7 +231,6 @@ class JSON(dict):
             if verbose is True:
                 annotation += f" {chars.dot_hollow} path: {path}"
             if check is True:
-                # checked_value, _ = self._lookup(path)
                 checked_value, _ = parent._lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
@@ -242,7 +243,7 @@ class JSON(dict):
         if (not isinstance(path, str)) or (not path):
             return None, self
         if (not isinstance(path_separator, str)) or (not path_separator):
-            path_separator = "/"
+            path_separator = JSON._PATH_SEPARATOR
         if not (path_components := unpack_path(path, path_separator=path_separator)):
             return None, self
         if path_components[0] == path_separator:

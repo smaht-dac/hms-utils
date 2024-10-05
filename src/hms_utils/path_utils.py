@@ -29,7 +29,7 @@ def unpack_path(path: str,
     return path_components
 
 
-def repack_path(path_components: List[str], root: bool = False, path_separator: Optional[str] = None) -> str:
+def repack_path(path_components: List[str], path_separator: Optional[str] = None, root: bool = False) -> str:
     if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
         path_separator = path_separator
     if not (isinstance(path_components, list) and path_components):
