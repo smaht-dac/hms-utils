@@ -307,9 +307,9 @@ class Config:
         start = 0
         while True:
             if not (match := Config._MACRO_PATTERN.search(value[start:])):
-                # secrets_encoded += value[start:]
                 if secret_part := value[start:]:
                     secrets_encoded += f"{Config._SECRET_VALUE_START}str:{secret_part}{Config._SECRET_VALUE_END}"
+                    # return f"{Config._SECRET_VALUE_START}str:{secret_part}{Config._SECRET_VALUE_END}"
                 break
             match_start = match.start()
             match_end = match.end()
@@ -374,12 +374,3 @@ class Config:
         else:
             json = self._json
         json._dump_for_testing(verbose=verbose, check=check)
-
-
-x = Config({
-    "abc": "def"
-}, secrets=True)
-print(x.json)
-print(x.data(show=True))
-print(x.data(show=False))
-print(x.secrets)

@@ -144,12 +144,3 @@ class ConfigWithSecrets(ConfigBasic):
                 secrets_encoded[0:start] + obfuscated +
                 secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
         return secrets_encoded
-
-
-x = ConfigWithSecrets({
-    "abc": "def"
-}, secrets=True)
-print(x.json)
-print(x.data(show=True))
-print(x.data(show=False))
-print(x.secrets)

@@ -23,7 +23,7 @@ class JSON(dict):
                     rvalue = lambda value: rvalue_from_arg(rvalue_from_data(value))  # noqa
                 else:
                     rvalue = rvalue_from_data
-            data = data.asdict()
+            data = data.asdict(rvalue=False)
         elif not isinstance(data, dict):
             data = {}
         super().__init__(data)
@@ -112,8 +112,8 @@ class JSON(dict):
         for key, value in super().items():
             if isinstance(value, dict) and (not isinstance(value, JSON)):
                 value = JSON(value)
-            if self._rvalue and is_primitive_type(value):
-                value = self._rvalue(value)
+            # if self._rvalue and is_primitive_type(value):
+            #     value = self._rvalue(value)
             yield key, value
 
     def values(self) -> Iterator[Any]:
