@@ -11,6 +11,7 @@ class ConfigOutput:
     @staticmethod
     def print_tree(config: Config, show: bool = False, secret_paths: Optional[List[str]] = None) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
+            nonlocal config
             return ConfigOutput._display_value(config, value=value, show=show)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
@@ -23,6 +24,7 @@ class ConfigOutput:
     @staticmethod
     def print_list(config: Config, show: bool = False, secret_paths: Optional[List[str]] = None) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
+            nonlocal config
             return ConfigOutput._display_value(config, value=value, show=show)
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)
 

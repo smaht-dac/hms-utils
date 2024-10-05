@@ -47,13 +47,16 @@ class ConfigWithSecrets(ConfigBasic):
             return super()._create_json(data)
         return JSON(data, rvalue=ConfigWithSecrets._secrets_encoded if self._secrets else None)
 
-    def data(self, show: Optional[bool] = False) -> JSON:
+    def data(self, sorted: bool = True, show: Optional[bool] = False) -> JSON:
         if self._secrets:
             if show is True:
-                return JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
+                data = JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
             elif show is False:
-                return JSON(self._json, rvalue=self._secrets_obfuscated)
-        return super().data()
+                data = JSON(self._json, rvalue=self._secrets_obfuscated)
+            else:
+                data = self._json
+            return data.sorted() if sorted is True else data
+        return super().data(sorted=sorted)
 
     @property
     def secrets(self) -> bool:

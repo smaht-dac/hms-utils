@@ -20,9 +20,8 @@ OBFUSCATED_VALUE = "********"
 SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
 
 
-def main():
-
-    parse_args(sys.argv)
+def main(argv: Optional[List] = None):
+    parse_args(argv if isinstance(argv, list) else sys.argv[1:])
     sys.exit(0)
 
 
@@ -80,6 +79,7 @@ def parse_args(argv: List[str]) -> object:
                     config_file = config_file[len("secrets:"):]
                 elif "secret" in config_file.lower():
                     secrets = True
+            config_file = os.path.expanduser(config_file)
             config_file = os.path.normpath(os.path.join(config_dir, config_file)
                                            if not os.path.isabs(config_file) else config_file)
             if not os.path.isfile(config_file):
@@ -126,7 +126,7 @@ def parse_args(argv: List[str]) -> object:
 
     config_dir = get_config_dir()
     configs = get_configs(config_dir)
-    # imports = get_configs(config_dir, imports=True)
+    imports = get_configs(config_dir, imports=True)
 
 #   print(f"config_dir: [{config_dir}]")
 #   print(f"configs: {configs}")
@@ -135,13 +135,13 @@ def parse_args(argv: List[str]) -> object:
 #       print(f"configs.secrets: {config.secrets}")
 #   print(argv)
 
-    # merged_secret_paths, merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
     merged_paths, unmerged_paths = (config := configs[0]).merge(configs[1:])
-    merged_secret_paths = []  # TODO
+    config.imports(imports)
 
     if True:
-        ConfigOutput.print_tree(config, show=True, secret_paths=merged_secret_paths)
-        ConfigOutput.print_list(config, show=True, secret_paths=merged_secret_paths)
+        ConfigOutput.print_tree(config, show=False)
+        ConfigOutput.print_list(config, show=False)
+        config._dump_for_testing()
 
     # import pdb ; pdb.set_trace()  # noqa
     # xxx = config.lookup('identity/xyzzy')
@@ -174,4 +174,5 @@ def _usage():
 
 
 if __name__ == "__main__":
-    main()
+    testargv = ["--config", "~/.config/hms/secrets.json", "~/.config/hms/config.json"]
+    main(testargv)

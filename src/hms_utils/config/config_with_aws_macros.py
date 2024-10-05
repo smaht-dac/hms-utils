@@ -44,7 +44,7 @@ class ConfigWithAwsMacros(ConfigBasic):
         else:
             secret_name = secret_specifier
             secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
-        return self._aws_get_secret(secrets_name, secret_name)
+        return self._aws_get_secret(secrets_name, secret_name) if secret_name and secrets_name else None
 
     def _aws_get_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
         if self._noaws:

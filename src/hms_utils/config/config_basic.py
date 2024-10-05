@@ -51,8 +51,8 @@ class ConfigBasic:
     def _create_json(self, data: dict) -> JSON:
         return JSON(data)
 
-    def data(self) -> JSON:
-        return self._json
+    def data(self, sorted: bool = True) -> JSON:
+        return self._json.sorted() if sorted is True else self._json
 
     @property
     def json(self) -> JSON:
