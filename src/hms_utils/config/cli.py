@@ -117,7 +117,8 @@ def parse_args(argv: List[str]) -> object:
             arg_merge_config = arg in ["--config", "-config", "--conf", "-conf"]
             arg_merge_secrets = arg in ["--secrets", "-secrets", "--secret", "-secret"]
             arg_import_config = imports and arg in ["--imports", "-imports", "--import", "-import"]
-            arg_import_secrets = imports and arg in ["--import-secrets", "-import-secrets", "--import-secret", "-import-secret"]
+            arg_import_secrets = imports and arg in ["--import-secrets", "-import-secrets",
+                                                     "--import-secret", "-import-secret"]
             if arg_merge_config or arg_merge_secrets or arg_import_config or arg_import_secrets:
                 if not config_dir_option_specified:
                     config_dir = os.getcwd()
