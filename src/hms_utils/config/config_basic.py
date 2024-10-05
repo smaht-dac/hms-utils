@@ -19,8 +19,8 @@ class ConfigBasic:
     _MACRO_START = "${"
     _MACRO_END = "}"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
-    _MACRO_HIDE_START = "@@@__["
-    _MACRO_HIDE_END = "]__@@@"
+    _MACRO_HIDE_START = "@@@@@@@__macro_hide_start_["
+    _MACRO_HIDE_END = "]__macro_hide_end_@@@@@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
     _TRICKY_FIX = True
 

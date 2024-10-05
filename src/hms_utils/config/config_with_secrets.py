@@ -9,8 +9,8 @@ from hms_utils.config.config_basic import ConfigBasic
 class ConfigWithSecrets(ConfigBasic):
 
     _SECRET_VALUE = "********"
-    _SECRET_VALUE_START = "@@@__secret_start__@@@["
-    _SECRET_VALUE_END = "]@@@__secret_end__@@@"
+    _SECRET_VALUE_START = "@@@@@@@__mark_secret_start__["
+    _SECRET_VALUE_END = "]__mark_secret_end__@@@@@@@"
     _SECRET_VALUE_START_LENGTH = len(_SECRET_VALUE_START)
     _SECRET_VALUE_END_LENGTH = len(_SECRET_VALUE_END)
 
