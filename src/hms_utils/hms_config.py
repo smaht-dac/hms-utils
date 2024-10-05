@@ -429,7 +429,7 @@ def print_config_and_secrets_merged(merged_config: Config, args: object) -> None
             return f"{chars.rarrow_hollow} merged {chars.check}"
         return None
 
-    def tree_arrow_indicator(key_path: str) -> str:
+    def tree_arrow_indicator(key_path: str, value: Any) -> str:
         nonlocal secrets
         return chars.rarrow_hollow if (secrets and secrets.contains(key_path)) else ""
 

@@ -205,7 +205,7 @@ def parse_args(argv: List[str]) -> object:
     if True:
         ConfigOutput.print_tree(config, show=False)
         ConfigOutput.print_list(config, show=False)
-        config._dump_for_testing()
+        # config._dump_for_testing()
 
     if args.lookup_paths:
         for lookup_path in args.lookup_paths:
