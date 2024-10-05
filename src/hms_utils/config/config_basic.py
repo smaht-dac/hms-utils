@@ -182,6 +182,7 @@ class ConfigBasic:
         return value, context
 
     def expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
+        # Note FYI that we do not macros the nested of macros.
         if isinstance(value, str):
             value = self._expand_macros_within_string(value, context)
         elif isinstance(value, JSON):

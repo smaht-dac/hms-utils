@@ -78,8 +78,9 @@ class ConfigWithSecrets(ConfigBasic):
         self._secrets = data._secrets
         return result
 
-    # All of this secrets stuff is just so that when obtaining values (print/dump or lookup), any
-    # strings which came from a "secret" configuration can be obfuscated by default, or shown if desired.
+    # All of this marking of secrets stuff is just so that when obtaining values (for lookup/print/dump/display),
+    # any strings which came from a "secret" configuration can be obfuscated by default, or shown if desired;
+    # we do go to the trouble of not marking macros within secret config values as secret.
 
     @staticmethod
     def _secrets_encoded(value: primitive_type) -> str:
