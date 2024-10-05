@@ -8,7 +8,7 @@ from hms_utils.config.config_basic import ConfigBasic
 
 class ConfigWithSecrets(ConfigBasic):
 
-    _SECRET_VALUE = "********"
+    _SECRET_OBFUSCATED_VALUE = "********"
     _SECRET_VALUE_START = "@@@@@@@__mark_secret_start__["
     _SECRET_VALUE_END = "]__mark_secret_end__@@@@@@@"
     _SECRET_VALUE_START_LENGTH = len(_SECRET_VALUE_START)
@@ -142,7 +142,7 @@ class ConfigWithSecrets(ConfigBasic):
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return ""
         if (not isinstance(obfuscated_value, str)) or (not obfuscated_value):
-            obfuscated_value = ConfigWithSecrets._SECRET_VALUE
+            obfuscated_value = ConfigWithSecrets._SECRET_OBFUSCATED_VALUE
         while True:
             if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
                 break

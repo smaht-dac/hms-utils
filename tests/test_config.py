@@ -561,10 +561,10 @@ def test_hms_config_g():
     assert value == "REDACTED_auth0_local_secret_value"
 
     value = config.lookup("foursight/smaht/Auth0Secret")
-    assert value == Config._SECRET_VALUE
+    assert value == Config._SECRET_OBFUSCATED_VALUE
 
     value = config.lookup("foursight/smaht/Auth0Secret", show=False)
-    assert value == Config._SECRET_VALUE
+    assert value == Config._SECRET_OBFUSCATED_VALUE
 
     value = config.lookup("foursight/smaht/Auth0Secret", show=None)
     assert value == f"{Config._SECRET_VALUE_START}str:REDACTED_auth0_local_secret_value{Config._SECRET_VALUE_END}"
