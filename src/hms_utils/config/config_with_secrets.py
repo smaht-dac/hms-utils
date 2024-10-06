@@ -185,3 +185,7 @@ class ConfigWithSecrets(ConfigBasic):
         if secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END) < start:
             return False
         return True
+
+    def _dump_for_testing(self, sorted: bool = False,
+                          verbose: bool = False, check: bool = False, show: bool = False) -> None:
+        self.data(show=show, sorted=sorted)._dump_for_testing(verbose=verbose, check=check)

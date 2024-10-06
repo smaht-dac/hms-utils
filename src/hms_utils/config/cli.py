@@ -56,7 +56,7 @@ def main(argv: Optional[List] = None):
         ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
 
     if args.debug:
-        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
+        config._dump_for_testing(show=args.show, sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     if args.lookup_paths:
         exports = {}

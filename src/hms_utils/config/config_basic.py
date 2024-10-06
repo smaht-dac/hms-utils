@@ -281,4 +281,6 @@ class ConfigBasic:
             raise Exception(message)
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
+        import pdb ; pdb.set_trace()  # noqa
+        pass
         self.data(sorted=sorted)._dump_for_testing(verbose=verbose, check=check)

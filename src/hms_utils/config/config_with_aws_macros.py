@@ -5,6 +5,7 @@ import re
 from typing import Any, Callable, Optional, Union
 from hms_utils.config.config_basic import ConfigBasic
 from hms_utils.dictionary_utils import JSON
+from hms_utils.config.config_with_secrets import ConfigWithSecrets
 
 
 class ConfigWithAwsMacros(ConfigBasic):
@@ -66,7 +67,9 @@ class ConfigWithAwsMacros(ConfigBasic):
             boto_secrets = BotoClient("secretsmanager")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
-            return secrets[secret_name]
+            if ((value := secrets[secret_name]) is not None) and isinstance(self, ConfigWithSecrets):
+                value = ConfigWithSecrets._secrets_encoded(value)
+            return value
         except Exception as e:
             if self._raise_exception is True:
                 raise e
