@@ -83,6 +83,8 @@ def parse_args(argv: List[str]) -> object:
         configs_for_merge = []
         configs_for_import = []
         lookup_paths = []
+        exports = False
+        exports_file = None
         list = False
         files = False
         dump = False
@@ -117,11 +119,11 @@ def parse_args(argv: List[str]) -> object:
             config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
             if value := os.environ.get("HMS_CONFIG_DIR"):
                 config_dir = value
-            argi = 0
-            while argi < len(argv):
+            argi = 0 ; argn = len(argv)  # noqa
+            while argi < argn:
                 arg = argv[argi] ; argi += 1  # noqa
                 if arg in ["--dir", "-dir", "--directory", "-directory"]:
-                    if not ((argi < len(argv)) and (config_dir := argv[argi])):
+                    if not ((argi < argn) and (config_dir := argv[argi])):
                         _usage()
                     del argv[argi - 1:argi + 1]
                     break
@@ -169,8 +171,8 @@ def parse_args(argv: List[str]) -> object:
         configs = []
         if not (config_dir_option_specified := isinstance(config_dir, str) and config_dir):
             config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
-        argi = 0
-        while argi < len(argv):
+        argi = 0 ; argn = len(argv)  # noqa
+        while argi < argn:
             arg = argv[argi] ; argi += 1  # noqa
             arg_config = arg in ["--config", "-config", "--conf", "-conf"]
             arg_secrets = arg in ["--secrets", "-secrets", "--secret", "-secret"]
@@ -186,14 +188,14 @@ def parse_args(argv: List[str]) -> object:
                     config_dir = os.getcwd()
                 secrets = arg_secrets or arg_import_secrets
                 argi_config = argi - 1
-                if not ((argi < len(argv)) and (config_file := argv[argi])):
+                if not ((argi < argn) and (config_file := argv[argi])):
                     _usage()
                 configs.append(verify_config(config_file, config_dir, secrets=secrets))
                 argi += 1
-                while argi < len(argv):
+                while argi < argn:
                     arg = argv[argi]
                     if arg.startswith("-") or not (config_file := arg).endswith(".json"):
-                        del argv[argi_config:argi] ; argi = 0  # noqa
+                        del argv[argi_config:argi] ; argi = 0 ; argn = len(argv)  # noqa
                         break
                     configs.append(verify_config(config_file, config_dir, secrets=secrets))
                     argi += 1
@@ -217,8 +219,8 @@ def parse_args(argv: List[str]) -> object:
         lookup_paths = []
         argi_lookup_paths = None
         argi_end_lookup_paths = len(argv)
-        argi = 0
-        while argi < len(argv):
+        argi = 0 ; argn = len(argv)  # noqa
+        while argi < argn:
             arg = argv[argi] ; argi += 1  # noqa
             if arg in ["--lookup", "-lookup"]:
                 argi_lookup_paths = argi - 1
@@ -234,15 +236,13 @@ def parse_args(argv: List[str]) -> object:
 
     def get_other_args():
         nonlocal argv, args
-        argi = 0
-        while argi < len(argv):
+        argi = 0 ; argn = len(argv)  # noqa
+        while argi < argn:
             arg = argv[argi].strip() ; argi += 1  # noqa
             if arg in ["--show", "-show"]:
                 args.show = True
-            elif arg in ["--noaws", "-noaws"]:
-                args.noaws = True
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
-                if not ((argi < len(argv)) and (identity := argv[argi].strip())):
+                if not ((argi < argn) and (identity := argv[argi].strip())):
                     _usage()
                 args.identity = identity
             elif arg in ["--list", "-list"]:
@@ -261,13 +261,26 @@ def parse_args(argv: List[str]) -> object:
                 args.debug = True
             elif arg in ["--nocolor", "-nocolor"]:
                 args.nocolor = True
+            elif arg in ["--noaws", "-noaws"]:
+                args.noaws = True
+            elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
+                if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
+                    _usage()
+                os.environ[AWS_PROFILE_ENV_NAME] = arg
+            elif arg in ["--export", "-export", "--exports", "-exports"]:
+                args.exports = True
+            elif arg in ["--export-file", "-export-file", "--exports-file", "-exports-file"]:
+                if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                    _usage()
+                args.exports = True
+                args.exports_file = argv[argi] ; argi += 1  # noqa
             elif arg.startswith("-"):
                 _usage()
             else:
                 args.lookup_paths.append(arg)
 
-    get_lookup_paths()
     get_configs()
+    get_lookup_paths()
     get_other_args()
     return args
 
