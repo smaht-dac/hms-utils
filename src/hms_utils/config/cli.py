@@ -42,6 +42,7 @@ def parse_args(argv: List[str]) -> object:
         list = False
         files = False
         dump = False
+        raw = False
         show = False
         noaws = False
         identity = None
@@ -202,8 +203,10 @@ def parse_args(argv: List[str]) -> object:
                 args.list = True
             elif arg in ["--files", "-files"]:
                 args.files = True
-            elif arg in ["--dump", "-dump"]:
+            elif arg in ["--dump", "-dump", "--tree", "-tree"]:
                 args.dump = True
+            elif arg in ["--raw", "-raw"]:
+                args.raw = True
             elif arg in ["--verbose", "-verbose"]:
                 args.verbose = True
             elif arg in ["--debug", "-debug"]:
@@ -250,7 +253,7 @@ def parse_args(argv: List[str]) -> object:
                     print(f"Imported config file: {config_for_import.name}")
 
     if args.dump:
-        ConfigOutput.print_tree(config, show=args.show)
+        ConfigOutput.print_tree(config, show=args.show, raw=args.raw)
 
     if args.list:
         ConfigOutput.print_list(config, show=args.show)

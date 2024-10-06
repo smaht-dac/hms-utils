@@ -9,9 +9,11 @@ from hms_utils.terminal_utils import terminal_color
 class ConfigOutput:
 
     @staticmethod
-    def print_tree(config: Config, show: bool = False) -> None:
+    def print_tree(config: Config, show: bool = False, raw: bool = False) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
+            if raw is not True:
+                return config.lookup(path)
             return ConfigOutput._display_value(config, value=value, show=show)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
