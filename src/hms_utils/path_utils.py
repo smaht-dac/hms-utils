@@ -41,5 +41,15 @@ def repack_path(path_components: List[str], path_separator: Optional[str] = None
     return (path_separator if path_rooted else "") + path_separator.join(path_components)
 
 
+def basename_path(path: str, path_separator: Optional[str] = None) -> str:
+    if not (isinstance(path, str) and (path := path.strip())):
+        return ""
+    if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
+        path_separator = os.sep
+    if (index := path.rfind(path_separator)) > 0:
+        return path[index + 1:]
+    return path
+
+
 def is_current_or_parent_relative_path(path: str) -> bool:
     return isinstance(path, str) and path.startswith(f".{os.sep}") or path.startswith(f"..{os.sep}")

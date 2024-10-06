@@ -8,7 +8,7 @@ from typing import List, Optional
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
-from hms_utils.path_utils import is_current_or_parent_relative_path
+from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -26,6 +26,9 @@ def main(argv: Optional[List] = None):
     config = args.config
     merged_paths, unmerged_paths = config.merge(args.configs_for_merge)
     config.imports(args.configs_for_import)
+
+    if args.noaws:
+        config._noaws = True
 
     if args.identity:
         config.aws_secrets_name = args.identity
@@ -56,15 +59,45 @@ def main(argv: Optional[List] = None):
         config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     if args.lookup_paths:
+        exports = {}
         status = 0
         for lookup_path in args.lookup_paths:
+            if args.exports:
+                if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
+                    exports_name = lookup_path[0:index]
+                    if not (lookup_path := lookup_path[index + 1:].strip()):
+                        continue
+                else:
+                    exports_name = basename_path(lookup_path)
             if (value := config.lookup(lookup_path, show=args.show)) is None:
+                if not args.verbose:
+                    continue
                 value = chars.null
                 status = 1
-            if args.verbose:
+            if args.exports:
+                if isinstance(value, dict):
+                    for key in value:
+                        exports[basename_path(key).replace("-", "_")] = value[key]
+                else:
+                    exports[exports_name.replace("-", "_")] = value
+            elif args.verbose:
                 print(f"{lookup_path}: {value}")
             else:
                 print(f"{value}")
+        if exports:
+            if args.exports_file:
+                if os.path.exists(args.exports_file):
+                    _error(f"Export file must not already exist: {args.exports_file}")
+                with io.open(args.exports_file, "w") as f:
+                    for export in exports:
+                        export = f"export {export}={exports[export]}"
+                        f.write(f"{export}\n")
+                        if args.verbose:
+                            print(f"{chars.rarrow_hollow} {export}")
+            else:
+                for export in sorted(exports):
+                    export = f"export {export}={exports[export]}"
+                    print(export)
         exit(status)
 
     sys.exit(0)
@@ -91,7 +124,7 @@ def parse_args(argv: List[str]) -> object:
         raw = False
         check = False
         show = False
-        noaws = False
+        noaws = True
         identity = None
         nocolor = False
         verbose = False
@@ -241,6 +274,7 @@ def parse_args(argv: List[str]) -> object:
             arg = argv[argi].strip() ; argi += 1  # noqa
             if arg in ["--show", "-show"]:
                 args.show = True
+                args.noaws = False
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
                 if not ((argi < argn) and (identity := argv[argi].strip())):
                     _usage()
