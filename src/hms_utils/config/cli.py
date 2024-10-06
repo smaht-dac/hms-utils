@@ -50,13 +50,14 @@ def main(argv: Optional[List] = None):
         args.dump = True
 
     if args.dump:
-        ConfigOutput.print_tree(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
 
     if args.list:
-        ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
 
     if args.debug:
-        config._dump_for_testing(show=args.show, sorted=not args.raw, verbose=args.verbose, check=args.check)
+        config._dump_for_testing(show=None if args.raw else args.show,
+                                 sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     if args.lookup_paths:
         exports = {}

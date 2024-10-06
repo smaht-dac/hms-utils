@@ -47,7 +47,10 @@ class ConfigOutput:
             return str(value) if nocolor is True else terminal_color(str(value), "red", bold=True)
         if show is True:
             return config._secrets_plaintext(value, plaintext_value=display_secret_value)
-        return config._secrets_obfuscated(value, obfuscated_value=display_secret_value)
+        elif show is False:
+            return config._secrets_obfuscated(value, obfuscated_value=display_secret_value)
+        else:
+            return value
 
     @lru_cache
     def _lookup_path(config: Config, path: str, show: Optional[bool]) -> Any:
