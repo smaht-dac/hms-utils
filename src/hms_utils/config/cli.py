@@ -62,6 +62,9 @@ def parse_args(argv: List[str]) -> object:
         # that the values therein won't displayed by default when listing the contents of the file.
         # Multiple --config or --secrets options can be used; so you have lots of options option-wise.
 
+        # If and only if either of the the --config or --secrets options are given then the
+        # default config/secrets file (e.g. i.e. in  the ~/.config/hms directory) will NOT be used.
+
         def get_config_dir() -> None:
             nonlocal argv, args
             config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
@@ -147,7 +150,7 @@ def parse_args(argv: List[str]) -> object:
                 if argi > 0:
                     del argv[argi_config:argi + 1]
         if _merges:
-            args.configs_for_merge = configs
+            args.configs_for_merge += configs
         elif _imports:
             args.configs_for_import = configs
         else:
@@ -212,7 +215,6 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
     merged_paths, unmerged_paths = args.config.merge(args.configs_for_merge)
     args.config.imports(args.configs_for_import)
-
     config = args.config
 
     #   print(f"config_dir: [{config_dir}]")
@@ -245,10 +247,10 @@ def parse_args(argv: List[str]) -> object:
                     print(f"Import config file: {config_for_import.name}")
 
     if args.dump:
-        ConfigOutput.print_tree(config, show=False)
+        ConfigOutput.print_tree(config, show=args.show)
 
     if args.list:
-        ConfigOutput.print_list(config, show=False)
+        ConfigOutput.print_list(config, show=args.show)
 
     if args.debug:
         config._dump_for_testing(check=args.verbose)
@@ -256,7 +258,7 @@ def parse_args(argv: List[str]) -> object:
     if args.lookup_paths:
         status = 0
         for lookup_path in args.lookup_paths:
-            if (value := config.lookup(lookup_path)) is None:
+            if (value := config.lookup(lookup_path, show=args.show)) is None:
                 value = chars.null
                 status = 1
             if args.verbose:
