@@ -281,12 +281,3 @@ class ConfigBasic:
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         self._json._dump_for_testing(verbose=verbose, check=check)
-
-
-x = ConfigBasic("~/.config/hms/config.json")
-y = x.lookup("identity/smaht")
-print(type(y))
-print(y)
-print(y.context_path)
-print(x.context_path(y))
-print(x.path(y))
