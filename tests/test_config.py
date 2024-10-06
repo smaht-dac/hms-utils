@@ -95,7 +95,7 @@ def test_hms_config_rewrite_c():
     assert config.lookup("/bravo/delta/echo", inherit_simple=inherit_simple) is None
     assert config.lookup("/delta/bravo/bravo_sub_three/bravo_sub_sub", inherit_simple=inherit_simple) is None
 
-    assert config.context_path(config.json['bravo']['bravo_sub_three']) == "/bravo/bravo_sub_three"
+    assert config.path(config.json['bravo']['bravo_sub_three']) == "/bravo/bravo_sub_three"
 
 
 def test_hms_config_rewrite_d():

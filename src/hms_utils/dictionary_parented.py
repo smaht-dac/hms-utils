@@ -69,8 +69,8 @@ class JSON(dict):
                 return node
             node = node._parent
 
-    def path(self, path_separator: Optional[Union[str, bool]] = None,
-             path_rooted: bool = False, path_suffix: Optional[str] = None) -> Union[List[str], str]:
+    def xpath(self, path_separator: Optional[Union[str, bool]] = None,
+              path_rooted: bool = False, path_suffix: Optional[str] = None) -> Union[List[str], str]:
         # FYI we only actually use this in hms_config for diagnostic messages.
         context = self
         context_path = []
@@ -94,8 +94,8 @@ class JSON(dict):
         return context_path
 
     @property
-    def context_path(self) -> List[str]:
-        return self.path(path_separator=False, path_rooted=False)
+    def path(self) -> str:
+        return self.xpath(path_separator=False, path_rooted=False)
 
     def get(self, key: Any, default: Any = None) -> Any:
         if key not in self:
@@ -219,7 +219,7 @@ class JSON(dict):
             annotation = (f" {chars.dot} id: {id(parent)} {chars.dot_hollow}"
                           f"{f' parent: {id(parent.parent)}' if parent.parent else ''}")
             if check is True:
-                path = parent.path(path_separator=True, path_rooted=True)
+                path = parent.xpath(path_separator=True, path_rooted=True)
                 checked_value, _ = self._lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(parent) else chars.xmark}"
             return annotation
@@ -227,7 +227,7 @@ class JSON(dict):
             nonlocal self, check
             annotation = f" {chars.dot} parent: {id(parent)}"
             if (verbose is True) or (check is True):
-                path = parent.path(path_separator=True, path_rooted=True, path=key)
+                path = parent.xpath(path_separator=True, path_rooted=True, path=key)
             if verbose is True:
                 annotation += f" {chars.dot_hollow} path: {path}"
             if check is True:

@@ -220,7 +220,7 @@ class ConfigBasic:
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type:"
-                                  f"{self.context_path(context, macro_value)}", not self._ignore_structured_macros)
+                                  f"{self.path(context, macro_value)}", not self._ignore_structured_macros)
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
@@ -266,13 +266,13 @@ class ConfigBasic:
     def is_absolute_path(self, path: str) -> bool:
         return isinstance(path, str) and path.startswith(self._path_separator)
 
-    def path(self, context: JSON, path_suffix: Optional[str] = None) -> str:
-        return context.path(path_rooted=True, path_suffix=path_suffix)
+    def xpath(self, context: JSON, path_suffix: Optional[str] = None) -> str:
+        return context.xpath(path_rooted=True, path_suffix=path_suffix)
 
-    def context_path(self, context: JSON, path_rooted: bool = True, path_suffix: Optional[str] = None) -> str:
+    def path(self, context: JSON, path_rooted: bool = True, path_suffix: Optional[str] = None) -> str:
         if not isinstance(context, JSON):
             return ""
-        return context.path(path_separator=self._path_separator, path_rooted=path_rooted, path_suffix=path_suffix)
+        return context.xpath(path_separator=self._path_separator, path_rooted=path_rooted, path_suffix=path_suffix)
 
     def _warn(self, message: str, raise_exception: bool = False) -> None:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
