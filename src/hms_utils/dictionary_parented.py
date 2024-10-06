@@ -227,7 +227,7 @@ class JSON(dict):
             nonlocal self, check
             annotation = f" {chars.dot} parent: {id(parent)}"
             if (verbose is True) or (check is True):
-                path = parent.context_path(path_separator=True, path_rooted=True, path=key)
+                path = parent.context_path(path_separator=True, path_rooted=True, path_suffix=key)
             if verbose is True:
                 annotation += f" {chars.dot_hollow} path: {path}"
             if check is True:

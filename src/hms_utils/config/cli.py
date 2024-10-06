@@ -256,7 +256,7 @@ def parse_args(argv: List[str]) -> object:
         ConfigOutput.print_tree(config, show=args.show, raw=args.raw)
 
     if args.list:
-        ConfigOutput.print_list(config, show=args.show)
+        ConfigOutput.print_list(config, show=args.show, raw=args.raw)
 
     if args.debug:
         config._dump_for_testing(check=args.verbose)
