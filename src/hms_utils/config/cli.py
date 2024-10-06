@@ -97,11 +97,14 @@ def parse_args(argv: List[str]) -> object:
                 elif "secret" in config_file.lower():
                     secrets = True
             config_file = os.path.expanduser(config_file)
-            if is_current_or_parent_relative_path(config_file) and os.path.isfile(config_file):
+            if os.path.isabs(config_file):
+                config_file = os.path.normpath(config_file)
+            elif is_current_or_parent_relative_path(config_file) and os.path.isfile(config_file):
                 config_file = os.path.normpath(os.path.join(os.getcwd(), config_file))
+            elif os.path.isfile(file := os.path.normpath(os.path.join(config_dir, config_file))):
+                config_file = file
             else:
-                config_file = os.path.normpath(os.path.join(config_dir, config_file)
-                                               if not os.path.isabs(config_file) else config_file)
+                config_file = os.path.normpath(os.path.join(os.getcwd(), config_file))
             if not os.path.isfile(config_file):
                 _error(f"Configuration file does not exist: {config_file}")
             try:
@@ -236,7 +239,7 @@ def parse_args(argv: List[str]) -> object:
         if args.files:
             print(f"Default config directory: {args.config_dir}")
         if config.name:
-            print(f"Config file: {config.name}")
+            print(f"Main config file: {config.name}")
         if args.configs_for_merge:
             for config_for_merge in args.configs_for_merge:
                 if config_for_merge.name:
@@ -244,7 +247,7 @@ def parse_args(argv: List[str]) -> object:
         if args.configs_for_import:
             for config_for_import in args.configs_for_import:
                 if config_for_import.name:
-                    print(f"Import config file: {config_for_import.name}")
+                    print(f"Imported config file: {config_for_import.name}")
 
     if args.dump:
         ConfigOutput.print_tree(config, show=args.show)

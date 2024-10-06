@@ -90,7 +90,7 @@ class ConfigWithSecrets(ConfigBasic):
         elif isinstance(data, list):
             for item in data:
                 if isinstance(item, ConfigWithSecrets):
-                    self._secrets = item._secrets
+                    self._secrets = self._secrets or item._secrets
         return super().merge(data)
 
     # All of this marking of secrets stuff is just so that when obtaining values (for lookup/print/dump/display),
