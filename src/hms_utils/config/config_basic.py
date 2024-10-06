@@ -33,8 +33,8 @@ class ConfigBasic:
             path_separator = ConfigBasic._PATH_SEPARATOR
         if isinstance(config, str):
             config = load_json_file(config)
-        elif not isinstance(config, dict):
-            raise Exception("Must create Config object with dictionary, JSON, or file path.")
+        elif isinstance(config, JSON) or (not isinstance(config, dict)):
+            raise Exception("Must create Config object with dictionary or file path.")
         self._json = self._create_json(config)
         self._name = name if isinstance(name, str) and name else None
         self._imports = None
@@ -69,7 +69,7 @@ class ConfigBasic:
             data = [data]
         if isinstance(data, list):
             for item in data:
-                if isinstance(item, dict):
+                if isinstance(item, dict) and (not isinstance(item, JSON)):
                     item = JSON(item)
                 elif isinstance(item, ConfigBasic):
                     item = item._json
@@ -85,21 +85,25 @@ class ConfigBasic:
             data = [data]
         if isinstance(data, list):
             for item in data:
-                if isinstance(item, dict):
-                    item = JSON(dict)
-                elif isinstance(item, ConfigBasic):
-                    item = item._json
-                if isinstance(item, JSON):
+                if isinstance(item, dict) and (not isinstance(item, JSON)):
+                    item = ConfigBasic(item)
+                if isinstance(item, ConfigBasic):
                     if self._imports is None:
                         self._imports = []
-                    self._imports.append(ConfigBasic(item))
+                    self._imports.append(item)
 
     def lookup(self, path: str,
                noexpand: bool = False,
                inherit_simple: bool = False,
                inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
         value, context = self._lookup(path, self._json, inherit_simple=inherit_simple, inherit_none=inherit_none)
-        return value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
+        value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
+        if (value is None) and self._imports:
+            for imported in self._imports:
+                if (value := imported.lookup(path, noexpand=noexpand,
+                                             inherit_simple=inherit_simple, inherit_none=inherit_none)) is not None:
+                    break
+        return value
 
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 inherit_simple: bool = False, inherit_none: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:

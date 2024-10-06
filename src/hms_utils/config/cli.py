@@ -50,7 +50,7 @@ def parse_args(argv: List[str]) -> object:
 
     args = Args()
 
-    def get_configs(_imports: bool = False) -> None:
+    def get_configs(_merges: bool = False, _imports: bool = False) -> None:
 
         nonlocal argv, args
 
@@ -119,15 +119,19 @@ def parse_args(argv: List[str]) -> object:
         argi = 0
         while argi < len(argv):
             arg = argv[argi] ; argi += 1  # noqa
-            arg_merge_config = arg in ["--config", "-config", "--conf", "-conf"]
-            arg_merge_secrets = arg in ["--secrets", "-secrets", "--secret", "-secret"]
+            arg_config = arg in ["--config", "-config", "--conf", "-conf"]
+            arg_secrets = arg in ["--secrets", "-secrets", "--secret", "-secret"]
+            arg_merge_config = _merges and arg in ["--merge", "-merge"]
+            arg_merge_secrets = _merges and arg in ["--merge-secrets", "-merge-secrets",
+                                                    "--merge-secret", "-merge-secret"]
             arg_import_config = _imports and arg in ["--imports", "-imports", "--import", "-import"]
             arg_import_secrets = _imports and arg in ["--import-secrets", "-import-secrets",
                                                       "--import-secret", "-import-secret"]
-            if arg_merge_config or arg_merge_secrets or arg_import_config or arg_import_secrets:
+            if (arg_config or arg_secrets or
+                arg_merge_config or arg_merge_secrets or arg_import_config or arg_import_secrets):  # noqa
                 if not config_dir_option_specified:
                     config_dir = os.getcwd()
-                secrets = arg_merge_secrets or arg_import_secrets
+                secrets = arg_secrets or arg_import_secrets
                 argi_config = argi - 1
                 if not ((argi < len(argv)) and (config_file := argv[argi])):
                     _usage()
@@ -142,7 +146,9 @@ def parse_args(argv: List[str]) -> object:
                     argi += 1
                 if argi > 0:
                     del argv[argi_config:argi + 1]
-        if _imports:
+        if _merges:
+            args.configs_for_merge = configs
+        elif _imports:
             args.configs_for_import = configs
         else:
             if not configs:
@@ -150,6 +156,7 @@ def parse_args(argv: List[str]) -> object:
                 configs.append(verify_config(DEFAULT_SECRETS_FILE_NAME, config_dir, secrets=True))
             args.config = configs[0]
             args.configs_for_merge = configs[1:]
+            get_configs(_merges=True)
             get_configs(_imports=True)
 
     def get_lookup_paths() -> List[str]:
@@ -200,9 +207,8 @@ def parse_args(argv: List[str]) -> object:
             else:
                 args.lookup_paths.append(arg)
 
-    # get_config_dir()
-    get_configs()
     get_lookup_paths()
+    get_configs()
     get_other_args()
     merged_paths, unmerged_paths = args.config.merge(args.configs_for_merge)
     args.config.imports(args.configs_for_import)
