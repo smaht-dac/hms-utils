@@ -43,6 +43,7 @@ def parse_args(argv: List[str]) -> object:
         files = False
         dump = False
         raw = False
+        check = False
         show = False
         noaws = False
         identity = None
@@ -209,6 +210,8 @@ def parse_args(argv: List[str]) -> object:
                 args.raw = True
             elif arg in ["--verbose", "-verbose"]:
                 args.verbose = True
+            elif arg in ["--check", "-check"]:
+                args.check = True
             elif arg in ["--debug", "-debug"]:
                 args.debug = True
             elif arg.startswith("-"):
@@ -259,7 +262,7 @@ def parse_args(argv: List[str]) -> object:
         ConfigOutput.print_list(config, show=args.show, raw=args.raw)
 
     if args.debug:
-        config._dump_for_testing(check=args.verbose)
+        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     if args.lookup_paths:
         status = 0

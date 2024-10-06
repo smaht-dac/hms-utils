@@ -54,9 +54,6 @@ def print_dictionary_tree(data: dict,
                 if value_modification:
                     value = value_modification
                 if arrow_indication:
-                    if not isinstance(arrow_indication, str):
-                        import pdb ; pdb.set_trace()  # noqa
-                        pass
                     corner = corner[:-1] + arrow_indication
                 output(f"{indent}{corner} {key}: {value}{f' {value_annotation}' if value_annotation else ''}")
     traverse(data, first=True)

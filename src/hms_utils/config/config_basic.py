@@ -280,5 +280,5 @@ class ConfigBasic:
         if (raise_exception is True) or (self._raise_exception is True):
             raise Exception(message)
 
-    def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
-        self._json._dump_for_testing(verbose=verbose, check=check)
+    def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
+        self.data(sorted=sorted)._dump_for_testing(verbose=verbose, check=check)

@@ -226,11 +226,14 @@ class JSON(dict):
         def value_annotator(parent: JSON, key: Any, value: Any) -> str:  # noqa
             nonlocal self, check
             annotation = f" {chars.dot} parent: {id(parent)}"
+            path = None
             if (verbose is True) or (check is True):
-                path = parent.context_path(path_separator=True, path_rooted=True, path_suffix=key)
-            if verbose is True:
-                annotation += f" {chars.dot_hollow} path: {path}"
-            if check is True:
+                if isinstance(parent, JSON):
+                    path = parent.context_path(path_separator=True, path_rooted=True, path_suffix=key)
+            if (verbose is True) and path:
+                pass
+                annotation += f" {chars.rarrow_hollow} {path}"
+            if (check is True) and path:
                 checked_value, _ = parent._lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
