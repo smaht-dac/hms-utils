@@ -254,6 +254,8 @@ def parse_args(argv: List[str]) -> object:
             for config_for_import in args.configs_for_import:
                 if config_for_import.name:
                     print(f"Imported config file: {config_for_import.name}")
+    elif not args.lookup_paths:
+        args.dump = True
 
     if args.dump:
         ConfigOutput.print_tree(config, show=args.show, raw=args.raw)
