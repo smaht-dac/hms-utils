@@ -9,3 +9,4 @@ class chars:
     rarrow_hollow = "▷"
     larrow_hollow = "◁"
     square_hollow = "□"
+    null = "∅"

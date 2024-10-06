@@ -34,11 +34,12 @@ def main_show_script_path():
 def parse_args(argv: List[str]) -> object:
 
     class Args:
+        config_dir = DEFAULT_CONFIG_DIR
         config_file = DEFAULT_CONFIG_FILE_NAME
         secrets_file = DEFAULT_SECRETS_FILE_NAME
         config = None
-        configs_for_merge = None
-        configs_for_import = None
+        configs_for_merge = []
+        configs_for_import = []
         lookup_paths = []
         list = False
         dump = False
@@ -53,9 +54,9 @@ def parse_args(argv: List[str]) -> object:
     def get_default_config_dir() -> Optional[str]:
         return os.path.expanduser(DEFAULT_CONFIG_DIR)
 
-    def get_config_dir() -> Optional[str]:
-        nonlocal argv
-        config_dir = None  # os.path.expanduser(DEFAULT_CONFIG_DIR)
+    def get_config_dir() -> None:
+        nonlocal argv, args
+        config_dir = os.path.expanduser(args.config_dir)
         if value := os.environ.get("HMS_CONFIG_DIR"):
             config_dir = value
         argi = 0
@@ -72,9 +73,9 @@ def parse_args(argv: List[str]) -> object:
             config_dir = os.path.normpath(os.path.join(os.getcwd(), config_dir))
         if not os.path.isdir(config_dir := os.path.normpath(config_dir)):
             _error(f"Configuration directory does not exist: {config_dir}")
-        return config_dir
+        args.config_dir = config_dir
 
-    def get_configs(config_dir: Optional[str], imports: bool = False) -> List[dict]:
+    def get_configs(config_dir: Optional[str], imports: bool = False) -> None:
         # We allow one or more files to be listed after --config or --secrets. Only the first file
         # in the list may NOT end in a ".json" suffix (as a argument not end in that, or and argument
         # starting with a dash, signifies the and of this list). If a file name contains "secret",
@@ -137,16 +138,15 @@ def parse_args(argv: List[str]) -> object:
                     argi += 1
                 if argi > 0:
                     del argv[argi_config:argi + 1]
-        if not configs:
-            configs.append(verify_config(DEFAULT_CONFIG_FILE_NAME, config_dir, secrets=False))
-            configs.append(verify_config(DEFAULT_SECRETS_FILE_NAME, config_dir, secrets=True))
         if imports:
             args.configs_for_import = configs
         else:
+            if not configs:
+                configs.append(verify_config(DEFAULT_CONFIG_FILE_NAME, config_dir, secrets=False))
+                configs.append(verify_config(DEFAULT_SECRETS_FILE_NAME, config_dir, secrets=True))
             args.config = configs[0]
             args.configs_for_merge = configs[1:]
             get_configs(config_dir, imports=True)
-        return configs
 
     def get_lookup_paths() -> List[str]:
         nonlocal argv, args
@@ -172,7 +172,7 @@ def parse_args(argv: List[str]) -> object:
         nonlocal argv, args
         argi = 0
         while argi < len(argv):
-            arg = argv[argi] ; argi += 1  # noqa
+            arg = argv[argi].strip() ; argi += 1  # noqa
             if arg in ["--show", "-show"]:
                 args.show = True
             elif arg in ["--noaws", "-noaws"]:
@@ -189,9 +189,13 @@ def parse_args(argv: List[str]) -> object:
                 args.verbose = True
             elif arg in ["--debug", "-debug"]:
                 args.debug = True
+            elif arg.startswith("-"):
+                _usage()
+            else:
+                args.lookup_paths.append(arg)
 
-    config_dir = get_config_dir()
-    get_configs(config_dir)
+    get_config_dir()
+    get_configs(args.config_dir)
     get_lookup_paths()
     get_other_args()
     merged_paths, unmerged_paths = args.config.merge(args.configs_for_merge)
@@ -214,6 +218,14 @@ def parse_args(argv: List[str]) -> object:
     if args.identity:
         args.config.aws_secrets_name = args.identity
 
+    if args.dump or args.list or args.debug:
+        if config.name:
+            print(f"Configuration file: {config.name}")
+        if args.configs_for_merge:
+            for config_for_merge in args.configs_for_merge:
+                if config_for_merge.name:
+                    print(f"Merged configuration file: {config_for_merge.name}")
+
     if args.dump:
         ConfigOutput.print_tree(config, show=False)
 
@@ -224,12 +236,16 @@ def parse_args(argv: List[str]) -> object:
         config._dump_for_testing(check=args.verbose)
 
     if args.lookup_paths:
+        status = 0
         for lookup_path in args.lookup_paths:
-            value = config.lookup(lookup_path)
+            if (value := config.lookup(lookup_path)) is None:
+                value = chars.null
+                status = 1
             if args.verbose:
                 print(f"{lookup_path}: {value}")
             else:
                 print(f"{value}")
+        exit(status)
 
     # import pdb ; pdb.set_trace()  # noqa
     # xxx = config.lookup('identity/xyzzy')
