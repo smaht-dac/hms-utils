@@ -18,8 +18,6 @@ DEFAULT_EXPORT_NAME_SEPARATOR = ":"
 AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
 OBFUSCATED_VALUE = "********"
 
-SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
-
 
 def main(argv: Optional[List] = None):
 
