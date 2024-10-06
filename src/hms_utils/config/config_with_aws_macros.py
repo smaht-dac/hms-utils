@@ -75,3 +75,12 @@ class ConfigWithAwsMacros(ConfigBasic):
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
         return None
+
+    def _contains_aws_secrets(self, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        if (start := value.find(ConfigWithAwsMacros._AWS_SECRET_MACRO_START)) < 0:
+            return False
+        if value.find(ConfigWithAwsMacros._AWS_SECRET_MACRO_END) < start:
+            return False
+        return True
