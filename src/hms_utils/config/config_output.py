@@ -22,11 +22,11 @@ class ConfigOutput:
             nonlocal config, nocolor, show
             if isinstance(config, ConfigWithSecrets):
                 if config._contains_secrets(value):
-                    return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red")
+                    return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red", bold=True)
                 elif isinstance(config, ConfigWithAwsMacros) and (raw is not True) and (show is True):
                     if config._contains_aws_secrets(value):
                         if ConfigOutput._lookup_path(config, path, show=None) != value:
-                            return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red")
+                            return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red", bold=True)
             return None
         print_dictionary_tree(config.data(show=None),
                               value_modifier=value_modifier, arrow_indicator=tree_arrow_indicator)
@@ -44,7 +44,7 @@ class ConfigOutput:
     def _display_value(config: Config, value: Any, show: bool, nocolor: bool = False) -> Optional[str]:
         def display_secret_value(value: Any) -> str:
             nonlocal nocolor
-            return str(value) if nocolor is True else terminal_color(str(value), "red")
+            return str(value) if nocolor is True else terminal_color(str(value), "red", bold=True)
         if show is True:
             return config._secrets_plaintext(value, plaintext_value=display_secret_value)
         return config._secrets_obfuscated(value, obfuscated_value=display_secret_value)
