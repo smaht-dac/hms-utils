@@ -13,7 +13,7 @@ class ConfigOutput:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
             if raw is not True:
-                return config.lookup(path)
+                return config.lookup(path, show=show)
             return ConfigOutput._display_value(config, value=value, show=show)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
@@ -28,7 +28,7 @@ class ConfigOutput:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config
             if raw is not True:
-                return config.lookup(path)
+                return config.lookup(path, show=show)
             return ConfigOutput._display_value(config, value=value, show=show)
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)
 
