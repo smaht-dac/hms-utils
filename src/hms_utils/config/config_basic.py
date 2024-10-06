@@ -266,13 +266,14 @@ class ConfigBasic:
     def is_absolute_path(self, path: str) -> bool:
         return isinstance(path, str) and path.startswith(self._path_separator)
 
-    def xpath(self, context: JSON, path_suffix: Optional[str] = None) -> str:
-        return context.xpath(path_rooted=True, path_suffix=path_suffix)
+    def context_path(self, context: JSON, path_suffix: Optional[str] = None) -> str:
+        return context.context_path(path_rooted=True, path_suffix=path_suffix)
 
     def path(self, context: JSON, path_rooted: bool = True, path_suffix: Optional[str] = None) -> str:
         if not isinstance(context, JSON):
             return ""
-        return context.xpath(path_separator=self._path_separator, path_rooted=path_rooted, path_suffix=path_suffix)
+        return context.context_path(path_separator=self._path_separator,
+                                    path_rooted=path_rooted, path_suffix=path_suffix)
 
     def _warn(self, message: str, raise_exception: bool = False) -> None:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
