@@ -22,12 +22,58 @@ SUPPRESS_AWS_SECRET_NOT_FOUND_WARNING = False  # Hack
 
 
 def main(argv: Optional[List] = None):
-    parse_args(argv if isinstance(argv, list) else sys.argv[1:])
+
+    args = parse_args(argv if isinstance(argv, list) else sys.argv[1:])
+
+    config = args.config
+    merged_paths, unmerged_paths = config.merge(args.configs_for_merge)
+    config.imports(args.configs_for_import)
+
+    if args.identity:
+        config.aws_secrets_name = args.identity
+
+    if args.dump or args.list or args.debug or args.files:
+        if args.files:
+            print(f"Default config directory: {args.config_dir}")
+        if config.name:
+            print(f"Main config file: {config.name}")
+        if args.configs_for_merge:
+            for config_for_merge in args.configs_for_merge:
+                if config_for_merge.name:
+                    print(f"Merged config file: {config_for_merge.name}")
+        if args.configs_for_import:
+            for config_for_import in args.configs_for_import:
+                if config_for_import.name:
+                    print(f"Imported config file: {config_for_import.name}")
+    elif not args.lookup_paths:
+        args.dump = True
+
+    if args.dump:
+        ConfigOutput.print_tree(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+
+    if args.list:
+        ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+
+    if args.debug:
+        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
+
+    if args.lookup_paths:
+        status = 0
+        for lookup_path in args.lookup_paths:
+            if (value := config.lookup(lookup_path, show=args.show)) is None:
+                value = chars.null
+                status = 1
+            if args.verbose:
+                print(f"{lookup_path}: {value}")
+            else:
+                print(f"{value}")
+        exit(status)
+
     sys.exit(0)
 
 
 def main_show_script_path():
-    sys.argv = ["hms-config", "--functions"]
+    sys.argv = ["hmsconfig", "--functions"]
     main()
 
 
@@ -47,6 +93,7 @@ def parse_args(argv: List[str]) -> object:
         show = False
         noaws = False
         identity = None
+        nocolor = False
         verbose = False
         debug = False
 
@@ -214,6 +261,8 @@ def parse_args(argv: List[str]) -> object:
                 args.check = True
             elif arg in ["--debug", "-debug"]:
                 args.debug = True
+            elif arg in ["--nocolor", "-nocolor"]:
+                args.nocolor = True
             elif arg.startswith("-"):
                 _usage()
             else:
@@ -222,66 +271,7 @@ def parse_args(argv: List[str]) -> object:
     get_lookup_paths()
     get_configs()
     get_other_args()
-    merged_paths, unmerged_paths = args.config.merge(args.configs_for_merge)
-    args.config.imports(args.configs_for_import)
-    config = args.config
-
-    #   print(f"config_dir: [{config_dir}]")
-    #   print(f"configs: {configs}")
-    #   for config in configs:
-    #       print(f"configs.name: {config.name}")
-    #       print(f"configs.secrets: {config.secrets}")
-    #   print(argv)
-
-    # config = configs[0]
-    # configs_for_merge = configs[1:]
-    # merged_paths, unmerged_paths = config.merge(configs_for_merge)
-    # config.imports(imports)
-
-    if args.identity:
-        args.config.aws_secrets_name = args.identity
-
-    if args.dump or args.list or args.debug or args.files:
-        if args.files:
-            print(f"Default config directory: {args.config_dir}")
-        if config.name:
-            print(f"Main config file: {config.name}")
-        if args.configs_for_merge:
-            for config_for_merge in args.configs_for_merge:
-                if config_for_merge.name:
-                    print(f"Merged config file: {config_for_merge.name}")
-        if args.configs_for_import:
-            for config_for_import in args.configs_for_import:
-                if config_for_import.name:
-                    print(f"Imported config file: {config_for_import.name}")
-    elif not args.lookup_paths:
-        args.dump = True
-
-    if args.dump:
-        ConfigOutput.print_tree(config, show=args.show, raw=args.raw)
-
-    if args.list:
-        ConfigOutput.print_list(config, show=args.show, raw=args.raw)
-
-    if args.debug:
-        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
-
-    if args.lookup_paths:
-        status = 0
-        for lookup_path in args.lookup_paths:
-            if (value := config.lookup(lookup_path, show=args.show)) is None:
-                value = chars.null
-                status = 1
-            if args.verbose:
-                print(f"{lookup_path}: {value}")
-            else:
-                print(f"{value}")
-        exit(status)
-
-    # import pdb ; pdb.set_trace()  # noqa
-    # xxx = config.lookup('identity/xyzzy')
-    # print(xxx)
-    pass
+    return args
 
 
 def _warning(message: str) -> None:
@@ -301,28 +291,12 @@ def _error(message: str, usage: bool = False, status: int = 1,
 
 
 def _usage():
-    print(f"{chars.rarrow} hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
+    print(f"{chars.rarrow} hmsconfig reads named values from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
-    print(f"  {chars.rarrow_hollow} usage: python hms_config.py"
+    print(f"  usage: python hms_config.py"
           f" [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
     sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-#   testargv = [
-#       "--config",
-#       "~/.config/hms/secrets.json",
-#       "~/.config/hms/config.json",
-#       "--show",
-#       "--verbose",
-#       "--lookup",
-#       "/auth0/client",
-#       "/identity/smaht/foursight/wolf",
-#       "--debug",
-#       "--dump",
-#       "asdfa",
-#       "--identity",
-#       "C4AppConfigFoursightSmahtDevelopment"
-#   ]
-#   main(testargv)
