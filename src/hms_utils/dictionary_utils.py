@@ -140,7 +140,7 @@ def sort_dictionary(data: dict, reverse: bool = False, leafs_first: bool = False
 
 
 def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
-    if isinstance(file, str) and os.path.isfile(file):
+    if isinstance(file, str) and os.path.isfile(file := os.path.expanduser(file)):
         try:
             with io.open(file, "r") as f:
                 return json.load(f)

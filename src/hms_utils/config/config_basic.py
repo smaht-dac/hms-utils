@@ -266,10 +266,13 @@ class ConfigBasic:
     def is_absolute_path(self, path: str) -> bool:
         return isinstance(path, str) and path.startswith(self._path_separator)
 
-    def context_path(self, context: JSON, path: Optional[str] = None) -> str:
+    def path(self, context: JSON, path_suffix: Optional[str] = None) -> str:
+        return context.path(path_rooted=True, path_suffix=path_suffix)
+
+    def context_path(self, context: JSON, path_rooted: bool = True, path_suffix: Optional[str] = None) -> str:
         if not isinstance(context, JSON):
             return ""
-        return context.path(path_separator=self._path_separator, path_rooted=True, path=path)
+        return context.path(path_separator=self._path_separator, path_rooted=path_rooted, path_suffix=path_suffix)
 
     def _warn(self, message: str, raise_exception: bool = False) -> None:
         print(f"WARNING: {message}", file=sys.stderr, flush=True)
@@ -278,3 +281,12 @@ class ConfigBasic:
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         self._json._dump_for_testing(verbose=verbose, check=check)
+
+
+x = ConfigBasic("~/.config/hms/config.json")
+y = x.lookup("identity/smaht")
+print(type(y))
+print(y)
+print(y.context_path)
+print(x.context_path(y))
+print(x.path(y))
