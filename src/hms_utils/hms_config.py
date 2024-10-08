@@ -114,6 +114,8 @@ def main():
                         while parent:
                             for key in parent:
                                 if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
+                                    if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                                        os.environ[AWS_PROFILE_ENV_NAME] = single_value
                                     # TODO: Shaky on this ...
                                     if merged_config._contains_macro(single_value):
                                         single_value = merged_config._expand_macro_value(single_value, value)
