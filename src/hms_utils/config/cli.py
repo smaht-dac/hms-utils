@@ -73,61 +73,6 @@ def main_show_script_path():
     main()
 
 
-def handle_lookup_command(config: Config, args: object) -> None:
-    if not args.lookup_paths:
-        return
-    status = 0
-    for lookup_path in args.lookup_paths:
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
-            if not args.verbose:
-                continue
-            value = chars.null
-            status = 1
-        if args.verbose:
-            print(f"{lookup_path}: {value}")
-        else:
-            print(f"{value}")
-    exit(status)
-
-
-def handle_exports_command(config: Config, args: object) -> None:
-    if not args.lookup_paths:
-        return
-    exports = {}
-    status = 0
-    for lookup_path in args.lookup_paths:
-        if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
-            exports_name = lookup_path[0:index]
-            if not (lookup_path := lookup_path[index + 1:].strip()):
-                continue
-        else:
-            exports_name = basename_path(lookup_path)
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
-            if not args.verbose:
-                continue
-            value = chars.null
-            status = 1
-        if isinstance(value, dict):
-            for key in value:
-                exports[basename_path(key).replace("-", "_")] = value[key]
-        else:
-            exports[exports_name.replace("-", "_")] = value
-    if args.exports_file:
-        if os.path.exists(args.exports_file):
-            _error(f"Export file must not already exist: {args.exports_file}")
-        with io.open(args.exports_file, "w") as f:
-            for export in exports:
-                export = f"export {export}={exports[export]}"
-                f.write(f"{export}\n")
-                if args.verbose:
-                    print(f"{chars.rarrow_hollow} {export}")
-    else:
-        for export in sorted(exports):
-            export = f"export {export}={exports[export]}"
-            print(export)
-    exit(status)
-
-
 def parse_args(argv: List[str]) -> object:
 
     class Args:
@@ -337,6 +282,62 @@ def parse_args(argv: List[str]) -> object:
     get_lookup_paths()
     get_other_args()
     return args
+
+
+def handle_lookup_command(config: Config, args: object) -> None:
+    if not args.lookup_paths:
+        return
+    status = 0
+    for lookup_path in args.lookup_paths:
+        if (value := config.lookup(lookup_path, show=args.show)) is None:
+            if not args.verbose:
+                continue
+            value = chars.null
+            status = 1
+        if args.verbose:
+            print(f"{lookup_path}: {value}")
+        else:
+            print(f"{value}")
+    exit(status)
+
+
+def handle_exports_command(config: Config, args: object) -> None:
+    if not args.lookup_paths:
+        return
+    exports = {}
+    status = 0
+    for lookup_path in args.lookup_paths:
+        if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
+            exports_name = lookup_path[0:index]
+            if not (lookup_path := lookup_path[index + 1:].strip()):
+                continue
+        else:
+            exports_name = basename_path(lookup_path)
+        # if (value := config.lookup(lookup_path, show=args.show)) is None:
+        if (value := config.lookup(lookup_path, show=None)) is None:
+            if not args.verbose:
+                continue
+            value = chars.null
+            status = 1
+        if isinstance(value, dict):
+            for key in value:
+                exports[basename_path(key).replace("-", "_")] = value[key]
+        else:
+            exports[exports_name.replace("-", "_")] = value
+    if args.exports_file:
+        if os.path.exists(args.exports_file):
+            _error(f"Export file must not already exist: {args.exports_file}")
+        with io.open(args.exports_file, "w") as f:
+            for export in exports:
+                export = f"export {export}={exports[export]}"
+                f.write(f"{export}\n")
+                if args.verbose:
+                    print(f"{chars.rarrow_hollow} {export}")
+    else:
+        for export in sorted(exports):
+            export = f"export {export}={exports[export]}"
+            print(export)
+    exit(status)
 
 
 def _warning(message: str) -> None:

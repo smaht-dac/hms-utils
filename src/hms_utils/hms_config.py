@@ -83,7 +83,7 @@ def main():
                 export_name = path_basename(name, args.path_separator)
             found = False ; found_dictionary = False  # noqa
             if (value := merged_config.lookup(name, allow_dictionary=True, raw=True)) is not None:
-                if (export_name == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                if (export_name == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
                     # Special case to handle list of paths the first of which specifies AWS_PROFILE,
                     # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
                     os.environ[AWS_PROFILE_ENV_NAME] = value
@@ -94,7 +94,7 @@ def main():
                     found_dictionary = True
                     for key in value:
                         if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
-                            if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                            if (key == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
                                 # Same special case as above for (direct) items within a dictionary.
                                 os.environ[AWS_PROFILE_ENV_NAME] = single_value
                             # TODO: A bit shaky on this ...
@@ -114,7 +114,7 @@ def main():
                         while parent:
                             for key in parent:
                                 if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
-                                    if (key == AWS_PROFILE_ENV_NAME) and (os.environ.get(AWS_PROFILE_ENV_NAME) is None):
+                                    if (key == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
                                         os.environ[AWS_PROFILE_ENV_NAME] = single_value
                                     # TODO: Shaky on this ...
                                     if merged_config._contains_macro(single_value):
