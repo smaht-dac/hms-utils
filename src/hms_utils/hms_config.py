@@ -123,7 +123,8 @@ def main():
                                         aws_secret_context_path = f"{name}{args.path_separator}"
                                         single_value = config._expand_aws_secret_macros(
                                             single_value, aws_secret_context_path=aws_secret_context_path)
-                                    exports[key] = single_value
+                                    if key not in exports:
+                                        exports[key] = single_value
                             parent = parent.parent
                 else:
                     exports[export_name] = value
