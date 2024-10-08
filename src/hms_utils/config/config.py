@@ -23,3 +23,9 @@ class Config(ConfigWithSecrets, ConfigWithAwsMacros):
                          raise_exception=raise_exception,
                          secrets=secrets,
                          noaws=noaws, **kwargs)
+
+    @staticmethod
+    def default():
+        config = Config("~/.config/hms/config.json")
+        config.merge(Config("~/.config/hms/secrets.json"))
+        return config
