@@ -114,8 +114,8 @@ class JSON(dict):
         for key, value in super().items():
             if isinstance(value, dict) and (not isinstance(value, JSON)):
                 value = JSON(value)
-            # if self._rvalue and is_primitive_type(value):
-            #     value = self._rvalue(value)
+            if self._rvalue and is_primitive_type(value):
+                value = self._rvalue(value)
             yield key, value
 
     def values(self) -> Iterator[Any]:
@@ -213,7 +213,11 @@ class JSON(dict):
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
         def root_indicator() -> str:
-            return f"\b\b{chars.rarrow} root {chars.dot} id: {id(self)}"
+            nonlocal self
+            indicator = f"\b\b{chars.rarrow} root {chars.dot} id: {id(self)}"
+            if self.parent:
+                indicator += f" {chars.dot} parent: {id(self.parent)}"
+            return indicator
         def parent_annotator(parent: JSON) -> str:  # noqa
             nonlocal self, check
             annotation = (f" {chars.dot} id: {id(parent)} {chars.dot_hollow}"
