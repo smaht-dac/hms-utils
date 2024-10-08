@@ -319,11 +319,26 @@ def handle_exports_command(config: Config, args: object) -> None:
                 continue
             value = chars.null
             status = 1
+        # Since dash is not even allowed in environment/export name change to underscore.
         if isinstance(value, dict):
             for key in value:
-                exports[basename_path(key).replace("-", "_")] = value[key]
+                exports_key = basename_path(key).replace("-", "_")
+                exports[exports_key] = value[key]
         else:
-            exports[exports_name.replace("-", "_")] = value
+            exports_key = basename_path(exports_name).replace("-", "_")
+            exports[exports_key] = value
+        # xyzzy
+        parent = value.parent
+        while parent:
+            for key in parent:
+                if not isinstance(parent[key], dict):
+                    # import pdb ; pdb.set_trace()  # noqa
+                    # x = config.lookup(parent.path + "/" + key)
+                    exports_key = basename_path(key).replace("-", "_")
+                    if exports_key not in exports:
+                        exports[exports_key] = parent[key]
+            parent = parent.parent
+        # xyzzy
     if args.exports_file:
         if os.path.exists(args.exports_file):
             _error(f"Export file must not already exist: {args.exports_file}")
