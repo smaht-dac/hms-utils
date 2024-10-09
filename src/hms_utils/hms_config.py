@@ -69,11 +69,41 @@ def main():
             print_config_and_secrets_unmerged(config, secrets, args)
         exit(0)
 
+    def setup_aws_profile_environment_variable():
+        # TOTAL HACK (in a hurry 2024-10-08). This does what below args.exports
+        # loop does but just for AWS_PROFILE environment variable setting.
+        nonlocal args, merged_config
+        for name in args.names:
+            if (value := merged_config.lookup(name, allow_dictionary=True, raw=True)) is not None:
+                if (name == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
+                    # Special case to handle list of paths the first of which specifies AWS_PROFILE,
+                    # and which needs to be set to evaluate subsequent paths which are aws-secret macro values.
+                    os.environ[AWS_PROFILE_ENV_NAME] = value
+                # TODO: Refactor this increasingtly unwieldy logic.
+                if isinstance(value, dict):
+                    # Special case: If target name/path is a dictionary then generate
+                    # exports for every direct (non-dictionary) key/value within it.
+                    for key in value:
+                        if ((single_value := value[key]) is not None) and (not isinstance(single_value, dict)):
+                            if (key == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
+                                # Same special case as above for (direct) items within a dictionary.
+                                os.environ[AWS_PROFILE_ENV_NAME] = single_value
+                    if True:
+                        # Walk up the hierarchy to get direct values of each parent/ancestor.
+                        parent = value.parent
+                        while parent:
+                            for key in parent:
+                                if ((single_value := parent[key]) is not None) and (not isinstance(single_value, dict)):
+                                    if (key == AWS_PROFILE_ENV_NAME) and (AWS_PROFILE_ENV_NAME not in os.environ):
+                                        os.environ[AWS_PROFILE_ENV_NAME] = single_value
+                            parent = parent.parent
+
     status = 0
     if args.export:
         if args.export_file and os.path.exists(args.export_file):
             error(f"Export file must not already exist: {args.export_file}")
         exports = {}
+        setup_aws_profile_environment_variable()
         for name in args.names:
             if (colon := name.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
                 export_name = name[0:colon]
