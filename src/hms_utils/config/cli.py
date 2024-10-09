@@ -51,7 +51,7 @@ def main(argv: Optional[List] = None):
 
     if args.dump:
         warnings = []
-        def collect_warnings(warning: str, raise_exception: bool = False) -> None:
+        def collect_warnings(warning: str, raise_exception: bool = False) -> None:  # noqa / TODO
             if warning not in warnings:
                 warnings.append(warning)
         config._warning = collect_warnings
@@ -59,7 +59,7 @@ def main(argv: Optional[List] = None):
         if warnings:
             print(f"{chars.rarrow} WARNINGS ({len(warnings)}):", file=sys.stderr)
             for warning in warnings:
-                  print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
+                print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
 
     if args.list:
         ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
