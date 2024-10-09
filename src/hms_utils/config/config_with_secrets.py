@@ -73,12 +73,12 @@ class ConfigWithSecrets(ConfigBasic):
                 return value
             elif show is True:
                 if isinstance(value, JSON):
-                    return value.asdict(rvalue=ConfigWithSecrets._secrets_plaintext)
+                    return JSON(value, rvalue=ConfigWithSecrets._secrets_plaintext)
                 else:
                     return ConfigWithSecrets._secrets_plaintext(value)
             elif show is False:
                 if isinstance(value, JSON):
-                    return value.asdict(rvalue=self._secrets_obfuscated)
+                    return JSON(value, rvalue=self._secrets_obfuscated)
                 else:
                     return self._secrets_obfuscated(value)
         return value

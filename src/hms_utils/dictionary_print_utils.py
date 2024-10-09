@@ -52,10 +52,14 @@ def print_dictionary_tree(data: dict,
                 output(indent + corner + " " + key)
                 inner_indent = (indent if first else indent + (2 * " ")) + (2 * " ")
                 for element_index, element_value in enumerate(value):
-                    element_output_value = "{}" if isinstance(element_value, dict) else str(element_value)
-                    output(f"{inner_indent}└── [{element_index}]: {element_output_value}")
                     if isinstance(element_value, dict):
+                        element_output_value = "{}"
+                        if parent_annotator and (parent_annotation := parent_annotator(element_value)):
+                            element_output_value += parent_annotation
+                        output(f"{inner_indent}└── [{element_index}]: {element_output_value}")
                         traverse(element_value, indent=inner_indent + (9 * " "))
+                    else:
+                        output(f"{inner_indent}└── [{element_index}]: {element_value}")
             else:
                 if paths:
                     key = key_path

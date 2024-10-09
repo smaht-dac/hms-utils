@@ -147,6 +147,7 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
         return None
 
 
+# THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
 # within the main dictionary. Should be able to use EXACTLY like a dicttionary type after creating with
 # JSON(dict); including copying and setting properties to any type including either other dictionaies
