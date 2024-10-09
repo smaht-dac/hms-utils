@@ -50,7 +50,16 @@ def main(argv: Optional[List] = None):
         args.dump = True
 
     if args.dump:
+        warnings = []
+        def collect_warnings(warning: str, raise_exception: bool = False) -> None:
+            if warning not in warnings:
+                warnings.append(warning)
+        config._warning = collect_warnings
         ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
+        if warnings:
+            print(f"{chars.rarrow} WARNINGS ({len(warnings)}):", file=sys.stderr)
+            for warning in warnings:
+                  print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
 
     if args.list:
         ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
@@ -332,8 +341,6 @@ def handle_exports_command(config: Config, args: object) -> None:
         while parent:
             for key in parent:
                 if not isinstance(parent[key], dict):
-                    # import pdb ; pdb.set_trace()  # noqa
-                    # x = config.lookup(parent.path + "/" + key)
                     exports_key = basename_path(key).replace("-", "_")
                     if exports_key not in exports:
                         exports[exports_key] = parent[key]
