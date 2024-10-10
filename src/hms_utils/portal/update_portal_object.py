@@ -600,38 +600,93 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
     schema_names_to_load = {}
 
     copy_to_temporary_directory = False
+    data_from_misnamed_files = {}
+    skip_misformated_files = []
     for json_file_path in glob.glob(os.path.join(inserts_directory, "*.json")):
         json_file_name = os.path.basename(json_file_path)
         schema_name = os.path.basename(json_file_name)[:-len(".json")]
         if (schema_name not in schema_snake_case_names) and (schema_name not in schema_names):
-            _print(f"File is not named for a known schema: {json_file_name} ▶ ignoring")
+            copying_misnamed_file_data = False
+            if True:
+                with io.open(json_file_path, "r") as f:
+                    if (isinstance(data := json.load(f), dict) and (len(data) == 1) and
+                        (((schema_name := next(iter(data))) in schema_names) or
+                         (schema_name in schema_snake_case_names)) and
+                        isinstance(data[schema_name], list)):  # noqa
+                        if debug:
+                            _print(f"Reformatting misformatted {schema_name} file: {json_file_path}")
+                        schema_snake_case_name = to_snake_case(schema_name)
+                        if schema_snake_case_name not in data_from_misnamed_files:
+                            data_from_misnamed_files[schema_snake_case_name] = data[schema_name]
+                        else:
+                            data_from_misnamed_files[schema_snake_case_name].extend(data[schema_name])
+                        schema_names_to_load[schema_snake_case_name] = len(data[schema_name])
+                        copying_misnamed_file_data = True
+            if not copying_misnamed_file_data:
+                _print(f"File is not named for a known schema: {json_file_name} ▶ ignoring")
             copy_to_temporary_directory = True
         else:
             try:
                 with io.open(json_file_path, "r") as f:
                     if not isinstance(data := json.load(f), list):
-                        _print("Data JSON file does not contain an array: {json_file_path} ▶ ignoring")
+                        if (isinstance(data, dict) and (len(data) == 1) and
+                            (((schema_name := next(iter(data))) in schema_names) or
+                             (schema_name in schema_snake_case_names)) and
+                            isinstance(data[schema_name], list)):  # noqa
+                            if debug:
+                                _print(f"Reformatting misformatted file: {json_file_path}")
+                            schema_snake_case_name = to_snake_case(schema_name)
+                            if schema_snake_case_name not in data_from_misnamed_files:
+                                data_from_misnamed_files[schema_snake_case_name] = data[schema_name]
+                            else:
+                                data_from_misnamed_files[schema_snake_case_name].extend(data[schema_name])
+                            schema_names_to_load[schema_snake_case_name] = len(data[schema_name])
+                            copying_misnamed_file_data = True
+                            if debug:
+                                _print(f"Skipping misformatted file: {json_file_path}")
+                            skip_misformated_files.append(json_file_path)
+                        else:
+                            _print(f"Data JSON file does not contain an array: {json_file_path} ▶ ignoring")
                         copy_to_temporary_directory = True
                     elif (nobjects := len(data)) < 1:
-                        _print("Data JSON file contains no items: {json_file_path} ▶ ignoring")
+                        _print(f"Data JSON file contains no items: {json_file_path} ▶ ignoring")
                         copy_to_temporary_directory = True
                     else:
                         schema_names_to_load[schema_name] = nobjects
             except Exception:
-                _print("Cannot load JSON data from file: {json_file_path} ▶ ignoring")
+                _print(f"Cannot load JSON data from file: {json_file_path} ▶ ignoring")
                 copy_to_temporary_directory = True
     if not schema_names_to_load:
-        _print("Directory contains no valid data: {inserts_directory}")
+        _print(f"Directory contains no valid data: {inserts_directory}")
         return False
     if copy_to_temporary_directory:
         with temporary_directory() as tmpdir:
             if debug:
                 _print(f"Using temporary directory: {tmpdir}")
             for json_file_path in glob.glob(os.path.join(inserts_directory, "*.json")):
+                if json_file_path in skip_misformated_files:
+                    continue
                 json_file_name = os.path.basename(json_file_path)
                 schema_name = os.path.basename(json_file_name)[:-len(".json")]
                 if (schema_name in schema_snake_case_names) or (schema_name in schema_names):
                     shutil.copy(json_file_path, tmpdir)
+            if data_from_misnamed_files:
+                for data_from_misnamed_file in data_from_misnamed_files:
+                    renamed_json_file_path = os.path.join(tmpdir, f"{data_from_misnamed_file}.json")
+                    if not os.path.exists(renamed_json_file_path):
+                        if debug:
+                            _print(f"Copying data from misnamed or misformatted file(s): {renamed_json_file_path}")
+                        with io.open(renamed_json_file_path, "w") as f:
+                            json.dump(data_from_misnamed_files[data_from_misnamed_file], f)
+                    else:
+                        if debug:
+                            _print(f"Appending data from misnamed or misformatted file(s): {renamed_json_file_path}")
+                        with io.open(renamed_json_file_path, "r") as f:
+                            existing_data_for_renamed_json_file = json.load(f)
+                            existing_data_for_renamed_json_file.extend(
+                                data_from_misnamed_files[data_from_misnamed_file])
+                        with io.open(renamed_json_file_path, "w") as f:
+                            json.dump(existing_data_for_renamed_json_file, f)
             loadxl(portal=portal, inserts_directory=tmpdir, schema_names_to_load=schema_names_to_load)
     else:
         loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
