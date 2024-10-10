@@ -50,11 +50,27 @@ class ConfigWithAwsMacros(ConfigBasic):
         return self._lookup_aws_secret(secret_specifier, context)
 
     def _lookup_aws_secret(self, secret_specifier: str, context: Optional[JSON] = None) -> Optional[str]:
-        def lookup_aws_profile_environment_variable(context: Optional[JSON] = None) -> Optional[str]:
+        def lookup_environment_variable(name: str, context: Optional[JSON] = None) -> Optional[str]:
+            if isinstance(context, JSON):
+                while True:
+                    if aws_profile := context.get(name):
+                        return aws_profile
+                    if not (context := context.parent):
+                        break
+            return None
+        def lookup_aws_profile_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
             if isinstance(context, JSON):
                 while True:
                     if aws_profile := context.get(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME):
                         return aws_profile
+                    if not (context := context.parent):
+                        break
+            return None
+        def lookup_identity_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
+            if isinstance(context, JSON):
+                while True:
+                    if identity := context.get(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME):
+                        return identity
                     if not (context := context.parent):
                         break
             return None
@@ -66,7 +82,8 @@ class ConfigWithAwsMacros(ConfigBasic):
             if self._aws_secrets_name:
                 secrets_name = self._aws_secrets_name
             else:
-                secrets_name = super().lookup(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context=context)
+                secrets_name = lookup_identity_environment_variable(context)
+                # secrets_name = super().lookup(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context=context)
         if not (secret_name and secrets_name):
             return None
         if aws_profile := lookup_aws_profile_environment_variable(context):
