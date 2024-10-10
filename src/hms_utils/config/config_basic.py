@@ -93,10 +93,12 @@ class ConfigBasic:
                     self._imports.append(item)
 
     def lookup(self, path: str,
+               context: Optional[JSON] = None,
                noexpand: bool = False,
                inherit_simple: bool = False,
                inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
-        value, context = self._lookup(path, self._json, inherit_simple=inherit_simple, inherit_none=inherit_none)
+        context = context if isinstance(context, JSON) else self._json
+        value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
         if (value is None) and self._imports:
             for imported in self._imports:

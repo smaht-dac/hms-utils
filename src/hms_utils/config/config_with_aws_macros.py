@@ -23,10 +23,12 @@ class ConfigWithAwsMacros(ConfigBasic):
                  warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
                  aws_secrets_name: Optional[str] = None,
-                 noaws: bool = False, **kwargs) -> None:
+                 noaws: bool = False,
+                 debug: bool = False, **kwargs) -> None:
         self._aws_secrets_name = aws_secrets_name.strip() if isinstance(aws_secrets_name, str) else None
         self._noaws = noaws is True
         self._raise_exception = raise_exception is True
+        self._debug = debug is True
         super().__init__(config,
                          name=name,
                          path_separator=path_separator,
@@ -57,7 +59,8 @@ class ConfigWithAwsMacros(ConfigBasic):
             if self._aws_secrets_name:
                 secrets_name = self._aws_secrets_name
             else:
-                secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
+                secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context=context)
+                # secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
         return self._aws_get_secret(secrets_name, secret_name) if secret_name and secrets_name else None
 
     def _aws_get_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
@@ -65,12 +68,15 @@ class ConfigWithAwsMacros(ConfigBasic):
             return None
         try:
             boto_secrets = BotoClient("secretsmanager")
+            if self._debug:
+                print(f"DEBUG: Reading AWS secrets: {secrets_name}/{secret_name}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
             if ((value := secrets[secret_name]) is not None) and isinstance(self, ConfigWithSecrets):
                 value = ConfigWithSecrets._secrets_encoded(value)
             return value
         except Exception as e:
+            import pdb ; pdb.set_trace()  # noqa
             if self._raise_exception is True:
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")

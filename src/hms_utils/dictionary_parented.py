@@ -28,30 +28,32 @@ class JSON(dict):
             data = dict(data)
         elif not isinstance(data, dict):
             data = {}
-        self._rvalue = rvalue if callable(rvalue) else None
-        self._parent = None
         super().__init__(data)
-        self._initialize()
+        self._initialize(rvalue)
 
-    def _initialize(self) -> None:
+    def _initialize(self, rvalue: Optional[Callable] = None) -> None:
+        if not callable(rvalue):
+            rvalue = None
+        self._parent = None
+        self._rvalue = None
         for key in self:
             value = super(JSON, self).__getitem__(key)
             if isinstance(value, dict):
-                if not isinstance(value, JSON):
-                    value = JSON(value, rvalue=self._rvalue)
+                value = JSON(value, rvalue=rvalue)
                 value._parent = self
+                value._rvalue = rvalue
                 super(JSON, self).__setitem__(key, value)
             elif isinstance(value, list):
-                # Just for completeness do any dictionaries nested within lists.
-                parent_key_value = []
+                value_list = []
                 for element in value:
                     if isinstance(element, dict) and (not isinstance(element, JSON)):
-                        parent_key_value.append(JSON(element, rvalue=self._rvalue))
+                        value_list.append(JSON(element, rvalue=rvalue))
                     else:
-                        parent_key_value.append(element)
-                super().__setitem__(key, parent_key_value)
-            elif self._rvalue and is_primitive_type(value):
-                super().__setitem__(key, self._rvalue(value))
+                        value_list.append(element)
+                super().__setitem__(key, value_list)
+            elif rvalue and is_primitive_type(value):
+                super().__setitem__(key, rvalue(value))
+        self._rvalue = rvalue if callable(rvalue) else None
 
     @property
     def parent(self) -> Optional[JSON]:
@@ -150,7 +152,8 @@ class JSON(dict):
     def copy(self, rvalue: Optional[Callable] = None) -> JSON:
         if not self._parent:
             return deepcopy(self)
-        root = JSON(self.root, rvalue=rvalue)
+        root = self.root
+        root = JSON(root, rvalue=rvalue)
         return root.lookup(self.path)
 
     def __setitem__(self, key: Any, value: Any) -> None:

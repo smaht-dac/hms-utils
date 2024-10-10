@@ -8,6 +8,7 @@ from typing import List, Optional
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
+from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
@@ -263,10 +264,10 @@ def parse_args(argv: List[str]) -> object:
                 args.raw = True
             elif arg in ["--verbose", "-verbose"]:
                 args.verbose = True
-            elif arg in ["--check", "-check"]:
-                args.check = True
             elif arg in ["--debug", "-debug"]:
                 args.debug = True
+            elif arg in ["--check", "-check"]:
+                args.check = True
             elif arg in ["--nocolor", "-nocolor"]:
                 args.nocolor = True
             elif arg in ["--noaws", "-noaws"]:
@@ -328,22 +329,22 @@ def handle_exports_command(config: Config, args: object) -> None:
             value = chars.null
             status = 1
         # Since dash is not even allowed in environment/export name change to underscore.
-        if isinstance(value, dict):
+        if isinstance(value, JSON):  # xyzzy dict
             for key in value:
                 exports_key = basename_path(key).replace("-", "_")
                 exports[exports_key] = value[key]
         else:
             exports_key = basename_path(exports_name).replace("-", "_")
             exports[exports_key] = value
-        # xyzzy
-        parent = value.parent
-        while parent:
-            for key in parent:
-                if not isinstance(parent[key], dict):
-                    exports_key = basename_path(key).replace("-", "_")
-                    if exports_key not in exports:
-                        exports[exports_key] = parent[key]
-            parent = parent.parent
+        if isinstance(value, JSON):
+            parent = value.parent
+            while parent:
+                for key in parent:
+                    if not isinstance(parent[key], dict):
+                        exports_key = basename_path(key).replace("-", "_")
+                        if exports_key not in exports:
+                            exports[exports_key] = parent[key]
+                parent = parent.parent
         # xyzzy
     if args.exports_file:
         if os.path.exists(args.exports_file):
