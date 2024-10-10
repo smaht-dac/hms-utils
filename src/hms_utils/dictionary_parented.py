@@ -124,6 +124,35 @@ class JSON(dict):
             path_separator = JSON._PATH_SEPARATOR
         return merge(self, secondary)
 
+    def lookup(data, path: str, path_separator: Optional[str] = None) -> Optional[Union[Any, JSON]]:
+        if (not isinstance(path, str)) or (not path):
+            return None, data
+        if (not isinstance(path_separator, str)) or (not path_separator):
+            path_separator = JSON._PATH_SEPARATOR
+        if not (path_components := unpack_path(path, path_separator=path_separator)):
+            return None, data
+        if path_components[0] == path_separator:
+            path_components = path_components[1:]
+            context = data.root
+        else:
+            context = data
+        value = None
+        for path_component_index, path_component in enumerate(path_components):
+            if (value := context.get(path_component)) is None:
+                break
+            if isinstance(value, JSON):
+                context = value
+            elif path_component_index < (len(path_components) - 1):
+                value = None
+                break
+        return value
+
+    def copy(self, rvalue: Optional[Callable] = None) -> JSON:
+        if not self._parent:
+            return deepcopy(self)
+        root = JSON(self.root, rvalue=rvalue)
+        return root.lookup(self.path)
+
     def __setitem__(self, key: Any, value: Any) -> None:
         if isinstance(value, dict):
             if not isinstance(value, JSON):
@@ -143,28 +172,6 @@ class JSON(dict):
         return JSON(deepcopy(dict(self), memo))
 
     def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
-        def lookup(data, path: str, path_separator: Optional[str] = None) -> Tuple[Optional[Union[Any, JSON]], JSON]:
-            if (not isinstance(path, str)) or (not path):
-                return None, data
-            if (not isinstance(path_separator, str)) or (not path_separator):
-                path_separator = JSON._PATH_SEPARATOR
-            if not (path_components := unpack_path(path, path_separator=path_separator)):
-                return None, data
-            if path_components[0] == path_separator:
-                path_components = path_components[1:]
-                context = data.root
-            else:
-                context = data
-            value = None
-            for path_component_index, path_component in enumerate(path_components):
-                if (value := context.get(path_component)) is None:
-                    break
-                if isinstance(value, JSON):
-                    context = value
-                elif path_component_index < (len(path_components) - 1):
-                    value = None
-                    break
-            return value, context
         def root_indicator() -> str:  # noqa
             nonlocal self
             indicator = f"\b\b{chars.rarrow} root {chars.dot} id: {id(self)}"
@@ -177,7 +184,7 @@ class JSON(dict):
                           f"{f' {chars.dot_hollow} parent: {id(parent.parent)}' if parent.parent else ''}")
             if check is True:
                 path = parent.context_path(path_separator=True, path_rooted=True)
-                checked_value, _ = lookup(self, path)
+                checked_value, _ = self.lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(parent) else chars.xmark}"
             return annotation
         def value_annotator(parent: JSON, key: Any, value: Any) -> str:  # noqa
@@ -191,7 +198,7 @@ class JSON(dict):
                 pass
                 annotation += f" {chars.rarrow_hollow} {path}"
             if (check is True) and path:
-                checked_value, _ = lookup(parent, path)
+                checked_value, _ = parent.lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
         print_dictionary_tree(self,

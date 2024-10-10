@@ -322,8 +322,7 @@ def handle_exports_command(config: Config, args: object) -> None:
                 continue
         else:
             exports_name = basename_path(lookup_path)
-        # if (value := config.lookup(lookup_path, show=args.show)) is None:
-        if (value := config.lookup(lookup_path, show=None)) is None:
+        if (value := config.lookup(lookup_path, show=args.show)) is None:
             if not args.verbose:
                 continue
             value = chars.null
