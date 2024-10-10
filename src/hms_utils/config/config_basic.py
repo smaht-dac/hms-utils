@@ -288,7 +288,7 @@ class ConfigBasic:
 
     def _debug(self, message: str) -> None:
         if (self._debug or ("--debug" in sys.argv) or ("-debug" in sys.argv) or
-            (os.environ.get("HMS_DEBUG", "").lower() == "true")):
+            (os.environ.get("HMS_DEBUG", "").lower() == "true")):  # noqa
             print(message, file=sys.stderr, flush=True)
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
