@@ -287,7 +287,10 @@ class ConfigBasic:
     def _warning(self, message: str, raise_exception: bool = False) -> None:
         if (raise_exception is True) or self._raise_exception:
             raise Exception(message)
-        self._warnings.append(f"WARNING: {message}")
+        if isinstance(message, str) and message:
+            message = f"WARNING: {message}"
+        if message not in self._warnings:
+            self._warnings.append(message)
 
     def _debug(self, message: str) -> None:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):

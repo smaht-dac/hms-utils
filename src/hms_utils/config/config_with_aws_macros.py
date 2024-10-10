@@ -84,15 +84,19 @@ class ConfigWithAwsMacros(ConfigBasic):
                         f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
-            if ((value := secrets[secret_name]) is not None) and isinstance(self, ConfigWithSecrets):
-                value = ConfigWithSecrets._secrets_encoded(value)
-            return value
         except Exception as e:
             if self._raise_exception is True:
                 raise e
+            self._warning(f"Cannot read AWS secrets: {secrets_name}"
+                          f"{f' (profile: {aws_profile})' if aws_profile else ''}")
+            return None
+        if (value := secrets.get(secret_name)) is None:
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
                           f"{f' (profile: {aws_profile})' if aws_profile else ''}")
-        return None
+            return None
+        if isinstance(self, ConfigWithSecrets):
+            value = ConfigWithSecrets._secrets_encoded(value)
+        return value
 
     def _contains_aws_secrets(self, value: Any) -> bool:
         if not isinstance(value, str):

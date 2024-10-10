@@ -35,7 +35,7 @@ def main(argv: Optional[List] = None):
     if args.identity:
         config.aws_secrets_name = args.identity
 
-    if args.dump or args.tree or args.list or args.debug or args.files:
+    if args.tree or args.list or args.dump or args.files:
         if args.files:
             print(f"Default config directory: {args.config_dir}")
         if config.name:
@@ -68,7 +68,7 @@ def main(argv: Optional[List] = None):
         else:
             status = handle_lookup_command(config, args)
 
-    if config._warnings:
+    if config._warnings and not args.nowarnings:
         print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
         for warning in config._warnings:
             print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
@@ -102,6 +102,7 @@ def parse_args(argv: List[str]) -> object:
         identity = None
         nocolor = False
         verbose = False
+        nowarnings = False
         debug = False
 
     args = Args()
@@ -251,7 +252,7 @@ def parse_args(argv: List[str]) -> object:
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
                 if not ((argi < argn) and (identity := argv[argi].strip())):
                     _usage()
-                args.identity = identity
+                args.identity = identity ; argi += 1  # noqa
             elif arg in ["--list", "-list"]:
                 args.list = True
             elif arg in ["--files", "-files"]:
@@ -272,10 +273,12 @@ def parse_args(argv: List[str]) -> object:
                 args.nocolor = True
             elif arg in ["--noaws", "-noaws"]:
                 args.noaws = True
+            elif arg in ["--nowarnings", "-nowarnings", "--nowarning", "-nowarning"]:
+                args.nowarnings = True
             elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
-                os.environ[AWS_PROFILE_ENV_NAME] = arg
+                os.environ[AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--export", "-export", "--exports", "-exports"]:
                 args.exports = True
             elif arg in ["--export-file", "-export-file", "--exports-file", "-exports-file"]:
@@ -300,10 +303,10 @@ def handle_lookup_command(config: Config, args: object) -> int:
     status = 0
     for lookup_path in args.lookup_paths:
         if (value := config.lookup(lookup_path, show=args.show)) is None:
+            status = 1
             if not args.verbose:
                 continue
             value = chars.null
-            status = 1
         if args.verbose:
             print(f"{lookup_path}: {value}")
         else:
@@ -362,10 +365,6 @@ def handle_exports_command(config: Config, args: object) -> int:
             export = f"export {export}={exports[export]}"
             print(export)
     return status
-
-
-def _warning(message: str) -> None:
-    print(f"WARNING: {message}", file=sys.stderr, flush=True)
 
 
 def _error(message: str, usage: bool = False, status: int = 1,
