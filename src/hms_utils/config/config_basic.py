@@ -92,19 +92,22 @@ class ConfigBasic:
                     if self._includes is None:
                         self._includes = []
                     self._includes.append(item)
+                    if item.secrets:
+                        self._secrets = True
 
     def lookup(self, path: str,
                context: Optional[JSON] = None,
                noexpand: bool = False,
                inherit_simple: bool = False,
-               inherit_none: bool = False) -> Optional[Union[Any, JSON]]:
+               inherit_none: bool = False, **kwargs) -> Optional[Union[Any, JSON]]:
         context = context if isinstance(context, JSON) else self._json
         value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
         if (value is None) and self._includes:
             for includes in self._includes:
                 if (value := includes.lookup(path, noexpand=noexpand,
-                                             inherit_simple=inherit_simple, inherit_none=inherit_none)) is not None:
+                                             inherit_simple=inherit_simple,
+                                             inherit_none=inherit_none, **kwargs)) is not None:
                     break
         return value
 

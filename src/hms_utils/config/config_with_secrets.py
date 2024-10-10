@@ -67,7 +67,7 @@ class ConfigWithSecrets(ConfigBasic):
                inherit_none: bool = False,
                show: Optional[bool] = False) -> Optional[Union[Any, JSON]]:
         value = super().lookup(path=path, context=context,
-                               noexpand=noexpand, inherit_simple=inherit_simple, inherit_none=inherit_none)
+                               noexpand=noexpand, inherit_simple=inherit_simple, inherit_none=inherit_none, show=show)
         if self._secrets:
             if value is None:
                 return value
