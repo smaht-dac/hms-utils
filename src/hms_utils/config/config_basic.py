@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
@@ -26,8 +27,7 @@ class ConfigBasic:
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 raise_exception: bool = False,
-                 debug: bool = False) -> None:
+                 raise_exception: bool = False) -> None:
 
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = ConfigBasic._PATH_SEPARATOR
@@ -37,7 +37,7 @@ class ConfigBasic:
             raise Exception("Must create Config object with dictionary or file path.")
         self._json = self._create_json(config)
         self._name = name if isinstance(name, str) and name else None
-        self._imports = None
+        self._includes = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
         self._ignore_missing_macros = True
@@ -81,7 +81,7 @@ class ConfigBasic:
                     unmerged_paths.extend(item_unmerged_paths)
         return merged_paths, unmerged_paths
 
-    def imports(self, data: Union[List[Union[dict, ConfigBasic]], Union[dict, ConfigBasic]]) -> None:
+    def include(self, data: Union[List[Union[dict, ConfigBasic]], Union[dict, ConfigBasic]]) -> None:
         if isinstance(data, (dict, ConfigBasic)):
             data = [data]
         if isinstance(data, list):
@@ -89,9 +89,9 @@ class ConfigBasic:
                 if isinstance(item, dict) and (not isinstance(item, JSON)):
                     item = ConfigBasic(item)
                 if isinstance(item, ConfigBasic):
-                    if self._imports is None:
-                        self._imports = []
-                    self._imports.append(item)
+                    if self._includes is None:
+                        self._includes = []
+                    self._includes.append(item)
 
     def lookup(self, path: str,
                context: Optional[JSON] = None,
@@ -101,9 +101,9 @@ class ConfigBasic:
         context = context if isinstance(context, JSON) else self._json
         value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
-        if (value is None) and self._imports:
-            for imported in self._imports:
-                if (value := imported.lookup(path, noexpand=noexpand,
+        if (value is None) and self._includes:
+            for includes in self._includes:
+                if (value := includes.lookup(path, noexpand=noexpand,
                                              inherit_simple=inherit_simple, inherit_none=inherit_none)) is not None:
                     break
         return value
@@ -248,9 +248,9 @@ class ConfigBasic:
             resolved_macro_value, resolved_macro_context = self._lookup(macro_value, context=context)
             if (resolved_macro_value is None) and self._custom_macro_lookup:
                 resolved_macro_value = self._custom_macro_lookup(macro_value, resolved_macro_context)
-        if (resolved_macro_value is None) and self._imports:
-            for import_item in self._imports:
-                resolved_macro_value, resolved_macro_context = import_item.lookup_macro(macro_value)
+        if (resolved_macro_value is None) and self._includes:
+            for include_item in self._includes:
+                resolved_macro_value, resolved_macro_context = include_item.lookup_macro(macro_value)
                 if resolved_macro_value is not None:
                     break
         return resolved_macro_value, resolved_macro_context
@@ -287,8 +287,7 @@ class ConfigBasic:
         self._warnings.append(f"WARNING: {message}")
 
     def _debug(self, message: str) -> None:
-        if (self._debug or ("--debug" in sys.argv) or ("-debug" in sys.argv) or
-            (os.environ.get("HMS_DEBUG", "").lower() == "true")):  # noqa
+        if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
             print(message, file=sys.stderr, flush=True)
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:

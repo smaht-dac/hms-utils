@@ -27,7 +27,7 @@ def main(argv: Optional[List] = None):
 
     config = args.config
     merged_paths, unmerged_paths = config.merge(args.configs_for_merge)
-    config.imports(args.configs_for_import)
+    config.include(args.configs_for_include)
 
     if args.noaws:
         config._noaws = True
@@ -44,10 +44,10 @@ def main(argv: Optional[List] = None):
             for config_for_merge in args.configs_for_merge:
                 if config_for_merge.name:
                     print(f"Merged config file: {config_for_merge.name}")
-        if args.configs_for_import:
-            for config_for_import in args.configs_for_import:
-                if config_for_import.name:
-                    print(f"Imported config file: {config_for_import.name}")
+        if args.configs_for_include:
+            for config_for_include in args.configs_for_include:
+                if config_for_include.name:
+                    print(f"Included config file: {config_for_include.name}")
     elif not args.lookup_paths:
         args.tree = True
 
@@ -87,7 +87,7 @@ def parse_args(argv: List[str]) -> object:
         config_dir = None
         config = None
         configs_for_merge = []
-        configs_for_import = []
+        configs_for_include = []
         lookup_paths = []
         exports = False
         exports_file = None
@@ -106,7 +106,7 @@ def parse_args(argv: List[str]) -> object:
 
     args = Args()
 
-    def get_configs(_merges: bool = False, _imports: bool = False) -> None:
+    def get_configs(_merges: bool = False, _includes: bool = False) -> None:
 
         nonlocal argv, args
 
@@ -186,14 +186,14 @@ def parse_args(argv: List[str]) -> object:
             arg_merge_config = _merges and arg in ["--merge", "-merge"]
             arg_merge_secrets = _merges and arg in ["--merge-secrets", "-merge-secrets",
                                                     "--merge-secret", "-merge-secret"]
-            arg_import_config = _imports and arg in ["--imports", "-imports", "--import", "-import"]
-            arg_import_secrets = _imports and arg in ["--import-secrets", "-import-secrets",
-                                                      "--import-secret", "-import-secret"]
+            arg_include_config = _includes and arg in ["--includes", "-includes", "--include", "-include"]
+            arg_include_secrets = _includes and arg in ["--include-secrets", "-include-secrets",
+                                                        "--include-secret", "-include-secret"]
             if (arg_config or arg_secrets or
-                arg_merge_config or arg_merge_secrets or arg_import_config or arg_import_secrets):  # noqa
+                arg_merge_config or arg_merge_secrets or arg_include_config or arg_include_secrets):  # noqa
                 if not config_dir_option_specified:
                     config_dir = os.getcwd()
-                secrets = arg_secrets or arg_import_secrets
+                secrets = arg_secrets or arg_include_secrets
                 argi_config = argi - 1
                 if not ((argi < argn) and (config_file := argv[argi])):
                     _usage()
@@ -210,8 +210,8 @@ def parse_args(argv: List[str]) -> object:
                     del argv[argi_config:argi + 1]
         if _merges:
             args.configs_for_merge += configs
-        elif _imports:
-            args.configs_for_import = configs
+        elif _includes:
+            args.configs_for_include = configs
         else:
             if not configs:
                 configs.append(verify_config(DEFAULT_CONFIG_FILE_NAME, config_dir, secrets=False))
@@ -219,7 +219,7 @@ def parse_args(argv: List[str]) -> object:
             args.config = configs[0]
             args.configs_for_merge = configs[1:]
             get_configs(_merges=True)
-            get_configs(_imports=True)
+            get_configs(_includes=True)
 
     def get_lookup_paths() -> List[str]:
         nonlocal argv, args

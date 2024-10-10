@@ -29,8 +29,7 @@ class ConfigWithSecrets(ConfigBasic):
                  custom_macro_lookup: Optional[Callable] = None,
                  raise_exception: bool = False,
                  secrets: bool = False,
-                 obfuscated_value: Optional[str] = None,
-                 debug: bool = False, **kwargs) -> None:
+                 obfuscated_value: Optional[str] = None, **kwargs) -> None:
         self._secrets = (secrets is True) or (isinstance(config, str) and ("secret" in os.path.basename(config)))
         self._obfuscated_value = (obfuscated_value
                                   if isinstance(obfuscated_value, str) and obfuscated_value
@@ -39,7 +38,7 @@ class ConfigWithSecrets(ConfigBasic):
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=custom_macro_lookup,
-                         raise_exception=raise_exception, debug=debug, **kwargs)
+                         raise_exception=raise_exception, **kwargs)
 
     def _create_json(self, data: dict) -> JSON:
         if not self._secrets:

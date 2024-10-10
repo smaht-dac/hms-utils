@@ -12,8 +12,7 @@ class Config(ConfigWithSecrets, ConfigWithAwsMacros):
                  custom_macro_lookup: Optional[Callable] = None,
                  raise_exception: bool = False,
                  secrets: bool = False,
-                 noaws: bool = False,
-                 debug: bool = False, **kwargs) -> None:
+                 noaws: bool = False, **kwargs) -> None:
 
         super().__init__(config=config,
                          name=name,
@@ -21,8 +20,7 @@ class Config(ConfigWithSecrets, ConfigWithAwsMacros):
                          custom_macro_lookup=custom_macro_lookup,
                          raise_exception=raise_exception,
                          secrets=secrets,
-                         noaws=noaws,
-                         debug=debug, **kwargs)
+                         noaws=noaws, **kwargs)
 
     @staticmethod
     def default():

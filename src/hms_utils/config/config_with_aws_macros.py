@@ -25,8 +25,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                  custom_macro_lookup: Optional[Callable] = None,
                  raise_exception: bool = False,
                  aws_secrets_name: Optional[str] = None,
-                 noaws: bool = False,
-                 debug: bool = False, **kwargs) -> None:
+                 noaws: bool = False, **kwargs) -> None:
         self._aws_secrets_name = aws_secrets_name.strip() if isinstance(aws_secrets_name, str) else None
         self._noaws = noaws is True
         self._raise_exception = raise_exception is True
@@ -34,7 +33,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=self._lookup_macro_custom,
-                         raise_exception=raise_exception, debug=debug, **kwargs)
+                         raise_exception=raise_exception, **kwargs)
 
     @property
     def aws_secrets_name(self) -> Optional[str]:
