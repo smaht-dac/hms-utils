@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.path_utils import repack_path, unpack_path
 from hms_utils.dictionary_utils import load_json_file
@@ -25,7 +26,8 @@ class ConfigBasic:
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 raise_exception: bool = False) -> None:
+                 raise_exception: bool = False,
+                 debug: bool = False) -> None:
 
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
             path_separator = ConfigBasic._PATH_SEPARATOR
@@ -283,6 +285,11 @@ class ConfigBasic:
         if (raise_exception is True) or self._raise_exception:
             raise Exception(message)
         self._warnings.append(f"WARNING: {message}")
+
+    def _debug(self, message: str) -> None:
+        if (self._debug or ("--debug" in sys.argv) or ("-debug" in sys.argv) or
+            (os.environ.get("HMS_DEBUG", "").lower() == "true")):
+            print(message, file=sys.stderr, flush=True)
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
         self.data(sorted=sorted)._dump_for_testing(verbose=verbose, check=check)

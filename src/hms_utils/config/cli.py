@@ -35,7 +35,7 @@ def main(argv: Optional[List] = None):
     if args.identity:
         config.aws_secrets_name = args.identity
 
-    if args.dump or args.list or args.debug or args.files:
+    if args.dump or args.tree or args.list or args.debug or args.files:
         if args.files:
             print(f"Default config directory: {args.config_dir}")
         if config.name:
@@ -49,15 +49,15 @@ def main(argv: Optional[List] = None):
                 if config_for_import.name:
                     print(f"Imported config file: {config_for_import.name}")
     elif not args.lookup_paths:
-        args.dump = True
+        args.tree = True
 
-    if args.dump:
+    if args.tree:
         ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
 
     if args.list:
         ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
 
-    if args.debug:
+    if args.dump:
         config._dump_for_testing(show=None if args.raw else args.show,
                                  sorted=not args.raw, verbose=args.verbose, check=args.check)
 
@@ -91,6 +91,7 @@ def parse_args(argv: List[str]) -> object:
         lookup_paths = []
         exports = False
         exports_file = None
+        tree = False
         list = False
         files = False
         dump = False
@@ -255,7 +256,9 @@ def parse_args(argv: List[str]) -> object:
                 args.list = True
             elif arg in ["--files", "-files"]:
                 args.files = True
-            elif arg in ["--dump", "-dump", "--tree", "-tree"]:
+            elif arg in ["--tree", "-tree"]:
+                args.tree = True
+            elif arg in ["--dump", "-dump"]:
                 args.dump = True
             elif arg in ["--raw", "-raw"]:
                 args.raw = True

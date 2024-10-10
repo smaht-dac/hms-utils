@@ -30,12 +30,11 @@ class ConfigWithAwsMacros(ConfigBasic):
         self._aws_secrets_name = aws_secrets_name.strip() if isinstance(aws_secrets_name, str) else None
         self._noaws = noaws is True
         self._raise_exception = raise_exception is True
-        self._debug = debug is True
         super().__init__(config,
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=self._lookup_macro_custom,
-                         raise_exception=raise_exception, **kwargs)
+                         raise_exception=raise_exception, debug=debug, **kwargs)
 
     @property
     def aws_secrets_name(self) -> Optional[str]:
@@ -82,9 +81,8 @@ class ConfigWithAwsMacros(ConfigBasic):
             return None
         try:
             boto_secrets = BotoClient("secretsmanager")
-            if True or self._debug:
-                print(f"DEBUG: Reading AWS secrets: {secrets_name}/{secret_name}"
-                      f"{f' (profile: {aws_profile})' if aws_profile else ''}")
+            self._debug(f"DEBUG: Reading AWS secret: {secrets_name}/{secret_name}"
+                        f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
             if ((value := secrets[secret_name]) is not None) and isinstance(self, ConfigWithSecrets):
