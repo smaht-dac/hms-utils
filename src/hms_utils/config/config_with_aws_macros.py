@@ -2,10 +2,11 @@ from __future__ import annotations
 from boto3 import client as BotoClient
 import json
 import re
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 from hms_utils.config.config_basic import ConfigBasic
-from hms_utils.dictionary_utils import JSON
+from hms_utils.dictionary_parented import JSON
 from hms_utils.config.config_with_secrets import ConfigWithSecrets
+from hms_utils.env_utils import os_environ
 
 
 class ConfigWithAwsMacros(ConfigBasic):
@@ -15,12 +16,12 @@ class ConfigWithAwsMacros(ConfigBasic):
     _AWS_SECRET_MACRO_END = ConfigBasic._MACRO_END
     _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
     _AWS_SECRET_NAME_NAME = "IDENTITY"
+    _AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
 
     def __init__(self, config: JSON,
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
                  aws_secrets_name: Optional[str] = None,
                  noaws: bool = False,
@@ -33,7 +34,6 @@ class ConfigWithAwsMacros(ConfigBasic):
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=self._lookup_macro_custom,
-                         warning=warning,
                          raise_exception=raise_exception, **kwargs)
 
     @property
@@ -50,7 +50,15 @@ class ConfigWithAwsMacros(ConfigBasic):
         secret_specifier = macro_value[len(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):]
         return self._lookup_aws_secret(secret_specifier, context)
 
-    def _lookup_aws_secret(self, secret_specifier: str, context: str) -> Optional[str]:
+    def _lookup_aws_secret(self, secret_specifier: str, context: Optional[JSON] = None) -> Optional[str]:
+        def lookup_aws_profile_environment_variable(context: Optional[JSON] = None) -> Optional[str]:
+            if isinstance(context, JSON):
+                while True:
+                    if aws_profile := context.get(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME):
+                        return aws_profile
+                    if not (context := context.parent):
+                        break
+            return None
         if (index := secret_specifier.find(self._path_separator)) > 0:
             secret_name = secret_specifier[index + 1:]
             secrets_name = secret_specifier[0:index]
@@ -59,11 +67,15 @@ class ConfigWithAwsMacros(ConfigBasic):
             if self._aws_secrets_name:
                 secrets_name = self._aws_secrets_name
             else:
-                secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context=context)
-                # secrets_name = self.lookup(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
-        return self._aws_get_secret(secrets_name, secret_name) if secret_name and secrets_name else None
+                secrets_name = super().lookup(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context=context)
+        if not (secret_name and secrets_name):
+            return None
+        if aws_profile := lookup_aws_profile_environment_variable(context):
+            with os_environ(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, aws_profile):
+                return self._aws_get_secret(secrets_name, secret_name, aws_profile)
+        return self._aws_get_secret(secrets_name, secret_name, aws_profile)
 
-    def _aws_get_secret(self, secrets_name: str, secret_name: str) -> Optional[str]:
+    def _aws_get_secret(self, secrets_name: str, secret_name: str, aws_profile: Optional[str] = None) -> Optional[str]:
         if self._noaws:
             return None
         try:
@@ -76,10 +88,10 @@ class ConfigWithAwsMacros(ConfigBasic):
                 value = ConfigWithSecrets._secrets_encoded(value)
             return value
         except Exception as e:
-            import pdb ; pdb.set_trace()  # noqa
             if self._raise_exception is True:
                 raise e
-            self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}")
+            self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
+                          f"{f' (profile: {aws_profile} if aws_profile else '''}")
         return None
 
     def _contains_aws_secrets(self, value: Any) -> bool:

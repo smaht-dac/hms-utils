@@ -369,7 +369,7 @@ def test_hms_config_a():
             "hotel": "3"
         },
         "zulu": "99"
-    }, warning=True)
+    })
 
     assert config.lookup("zulu") == "99"
     assert config.lookup("charlie/echo") == "3_1_2_4_echooooo${zulu}"  # WARNING: zule evaluates to non-string.

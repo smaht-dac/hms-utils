@@ -2,7 +2,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Optional
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import print_dictionary_list, print_dictionary_tree
+from hms_utils.dictionary_print_utils import print_dictionary_list, print_dictionary_tree
 from hms_utils.config.config import Config
 from hms_utils.config.config_with_secrets import ConfigWithSecrets
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
@@ -13,7 +13,14 @@ class ConfigOutput:
 
     @staticmethod
     def print_tree(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
-        def value_modifier(path: str, value: Any) -> Optional[str]:
+        def root_indicator():
+            indicator = f"\b\b{chars.rarrow} {config.name}"
+            if config._merged:
+                for merged in config._merged:
+                    indicator += f"\n{chars.rarrow_hollow} {merged} (merged)"
+                pass
+            return indicator
+        def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, show, raw
             if raw is not True:
                 value = ConfigOutput._lookup_path(config, path, show=None)
@@ -29,7 +36,9 @@ class ConfigOutput:
                             return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red", bold=True)
             return None
         print_dictionary_tree(config.data(show=None),
-                              value_modifier=value_modifier, arrow_indicator=tree_arrow_indicator)
+                              value_modifier=value_modifier,
+                              arrow_indicator=tree_arrow_indicator,
+                              root_indicator=root_indicator, indent=2)
 
     @staticmethod
     def print_list(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:

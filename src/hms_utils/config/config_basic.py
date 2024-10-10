@@ -1,6 +1,5 @@
 from __future__ import annotations
 import re
-import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
 from hms_utils.path_utils import repack_path, unpack_path
 from hms_utils.dictionary_utils import load_json_file
@@ -26,7 +25,6 @@ class ConfigBasic:
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False) -> None:
 
         if not (isinstance(path_separator, str) and (path_separator := path_separator.strip())):
@@ -43,10 +41,9 @@ class ConfigBasic:
         self._ignore_missing_macros = True
         self._ignore_circular_macros = True
         self._ignore_structured_macros = True
-        self._warning = (warning if callable(warning) else (self._warn if warning is True else lambda _, __=None: _))
+        self._warnings = []
         self._raise_exception = raise_exception is True
-        if self._raise_exception:
-            self._warning = self._warn
+        self._merged = []
 
     def _create_json(self, data: dict) -> JSON:
         return JSON(data)
@@ -72,6 +69,8 @@ class ConfigBasic:
                 if isinstance(item, dict) and (not isinstance(item, JSON)):
                     item = JSON(item)
                 elif isinstance(item, ConfigBasic):
+                    if merged_name := item.name:
+                        self._merged.append(merged_name)
                     item = item._json
                 if isinstance(item, JSON):
                     self._json, item_merged_paths, item_unmerged_paths = (
@@ -222,7 +221,7 @@ class ConfigBasic:
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type:"
-                                  f"{self.path(context, macro_value)}", not self._ignore_structured_macros)
+                                  f" {self.path(context, macro_value)}", not self._ignore_structured_macros)
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
@@ -277,10 +276,10 @@ class ConfigBasic:
         return context.context_path(path_separator=self._path_separator,
                                     path_rooted=path_rooted, path_suffix=path_suffix)
 
-    def _warn(self, message: str, raise_exception: bool = False) -> None:
-        print(f"WARNING: {message}", file=sys.stderr, flush=True)
-        if (raise_exception is True) or (self._raise_exception is True):
+    def _warning(self, message: str, raise_exception: bool = False) -> None:
+        if (raise_exception is True) or self._raise_exception:
             raise Exception(message)
+        self._warnings.append(f"WARNING: {message}")
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
         self.data(sorted=sorted)._dump_for_testing(verbose=verbose, check=check)

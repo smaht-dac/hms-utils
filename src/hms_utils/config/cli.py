@@ -52,16 +52,7 @@ def main(argv: Optional[List] = None):
         args.dump = True
 
     if args.dump:
-        warnings = []
-        def collect_warnings(warning: str, raise_exception: bool = False) -> None:  # noqa / TODO
-            if warning not in warnings:
-                warnings.append(warning)
-        config._warning = collect_warnings
         ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
-        if warnings:
-            print(f"{chars.rarrow} WARNINGS ({len(warnings)}):", file=sys.stderr)
-            for warning in warnings:
-                print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
 
     if args.list:
         ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
@@ -70,13 +61,19 @@ def main(argv: Optional[List] = None):
         config._dump_for_testing(show=None if args.raw else args.show,
                                  sorted=not args.raw, verbose=args.verbose, check=args.check)
 
+    status = 0
     if args.lookup_paths:
         if args.exports:
-            handle_exports_command(config, args)
+            status = handle_exports_command(config, args)
         else:
-            handle_lookup_command(config, args)
+            status = handle_lookup_command(config, args)
 
-    sys.exit(0)
+    if config._warnings:
+        print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
+        for warning in config._warnings:
+            print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
+
+    sys.exit(status)
 
 
 def main_show_script_path():
@@ -100,7 +97,7 @@ def parse_args(argv: List[str]) -> object:
         raw = False
         check = False
         show = False
-        noaws = True
+        noaws = False
         identity = None
         nocolor = False
         verbose = False
@@ -250,7 +247,6 @@ def parse_args(argv: List[str]) -> object:
             arg = argv[argi].strip() ; argi += 1  # noqa
             if arg in ["--show", "-show"]:
                 args.show = True
-                args.noaws = False
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
                 if not ((argi < argn) and (identity := argv[argi].strip())):
                     _usage()
@@ -295,9 +291,9 @@ def parse_args(argv: List[str]) -> object:
     return args
 
 
-def handle_lookup_command(config: Config, args: object) -> None:
+def handle_lookup_command(config: Config, args: object) -> int:
     if not args.lookup_paths:
-        return
+        return 0
     status = 0
     for lookup_path in args.lookup_paths:
         if (value := config.lookup(lookup_path, show=args.show)) is None:
@@ -309,12 +305,12 @@ def handle_lookup_command(config: Config, args: object) -> None:
             print(f"{lookup_path}: {value}")
         else:
             print(f"{value}")
-    exit(status)
+    return status
 
 
-def handle_exports_command(config: Config, args: object) -> None:
+def handle_exports_command(config: Config, args: object) -> int:
     if not args.lookup_paths:
-        return
+        return 0
     exports = {}
     status = 0
     for lookup_path in args.lookup_paths:
@@ -362,7 +358,7 @@ def handle_exports_command(config: Config, args: object) -> None:
         for export in sorted(exports):
             export = f"export {export}={exports[export]}"
             print(export)
-    exit(status)
+    return status
 
 
 def _warning(message: str) -> None:

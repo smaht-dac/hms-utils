@@ -27,7 +27,6 @@ class ConfigWithSecrets(ConfigBasic):
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
                  custom_macro_lookup: Optional[Callable] = None,
-                 warning: Optional[Union[Callable, bool]] = None,
                  raise_exception: bool = False,
                  secrets: bool = False,
                  obfuscated_value: Optional[str] = None, **kwargs) -> None:
@@ -39,7 +38,6 @@ class ConfigWithSecrets(ConfigBasic):
                          name=name,
                          path_separator=path_separator,
                          custom_macro_lookup=custom_macro_lookup,
-                         warning=warning,
                          raise_exception=raise_exception, **kwargs)
 
     def _create_json(self, data: dict) -> JSON:
