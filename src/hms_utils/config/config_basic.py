@@ -231,7 +231,7 @@ class ConfigBasic:
                 else:
                     expanding_macros.append(macro_value)
             else:
-                self._warning(f"Macro not found: {macro_value}", not self._ignore_missing_macros)
+                self._note_macro_not_found(macro_value)
                 value = hide_macros(value, macro_value)
                 missing_macro_found = True
         if missing_macro_found:
@@ -252,6 +252,9 @@ class ConfigBasic:
                 if resolved_macro_value is not None:
                     break
         return resolved_macro_value, resolved_macro_context
+
+    def _note_macro_not_found(self, macro_value: str) -> None:
+        self._warning(f"Macro not found: {macro_value}", not self._ignore_missing_macros)
 
     def unpack_path(self, path: str) -> List[str]:
         return unpack_path(path, path_separator=self._path_separator,

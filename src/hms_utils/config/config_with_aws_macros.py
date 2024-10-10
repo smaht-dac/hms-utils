@@ -102,3 +102,7 @@ class ConfigWithAwsMacros(ConfigBasic):
         if value.find(ConfigWithAwsMacros._AWS_SECRET_MACRO_END) < start:
             return False
         return True
+
+    def _note_macro_not_found(self, macro_value: str) -> None:
+        if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
+            super()._note_macro_not_found(macro_value)
