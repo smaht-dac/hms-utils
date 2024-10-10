@@ -1,5 +1,6 @@
 from __future__ import annotations
 from boto3 import client as BotoClient
+from functools import lru_cache
 import json
 import re
 from typing import Any, Callable, Optional
@@ -75,13 +76,15 @@ class ConfigWithAwsMacros(ConfigBasic):
                 return self._aws_get_secret(secrets_name, secret_name, aws_profile)
         return self._aws_get_secret(secrets_name, secret_name, aws_profile)
 
+    @lru_cache
     def _aws_get_secret(self, secrets_name: str, secret_name: str, aws_profile: Optional[str] = None) -> Optional[str]:
         if self._noaws:
             return None
         try:
             boto_secrets = BotoClient("secretsmanager")
-            if self._debug:
-                print(f"DEBUG: Reading AWS secrets: {secrets_name}/{secret_name}")
+            if True or self._debug:
+                print(f"DEBUG: Reading AWS secrets: {secrets_name}/{secret_name}"
+                      f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
             if ((value := secrets[secret_name]) is not None) and isinstance(self, ConfigWithSecrets):
@@ -91,7 +94,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             if self._raise_exception is True:
                 raise e
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
-                          f"{f' (profile: {aws_profile} if aws_profile else '''}")
+                          f"{f' (profile: {aws_profile})' if aws_profile else ''}")
         return None
 
     def _contains_aws_secrets(self, value: Any) -> bool:
