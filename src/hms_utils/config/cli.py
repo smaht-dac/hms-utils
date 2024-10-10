@@ -10,6 +10,7 @@ from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
+from hms_utils.type_utils import is_primitive_type
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -331,8 +332,10 @@ def handle_exports_command(config: Config, args: object) -> None:
         # Since dash is not even allowed in environment/export name change to underscore.
         if isinstance(value, JSON):  # xyzzy dict
             for key in value:
-                exports_key = basename_path(key).replace("-", "_")
-                exports[exports_key] = value[key]
+                key_value = value[key]
+                if is_primitive_type(key_value):
+                    exports_key = basename_path(key).replace("-", "_")
+                    exports[exports_key] = key_value
         else:
             exports_key = basename_path(exports_name).replace("-", "_")
             exports[exports_key] = value
