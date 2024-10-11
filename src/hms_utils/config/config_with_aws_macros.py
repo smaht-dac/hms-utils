@@ -84,7 +84,6 @@ class ConfigWithAwsMacros(ConfigBasic):
             return None
         try:
             boto_secrets = BotoClient("secretsmanager")
-            import pdb ; pdb.set_trace()  # noqa
             self._debug(f"DEBUG: Reading AWS secret: {secrets_name}/{secret_name}"
                         f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
