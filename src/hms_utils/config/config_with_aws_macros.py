@@ -116,7 +116,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             return None
         if isinstance(self, ConfigWithSecrets):
             # value = ConfigWithSecrets._secrets_encoded(f"aws:{account_number}:{secrets_name}:{secret_name}:{value}")
-            value = ConfigWithSecrets._secrets_encoded(value)
+            value = self._secrets_encoded(value)
         return value
 
     def _contains_aws_secrets(self, value: Any) -> bool:

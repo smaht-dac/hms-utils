@@ -43,12 +43,12 @@ class ConfigWithSecrets(ConfigBasic):
     def _create_json(self, data: dict) -> JSON:
         if not self._secrets:
             return super()._create_json(data)
-        return JSON(data, rvalue=ConfigWithSecrets._secrets_encoded if self._secrets else None)
+        return JSON(data, rvalue=self._secrets_encoded if self._secrets else None)
 
     def data(self, sorted: bool = True, show: Optional[bool] = False) -> JSON:
         if self._secrets:
             if show is True:
-                data = JSON(self._json, rvalue=ConfigWithSecrets._secrets_plaintext)
+                data = JSON(self._json, rvalue=self._secrets_plaintext)
             elif show is False:
                 data = JSON(self._json, rvalue=self._secrets_obfuscated)
             else:
@@ -73,10 +73,10 @@ class ConfigWithSecrets(ConfigBasic):
                 return value
             elif show is True:
                 if isinstance(value, JSON):
-                    return value.copy(rvalue=ConfigWithSecrets._secrets_plaintext)
-                    # return JSON(value, rvalue=ConfigWithSecrets._secrets_plaintext)
+                    return value.copy(rvalue=self._secrets_plaintext)
+                    # return JSON(value, rvalue=self._secrets_plaintext)
                 else:
-                    return ConfigWithSecrets._secrets_plaintext(value)
+                    return self._secrets_plaintext(value)
             elif show is False:
                 if isinstance(value, JSON):
                     return value.copy(rvalue=self._secrets_obfuscated)
@@ -99,8 +99,7 @@ class ConfigWithSecrets(ConfigBasic):
     # any strings which came from a "secret" configuration can be obfuscated by default, or shown if desired;
     # we do go to the trouble of not marking macros within secret config values as secret.
 
-    @staticmethod
-    def _secrets_encoded(value: primitive_type) -> str:
+    def _secrets_encoded(self, value: primitive_type) -> str:
         if not is_primitive_type(value):
             return ""
         if (value_type := type(value).__name__) != ConfigWithSecrets._TYPE_NAME_STR:
@@ -125,8 +124,7 @@ class ConfigWithSecrets(ConfigBasic):
             start += match_end
         return secrets_encoded
 
-    @staticmethod
-    def _secrets_plaintext(secrets_encoded: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
+    def _secrets_plaintext(self, secrets_encoded: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
             return secrets_encoded
         if not callable(plaintext_value):
