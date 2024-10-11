@@ -572,21 +572,14 @@ def test_hms_config_g():
     value = config.lookup("foursight/smaht/Auth0Client")
     assert value == "UfM_REDACTED_Hf9"
 
-    return  # TODO
-
-    mocked_aws_secrets_value = {
-        "deploying_iam_user": "kent.pitman.biotest",
-        "ENCODED_AUTH0_CLIENT": "XYZ_REDACTED_auth0_client_ABC",
-        "ENCODED_AUTH0_SECRET": "XYZ_REDACTED_auth0_secret_ABC",
-        "RDS_NAME": "rds-cgap-wolf"
-    }
-    hms_config_class = "hms_utils.hms_config_rewriting.ConfigWithAwsMacroExpander"
-    with patch(f"{hms_config_class}._aws_get_secret_value") as mocked_aws_get_secret_value:
-        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
+    def mock_aws_get_secret(config, secrets_name, secret_name, aws_profil):  # noqa
+        value = config.lookup("auth0/prod/secret")
+        assert value == "${aws-secret:ENCODED_AUTH0_SECRET}"
+        assert secrets_name == "C4DatastoreCgapWolfC4DatastorecgapwolfapplicationconfigurationApplicationConfiguration"
+        assert secret_name == "ENCODED_AUTH0_SECRET"
+        return "mocked_aws_secret_value_1234567890"
+    hms_config_with_aws_secrets_class_name = "hms_utils.config.config_with_aws_macros.ConfigWithAwsMacros"
+    hms_config_with_aws_secrets_get_secrets_function_name = f"{hms_config_with_aws_secrets_class_name}._aws_get_secret"
+    with patch(hms_config_with_aws_secrets_get_secrets_function_name, new=mock_aws_get_secret):
         value = config.lookup("foursight/cgap/wolf/Auth0Secret")
-        assert value == "XYZ_REDACTED_auth0_secret_ABC"
-
-    with patch(f"{hms_config_class}._aws_get_secret_value") as mocked_aws_get_secret_value:
-        mocked_aws_get_secret_value.return_value = mocked_aws_secrets_value
-        value = config.lookup("auth0/prod/secret", aws_secret_context_path="foursight/cgap/wolf/")
-        assert value == "XYZ_REDACTED_auth0_secret_ABC"
+        assert value == "mocked_aws_secret_value_1234567890"
