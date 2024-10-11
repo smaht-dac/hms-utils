@@ -23,37 +23,41 @@ class ConfigOutput:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, show, raw
             if raw is not True:
-                value = ConfigOutput._lookup_path(config, path, show=None)
+                value = ConfigOutput._lookup(config, path, show=None)
             return ConfigOutput._display_value(config, value=value, show=show, nocolor=nocolor)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, nocolor, show
             if isinstance(config, ConfigWithSecrets):
                 if config._contains_secrets(value):
-                    return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red", bold=True)
+                    return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
                 elif isinstance(config, ConfigWithAwsMacros) and (raw is not True) and (show is True):
                     if config._contains_aws_secrets(value):
-                        if ConfigOutput._lookup_path(config, path, show=None) != value:
-                            return chars.rarrow if nocolor is True else terminal_color(chars.rarrow, "red", bold=True)
+                        if ConfigOutput._lookup(config, path, show=None) != value:
+                            return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
             return None
         print_dictionary_tree(config.data(show=None),
                               value_modifier=value_modifier,
                               arrow_indicator=tree_arrow_indicator,
-                              root_indicator=root_indicator, indent=2)
+                              root_indicator=None, indent=2)
 
     @staticmethod
     def print_list(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:
             nonlocal config, nocolor, show, raw
             if raw is not True:
-                return ConfigOutput._lookup_path(config, path, show=show)
-            return ConfigOutput._display_value(config, value=value, show=show, nocolor=nocolor)
+                lookup_value = ConfigOutput._lookup(config, path, show=None)
+                if config._contains_aws_secrets(value) and config._contains_secrets(lookup_value):
+                    # TODO: annotate with AWS secrets/secret names.
+                    pass
+                return ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
+            return value
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)
 
     @staticmethod
     def _display_value(config: Config, value: Any, show: bool, nocolor: bool = False) -> Optional[str]:
         def display_secret_value(value: Any) -> str:
             nonlocal nocolor
-            return str(value) if nocolor is True else terminal_color(str(value), "red", bold=True)
+            return terminal_color(str(value), "red", bold=True, nocolor=nocolor)
         if show is True:
             return config._secrets_plaintext(value, plaintext_value=display_secret_value)
         elif show is False:
@@ -62,5 +66,5 @@ class ConfigOutput:
             return value
 
     @lru_cache
-    def _lookup_path(config: Config, path: str, show: Optional[bool]) -> Any:
+    def _lookup(config: Config, path: str, show: Optional[bool]) -> Any:
         return config.lookup(path, show=show)

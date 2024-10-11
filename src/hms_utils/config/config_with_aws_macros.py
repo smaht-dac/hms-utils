@@ -3,6 +3,7 @@ from boto3 import client as BotoClient, Session as BotoSession
 from botocore.exceptions import ProfileNotFound as BotoProfileNotFound
 from functools import lru_cache
 import json
+import os
 import re
 from typing import Any, Callable, Optional
 from hms_utils.config.config_basic import ConfigBasic
@@ -63,7 +64,9 @@ class ConfigWithAwsMacros(ConfigBasic):
         def lookup_aws_profile_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
             return lookup_environment_variable(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context)
         def lookup_identity_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
-            return lookup_environment_variable(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
+            if (value := lookup_environment_variable(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)) is None:
+                value = os.environ.get(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME)
+            return value
         if (index := secret_specifier.find(self._path_separator)) > 0:
             secret_name = secret_specifier[index + 1:]
             secrets_name = secret_specifier[0:index]
@@ -86,7 +89,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             return None
         try:
             boto_secrets = BotoClient("secretsmanager")
-            self._debug(f"DEBUG: Reading AWS secret: {secrets_name}/{secret_name}"
+            self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             secrets = json.loads(secrets.get("SecretString"))
@@ -102,7 +105,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                 self._warning(message)
             return None
         if (value := secrets.get(secret_name)) is None:
-            self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
+            self._warning(f"Cannot find AWS secret {secrets_name}/{secret_name}"
                           f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             return None
         if isinstance(self, ConfigWithSecrets):

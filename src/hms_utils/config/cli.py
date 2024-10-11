@@ -32,29 +32,23 @@ def main(argv: Optional[List] = None):
     if args.noaws:
         config._noaws = True
 
-    if args.tree or args.list or args.dump or args.files:
-        if args.files:
-            print(f"Default config directory: {args.config_dir}")
+    if args.tree or args.list or args.dump:
         if config.name:
-            print(f"Main config file: {config.name}")
+            print(f"{chars.rarrow} {config.name}")
         if args.configs_for_merge:
             for config_for_merge in args.configs_for_merge:
                 if config_for_merge.name:
-                    print(f"Merged config file: {config_for_merge.name}")
+                    print(f"{chars.rarrow_hollow} {config_for_merge.name} (merged)")
         if args.configs_for_include:
             for config_for_include in args.configs_for_include:
                 if config_for_include.name:
-                    print(f"Included config file: {config_for_include.name}")
-    elif not args.lookup_paths:
-        args.tree = True
+                    print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
     if args.tree:
         ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
-
-    if args.list:
+    elif args.list:
         ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
-
-    if args.dump:
+    elif args.dump:
         config._dump_for_testing(show=None if args.raw else args.show,
                                  sorted=not args.raw, verbose=args.verbose, check=args.check)
 
@@ -66,7 +60,6 @@ def main(argv: Optional[List] = None):
             status = handle_lookup_command(config, args)
 
     if config._warnings:
-        import pdb ; pdb.set_trace()  # noqa
         if ((not args.nowarnings) and args.lookup_paths) or args.warnings:
             print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
             for warning in config._warnings:
@@ -78,6 +71,78 @@ def main(argv: Optional[List] = None):
 def main_show_script_path():
     sys.argv = ["hmsconfig", "--functions"]
     main()
+
+
+def handle_lookup_command(config: Config, args: object) -> int:
+    if not args.lookup_paths:
+        return 0
+    status = 0
+    for lookup_path in args.lookup_paths:
+        if (value := config.lookup(lookup_path, show=args.show)) is None:
+            status = 1
+            if not args.verbose:
+                continue
+            value = chars.null
+        if isinstance(value, JSON) and args.formatted:
+            value = json.dumps(value, indent=4)
+        if args.verbose:
+            print(f"{lookup_path}: {value}")
+        else:
+            print(f"{value}")
+    return status
+
+
+def handle_exports_command(config: Config, args: object) -> int:
+    if not args.lookup_paths:
+        return 0
+    exports = {}
+    status = 0
+    for lookup_path in args.lookup_paths:
+        if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
+            exports_name = lookup_path[0:index]
+            if not (lookup_path := lookup_path[index + 1:].strip()):
+                continue
+        else:
+            exports_name = basename_path(lookup_path)
+        if (value := config.lookup(lookup_path, show=args.show)) is None:
+            if not args.verbose:
+                continue
+            value = chars.null
+            status = 1
+        # Since dash is not even allowed in environment/export name change to underscore.
+        if isinstance(value, JSON):  # xyzzy dict
+            for key in value:
+                key_value = value[key]
+                if is_primitive_type(key_value):
+                    exports_key = basename_path(key).replace("-", "_")
+                    exports[exports_key] = key_value
+        else:
+            exports_key = basename_path(exports_name).replace("-", "_")
+            exports[exports_key] = value
+        if isinstance(value, JSON):
+            parent = value.parent
+            while parent:
+                for key in parent:
+                    if not isinstance(parent[key], dict):
+                        exports_key = basename_path(key).replace("-", "_")
+                        if exports_key not in exports:
+                            exports[exports_key] = parent[key]
+                parent = parent.parent
+        # xyzzy
+    if args.exports_file:
+        if os.path.exists(args.exports_file):
+            _error(f"Export file must not already exist: {args.exports_file}")
+        with io.open(args.exports_file, "w") as f:
+            for export in exports:
+                export = f"export {export}={exports[export]}"
+                f.write(f"{export}\n")
+                if args.verbose:
+                    print(f"{chars.rarrow_hollow} {export}")
+    else:
+        for export in sorted(exports):
+            export = f"export {export}={exports[export]}"
+            print(export)
+    return status
 
 
 def parse_args(argv: List[str]) -> object:
@@ -255,8 +320,6 @@ def parse_args(argv: List[str]) -> object:
                 os.environ[ConfigWithAwsMacros._AWS_SECRET_NAME_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--list", "-list"]:
                 args.list = True
-            elif arg in ["--files", "-files"]:
-                args.files = True
             elif arg in ["--tree", "-tree"]:
                 args.tree = True
             elif arg in ["--dump", "-dump"]:
@@ -300,79 +363,18 @@ def parse_args(argv: List[str]) -> object:
     get_configs()
     get_lookup_paths()
     get_other_args()
+
+    if args.lookup_paths and (args.tree or args.list or args.dump):
+        _usage()
+    if ((1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
+        _usage()
+    if not (args.lookup_paths or args.tree or args.list or args.dump):
+        args.tree = True
+    if args.show:
+        if args.dump:
+            _usage()
+
     return args
-
-
-def handle_lookup_command(config: Config, args: object) -> int:
-    if not args.lookup_paths:
-        return 0
-    status = 0
-    for lookup_path in args.lookup_paths:
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
-            status = 1
-            if not args.verbose:
-                continue
-            value = chars.null
-        if isinstance(value, JSON) and args.formatted:
-            value = json.dumps(value, indent=4)
-        if args.verbose:
-            print(f"{lookup_path}: {value}")
-        else:
-            print(f"{value}")
-    return status
-
-
-def handle_exports_command(config: Config, args: object) -> int:
-    if not args.lookup_paths:
-        return 0
-    exports = {}
-    status = 0
-    for lookup_path in args.lookup_paths:
-        if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
-            exports_name = lookup_path[0:index]
-            if not (lookup_path := lookup_path[index + 1:].strip()):
-                continue
-        else:
-            exports_name = basename_path(lookup_path)
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
-            if not args.verbose:
-                continue
-            value = chars.null
-            status = 1
-        # Since dash is not even allowed in environment/export name change to underscore.
-        if isinstance(value, JSON):  # xyzzy dict
-            for key in value:
-                key_value = value[key]
-                if is_primitive_type(key_value):
-                    exports_key = basename_path(key).replace("-", "_")
-                    exports[exports_key] = key_value
-        else:
-            exports_key = basename_path(exports_name).replace("-", "_")
-            exports[exports_key] = value
-        if isinstance(value, JSON):
-            parent = value.parent
-            while parent:
-                for key in parent:
-                    if not isinstance(parent[key], dict):
-                        exports_key = basename_path(key).replace("-", "_")
-                        if exports_key not in exports:
-                            exports[exports_key] = parent[key]
-                parent = parent.parent
-        # xyzzy
-    if args.exports_file:
-        if os.path.exists(args.exports_file):
-            _error(f"Export file must not already exist: {args.exports_file}")
-        with io.open(args.exports_file, "w") as f:
-            for export in exports:
-                export = f"export {export}={exports[export]}"
-                f.write(f"{export}\n")
-                if args.verbose:
-                    print(f"{chars.rarrow_hollow} {export}")
-    else:
-        for export in sorted(exports):
-            export = f"export {export}={exports[export]}"
-            print(export)
-    return status
 
 
 def _error(message: str, usage: bool = False, status: int = 1,
@@ -388,10 +390,14 @@ def _error(message: str, usage: bool = False, status: int = 1,
 
 
 def _usage():
-    print(f"{chars.rarrow} hmsconfig reads named values from {DEFAULT_CONFIG_FILE_NAME} or"
-          f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
-    print(f"  usage: python hms_config.py"
-          f" [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
+    print("USAGE: hmsconfig OPTIONS [path]")
+    print("OPTIONS:")
+    print("--config:  list of JSON config files")
+    print("--list:    show all config data in list format")
+    print("--tree:    show all config data in tree format")
+    print("--dump:    show all config data in demp/debug format")
+    print("--verbose: verbose output")
+    print("--debug:   debugging output")
     sys.exit(1)
 
 
