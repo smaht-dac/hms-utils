@@ -11,13 +11,13 @@ from hms_utils.config.config_output import ConfigOutput
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
 from hms_utils.type_utils import is_primitive_type
+from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
 DEFAULT_SECRETS_FILE_NAME = "secrets.json"
 DEFAULT_PATH_SEPARATOR = "/"
 DEFAULT_EXPORT_NAME_SEPARATOR = ":"
-AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
 OBFUSCATED_VALUE = "********"
 
 
@@ -31,9 +31,6 @@ def main(argv: Optional[List] = None):
 
     if args.noaws:
         config._noaws = True
-
-    if args.identity:
-        config.aws_secrets_name = args.identity
 
     if args.tree or args.list or args.dump or args.files:
         if args.files:
@@ -99,7 +96,6 @@ def parse_args(argv: List[str]) -> object:
         check = False
         show = False
         noaws = False
-        identity = None
         nocolor = False
         verbose = False
         nowarnings = False
@@ -250,9 +246,9 @@ def parse_args(argv: List[str]) -> object:
             if arg in ["--show", "-show"]:
                 args.show = True
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
-                if not ((argi < argn) and (identity := argv[argi].strip())):
+                if not ((argi < argn) and (arg := argv[argi].strip())):
                     _usage()
-                args.identity = identity ; argi += 1  # noqa
+                os.environ[ConfigWithAwsMacros._AWS_SECRET_NAME_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--list", "-list"]:
                 args.list = True
             elif arg in ["--files", "-files"]:
@@ -278,7 +274,7 @@ def parse_args(argv: List[str]) -> object:
             elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
-                os.environ[AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
+                os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--export", "-export", "--exports", "-exports"]:
                 args.exports = True
             elif arg in ["--export-file", "-export-file", "--exports-file", "-exports-file"]:
@@ -290,6 +286,8 @@ def parse_args(argv: List[str]) -> object:
                 _usage()
             else:
                 args.lookup_paths.append(arg)
+        if not args.show:
+            args.noaws = True
 
     get_configs()
     get_lookup_paths()

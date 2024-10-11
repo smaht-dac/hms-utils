@@ -6,6 +6,7 @@ import re
 from typing import Any, Callable, Optional
 from hms_utils.config.config_basic import ConfigBasic
 from hms_utils.dictionary_parented import JSON
+from hms_utils.chars import chars
 from hms_utils.config.config_with_secrets import ConfigWithSecrets
 from hms_utils.env_utils import os_environ
 
@@ -91,12 +92,16 @@ class ConfigWithAwsMacros(ConfigBasic):
         except Exception as e:
             if self._raise_exception is True:
                 raise e
-            self._warning(f"Cannot read AWS secrets: {secrets_name}"
-                          f"{f' (profile: {aws_profile})' if aws_profile else ''}")
+            message = f"Cannot read AWS secrets: {secrets_name}"
+            if aws_profile:
+                message += f" {chars.dot} profile: {aws_profile}"
+            if ("token" in str(e)) and ("expired" in str(e)):
+                message += f" {chars.dot} expired"
+            self._warning(message)
             return None
         if (value := secrets.get(secret_name)) is None:
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
-                          f"{f' (profile: {aws_profile})' if aws_profile else ''}")
+                          f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             return None
         if isinstance(self, ConfigWithSecrets):
             value = ConfigWithSecrets._secrets_encoded(value)
@@ -111,6 +116,6 @@ class ConfigWithAwsMacros(ConfigBasic):
             return False
         return True
 
-    def _note_macro_not_found(self, macro_value: str) -> None:
+    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
-            super()._note_macro_not_found(macro_value)
+            super()._note_macro_not_found(macro_value, context)
