@@ -85,6 +85,11 @@ class ConfigWithAwsMacros(ConfigBasic):
 
     @lru_cache
     def _aws_get_secret(self, secrets_name: str, secret_name: str, aws_profile: Optional[str] = None) -> Optional[str]:
+        def extract_aws_account_number(secrets: dict) -> str:
+            try:
+                return secrets["ARN"].split(':')[4].strip()
+            except Exception:
+                return ""
         if self._noaws:
             return None
         try:
@@ -92,6 +97,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' (profile: {aws_profile})' if aws_profile else ''}")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
+            account_number = extract_aws_account_number(secrets)  # noqa TODO
             secrets = json.loads(secrets.get("SecretString"))
         except Exception as e:
             if self._raise_exception is True:
@@ -109,6 +115,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                           f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             return None
         if isinstance(self, ConfigWithSecrets):
+            # value = ConfigWithSecrets._secrets_encoded(f"aws:{account_number}:{secrets_name}:{secret_name}:{value}")
             value = ConfigWithSecrets._secrets_encoded(value)
         return value
 

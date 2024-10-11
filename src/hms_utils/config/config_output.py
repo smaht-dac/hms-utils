@@ -47,6 +47,8 @@ class ConfigOutput:
             if raw is not True:
                 lookup_value = ConfigOutput._lookup(config, path, show=None)
                 if config._contains_aws_secrets(value) and config._contains_secrets(lookup_value):
+                    # import pdb ; pdb.set_trace()  # noqa
+                    pass
                     # TODO: annotate with AWS secrets/secret names.
                     pass
                 value = ConfigOutput._display_value(config, lookup_value, show=show, nocolor=nocolor)

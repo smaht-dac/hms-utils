@@ -109,7 +109,6 @@ class ConfigWithSecrets(ConfigBasic):
         start = 0
         while True:
             if not (match := ConfigBasic._MACRO_PATTERN.search(value[start:])):
-                # secrets_encoded += value[start:]
                 if secret_part := value[start:]:
                     secrets_encoded += (
                         f"{ConfigWithSecrets._SECRET_VALUE_START}str:"
@@ -139,17 +138,21 @@ class ConfigWithSecrets(ConfigBasic):
             if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
             secret_value = secrets_encoded[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
-            if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
-                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
-            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
-                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
-                secret_value_typed = int(secret_value)
-            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
-                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
-                secret_value_typed = float(secret_value)
-            elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
-                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
-                secret_value_typed = True if (secret_value.lower() == "true") else False
+            secret_value, secret_value_typed = ConfigWithSecrets._secrets_plaintext_value(secret_value)
+#           if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
+#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
+#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
+#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
+#               secret_value_typed = int(secret_value)
+#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
+#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
+#               secret_value_typed = float(secret_value)
+#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
+#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
+#               secret_value_typed = True if (secret_value.lower() == "true") else False
+#           elif secret_value.startswith(f"aws:"):
+#               import pdb ; pdb.set_trace()  # noqa
+#               pass
             if callable(plaintext_value):
                 secret_value = plaintext_value(secret_value)
             secrets_encoded = (
@@ -158,6 +161,26 @@ class ConfigWithSecrets(ConfigBasic):
         if (secret_value_typed is not None) and (str(secret_value_typed) == secret_value):
             return secret_value_typed
         return secrets_encoded
+
+    @staticmethod
+    def _secrets_plaintext_value(secret_value: str) -> Tuple[primitive_type, Any]:
+        secret_value_typed = None
+        if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
+            if secret_value.startswith("str:aws:") and (len(value := secret_value.split(":")) >= 6):
+                # TODO
+                secret_value = ":".join(value[5:])
+            else:
+                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
+        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
+            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
+            secret_value_typed = int(secret_value)
+        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
+            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
+            secret_value_typed = float(secret_value)
+        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
+            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
+            secret_value_typed = True if (secret_value.lower() == "true") else False
+        return secret_value, secret_value_typed
 
     def _secrets_obfuscated(self, secrets_encoded: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
         if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
