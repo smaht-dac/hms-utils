@@ -49,7 +49,7 @@ class ConfigOutput:
                 if config._contains_aws_secrets(value) and config._contains_secrets(lookup_value):
                     # TODO: annotate with AWS secrets/secret names.
                     pass
-                return ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
+                value = ConfigOutput._display_value(config, lookup_value, show=show, nocolor=nocolor)
             return value
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)
 
