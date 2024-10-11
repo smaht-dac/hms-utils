@@ -1,5 +1,6 @@
 from __future__ import annotations
-from boto3 import client as BotoClient
+from boto3 import client as BotoClient, Session as BotoSession
+from botocore.exceptions import ProfileNotFound as BotoProfileNotFound
 from functools import lru_cache
 import json
 import re
@@ -92,12 +93,13 @@ class ConfigWithAwsMacros(ConfigBasic):
         except Exception as e:
             if self._raise_exception is True:
                 raise e
-            message = f"Cannot read AWS secrets: {secrets_name}"
-            if aws_profile:
-                message += f" {chars.dot} profile: {aws_profile}"
-            if ("token" in str(e)) and ("expired" in str(e)):
-                message += f" {chars.dot} expired"
-            self._warning(message)
+            if self._is_any_aws_environent_defined():
+                message = f"Cannot read AWS secrets: {secrets_name}"
+                if aws_profile:
+                    message += f" {chars.dot} profile: {aws_profile}"
+                if ("token" in str(e)) and ("expired" in str(e)):
+                    message += f" {chars.dot} expired"
+                self._warning(message)
             return None
         if (value := secrets.get(secret_name)) is None:
             self._warning(f"Cannot find AWS secret: {secrets_name}/{secret_name}"
@@ -119,3 +121,10 @@ class ConfigWithAwsMacros(ConfigBasic):
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
             super()._note_macro_not_found(macro_value, context)
+
+    @lru_cache
+    def _is_any_aws_environent_defined(self) -> bool:
+        try:
+            return BotoSession().get_credentials() is not None
+        except BotoProfileNotFound:
+            return False

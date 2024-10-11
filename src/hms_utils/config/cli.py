@@ -65,10 +65,12 @@ def main(argv: Optional[List] = None):
         else:
             status = handle_lookup_command(config, args)
 
-    if config._warnings and not args.nowarnings:
-        print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
-        for warning in config._warnings:
-            print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
+    if config._warnings:
+        import pdb ; pdb.set_trace()  # noqa
+        if ((not args.nowarnings) and args.lookup_paths) or args.warnings:
+            print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
+            for warning in config._warnings:
+                print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
 
     sys.exit(status)
 
@@ -97,8 +99,10 @@ def parse_args(argv: List[str]) -> object:
         show = False
         noaws = False
         nocolor = False
+        formatted = False
         verbose = False
         nowarnings = False
+        warnings = False
         debug = False
 
     args = Args()
@@ -271,6 +275,10 @@ def parse_args(argv: List[str]) -> object:
                 args.noaws = True
             elif arg in ["--nowarnings", "-nowarnings", "--nowarning", "-nowarning"]:
                 args.nowarnings = True
+            elif arg in ["--warnings", "-warnings", "--warning", "-warning"]:
+                args.warnings = True
+            elif arg in ["--format", "-format", "--formatted", "-formatted"]:
+                args.formatted = True
             elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
@@ -305,6 +313,8 @@ def handle_lookup_command(config: Config, args: object) -> int:
             if not args.verbose:
                 continue
             value = chars.null
+        if isinstance(value, JSON) and args.formatted:
+            value = json.dumps(value, indent=4)
         if args.verbose:
             print(f"{lookup_path}: {value}")
         else:
