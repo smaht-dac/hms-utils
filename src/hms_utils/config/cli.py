@@ -45,12 +45,11 @@ def main(argv: Optional[List] = None):
                     print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
     if args.tree:
-        ConfigOutput.print_tree(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
     elif args.list:
-        ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_list(config, show=args.show, nocolor=args.nocolor)
     elif args.dump:
-        config._dump_for_testing(show=None if args.raw else args.show,
-                                 sorted=not args.raw, verbose=args.verbose, check=args.check)
+        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     status = 0
     if args.lookup_paths:
@@ -369,17 +368,19 @@ def parse_args(argv: List[str]) -> object:
     get_lookup_paths()
     get_other_args()
 
-    if args.lookup_paths and (args.tree or args.list or args.dump):
+    if args.lookup_paths:
+        if args.tree or args.list or args.dump or args.raw:
+            _usage()
+    elif args.exports:
         _usage()
     if ((1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
         _usage()
+    if args.show and (args.dump or args.raw):
+        _usage()
     if not (args.lookup_paths or args.tree or args.list or args.dump):
         args.tree = True
-    if args.show:
-        if args.dump:
-            _usage()
-    if args.exports and not args.lookup_paths:
-        _usage()
+    if args.raw:
+        args.show = None
 
     return args
 

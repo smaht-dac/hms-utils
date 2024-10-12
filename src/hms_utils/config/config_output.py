@@ -11,22 +11,21 @@ from hms_utils.terminal_utils import terminal_color
 class ConfigOutput:
 
     @staticmethod
-    def print_tree(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
+    def print_tree(config: Config, show: Optional[bool] = False, nocolor: bool = False) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
-            nonlocal config, show, raw
-            if raw is not True:
+            nonlocal config, show
+            if show is not None:
                 value = ConfigOutput._lookup(config, path, show=None)
                 if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(value):
                     aws_account_number, aws_secrets_name, aws_secret_name = config._secrets_plaintext_info(value)
                     if aws_account_number:
-                        value += (f" {chars.dot} {aws_account_number}"
-                                  f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
+                        value += (f" {chars.dot} {aws_account_number}:{aws_secrets_name}/{aws_secret_name}")
                 return ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
             elif show is True:
-                return ConfigOutput._lookup(config, path, show=None)
+                return ConfigOutput._lookup(config, path, show=show)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
-            nonlocal config, show, raw
-            if (raw is not True) or (show is True):
+            nonlocal config, show
+            if show is not None:
                 if config._contains_secret_values(ConfigOutput._lookup(config, path, show=None)):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
         print_dictionary_tree(config.data(show=None),
@@ -34,10 +33,10 @@ class ConfigOutput:
                               arrow_indicator=tree_arrow_indicator, indent=2)
 
     @staticmethod
-    def print_list(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
+    def print_list(config: Config, show: Optional[bool] = False, nocolor: bool = False) -> None:
         def value_modifier(path: str, value: Any) -> Optional[str]:
-            nonlocal config, nocolor, show, raw
-            if raw is not True:
+            nonlocal config, nocolor, show
+            if show is not None:
                 value = ConfigOutput._lookup(config, path, show=None)
                 aws_account_number = aws_secrets_name = aws_secret_name = None
                 if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(value):
@@ -45,9 +44,9 @@ class ConfigOutput:
                         config._secrets_plaintext_info(value)
                 value = ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
                 if aws_account_number:
-                    value += (f" {chars.dot} {aws_account_number}"
-                              f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
-            elif show is True:
+                    value += (f" {chars.dot} {aws_account_number}:{aws_secrets_name}/{aws_secret_name}")
+            # elif show is True:
+            else:
                 value = ConfigOutput._lookup(config, path, show=None)
             return value
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)

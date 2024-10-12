@@ -301,4 +301,4 @@ class ConfigBasic:
             print(message, file=sys.stderr, flush=True)
 
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
-        self.data(sorted=sorted)._dump_for_testing(verbose=verbose, check=check)
+        self.data(show=None, sorted=sorted)._dump_for_testing(verbose=verbose, check=check)
