@@ -35,7 +35,7 @@ class JSON(dict):
         if not callable(rvalue):
             rvalue = None
         self._parent = None
-        self._rvalue = None
+        self._rvalue = rvalue
         for key in self:
             value = super(JSON, self).__getitem__(key)
             if isinstance(value, dict):
@@ -53,7 +53,6 @@ class JSON(dict):
                 super().__setitem__(key, value_list)
             elif rvalue and is_primitive_type(value):
                 super().__setitem__(key, rvalue(value))
-        self._rvalue = rvalue if callable(rvalue) else None
 
     @property
     def parent(self) -> Optional[JSON]:
