@@ -62,10 +62,6 @@ class ConfigWithAwsMacros(ConfigBasic):
                     if not (context := context.parent):
                         break
             return os.environ.get(name)
-        def lookup_aws_profile_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
-            return lookup_environment_variable(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context)
-        def lookup_identity_environment_variable(context: Optional[JSON] = None) -> Optional[str]:  # noqa
-            return lookup_environment_variable(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
         if (index := secret_specifier.find(self._path_separator)) > 0:
             secret_name = secret_specifier[index + 1:]
             secrets_name = secret_specifier[0:index]
@@ -74,10 +70,10 @@ class ConfigWithAwsMacros(ConfigBasic):
             if self._aws_secrets_name:
                 secrets_name = self._aws_secrets_name
             else:
-                secrets_name = lookup_identity_environment_variable(context)
+                secrets_name = lookup_environment_variable(ConfigWithAwsMacros._AWS_SECRET_NAME_NAME, context)
         if not (secret_name and secrets_name):
             return None
-        if aws_profile := lookup_aws_profile_environment_variable(context):
+        if aws_profile := lookup_environment_variable(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, context):
             with os_environ(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME, aws_profile):
                 return self._aws_get_secret(secrets_name, secret_name, aws_profile)
         return self._aws_get_secret(secrets_name, secret_name, aws_profile)
