@@ -188,7 +188,7 @@ class ConfigWithSecrets(ConfigBasic):
                 secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
         return secrets_encoded
 
-    def _contains_secrets(self, secrets_encoded: Any) -> bool:
+    def _contains_secret_values(self, secrets_encoded: Any) -> bool:
         if not isinstance(secrets_encoded, str):
             return False
         if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:

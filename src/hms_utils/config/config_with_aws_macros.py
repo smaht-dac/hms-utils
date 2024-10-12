@@ -128,15 +128,6 @@ class ConfigWithAwsMacros(ConfigBasic):
             return False
         return value.find(ConfigWithSecrets._SECRET_VALUE_END) > start
 
-    def _contains_aws_secrets(self, value: Any) -> bool:
-        if not isinstance(value, str):
-            return False
-        if (start := value.find(ConfigWithAwsMacros._AWS_SECRET_MACRO_START)) < 0:
-            return False
-        if value.find(ConfigWithAwsMacros._AWS_SECRET_MACRO_END) < start:
-            return False
-        return True
-
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
             super()._note_macro_not_found(macro_value, context)

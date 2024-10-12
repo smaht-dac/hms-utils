@@ -4,7 +4,6 @@ from typing import Any, Optional
 from hms_utils.chars import chars
 from hms_utils.dictionary_print_utils import print_dictionary_list, print_dictionary_tree
 from hms_utils.config.config import Config
-from hms_utils.config.config_with_secrets import ConfigWithSecrets
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 from hms_utils.terminal_utils import terminal_color
 
@@ -17,28 +16,20 @@ class ConfigOutput:
             nonlocal config, show, raw
             if raw is not True:
                 value = ConfigOutput._lookup(config, path, show=None)
-                aws_account_number = aws_secrets_name = aws_secret_name = None
                 if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(value):
-                    aws_account_number, aws_secrets_name, aws_secret_name = \
-                        config._secrets_plaintext_info(value)
-                value = ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
-                if aws_account_number:
-                    value += (f" {chars.dot} {aws_account_number}"
-                              f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
+                    aws_account_number, aws_secrets_name, aws_secret_name = config._secrets_plaintext_info(value)
+                    if aws_account_number:
+                        value += (f" {chars.dot} {aws_account_number}"
+                                  f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
+                return ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
             elif show is True:
-                value = ConfigOutput._lookup(config, path, show=None)
-            return value
+                return ConfigOutput._lookup(config, path, show=None)
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
-            nonlocal config, nocolor, show
-            # TODO more like above i think
-            if isinstance(config, ConfigWithSecrets):
-                if config._contains_secrets(value):
+            nonlocal config, show, raw
+            if (raw is not True) or (show is True):
+                value = ConfigOutput._lookup(config, path, show=None)
+                if config._contains_secret_values(value):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
-                elif isinstance(config, ConfigWithAwsMacros) and (raw is not True) and (show is True):
-                    if config._contains_aws_secrets(value):
-                        if ConfigOutput._lookup(config, path, show=None) != value:
-                            return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
-            return None
         print_dictionary_tree(config.data(show=None),
                               value_modifier=value_modifier,
                               arrow_indicator=tree_arrow_indicator, indent=2)
