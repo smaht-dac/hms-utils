@@ -128,6 +128,7 @@ def handle_exports_command(config: Config, args: object) -> int:
                         if exports_key not in exports:
                             exports[exports_key] = parent[key]
                 parent = parent.parent
+    exports = dict(sorted(exports.items()))
     if args.exports_file:
         if os.path.exists(args.exports_file):
             _error(f"Export file must not already exist: {args.exports_file}")
@@ -376,6 +377,8 @@ def parse_args(argv: List[str]) -> object:
     if args.show:
         if args.dump:
             _usage()
+    if args.exports and not args.lookup_paths:
+        _usage()
 
     return args
 
