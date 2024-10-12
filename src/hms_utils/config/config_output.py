@@ -17,9 +17,20 @@ class ConfigOutput:
             nonlocal config, show, raw
             if raw is not True:
                 value = ConfigOutput._lookup(config, path, show=None)
-            return ConfigOutput._display_value(config, value=value, show=show, nocolor=nocolor)
+                aws_account_number = aws_secrets_name = aws_secret_name = None
+                if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(value):
+                    aws_account_number, aws_secrets_name, aws_secret_name = \
+                        config._secrets_plaintext_info(value)
+                value = ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
+                if aws_account_number:
+                    value += (f" {chars.dot} {aws_account_number}"
+                              f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
+            elif show is True:
+                value = ConfigOutput._lookup(config, path, show=None)
+            return value
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, nocolor, show
+            # TODO more like above i think
             if isinstance(config, ConfigWithSecrets):
                 if config._contains_secrets(value):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
@@ -37,12 +48,12 @@ class ConfigOutput:
         def value_modifier(path: str, value: Any) -> Optional[str]:
             nonlocal config, nocolor, show, raw
             if raw is not True:
-                lookup_value = ConfigOutput._lookup(config, path, show=None)
+                value = ConfigOutput._lookup(config, path, show=None)
                 aws_account_number = aws_secrets_name = aws_secret_name = None
-                if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(lookup_value):
+                if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(value):
                     aws_account_number, aws_secrets_name, aws_secret_name = \
-                        config._secrets_plaintext_info(lookup_value)
-                value = ConfigOutput._display_value(config, lookup_value, show=show, nocolor=nocolor)
+                        config._secrets_plaintext_info(value)
+                value = ConfigOutput._display_value(config, value, show=show, nocolor=nocolor)
                 if aws_account_number:
                     value += (f" {chars.dot} {aws_account_number}"
                               f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")

@@ -45,7 +45,7 @@ def main(argv: Optional[List] = None):
                     print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
     if args.tree:
-        ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_tree(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
     elif args.list:
         ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
     elif args.dump:
