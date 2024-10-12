@@ -310,8 +310,9 @@ def parse_args(argv: List[str]) -> object:
         argi = 0 ; argn = len(argv)  # noqa
         while argi < argn:
             arg = argv[argi].strip() ; argi += 1  # noqa
-            if arg in ["--functions", "-functions", "--function", "-function",
-                       "--shell", "-shell", "--script", "-script", "--scripts", "-scripts"]:
+            if arg in ["--shell", "-shell", "--script", "-script", "--scripts", "-scripts",
+                       "--command", "-command", "--commands", "-commands",
+                       "--function", "-function", "--functions", "-functions"]:
                 print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cli.sh"))
                 exit(0)
             elif arg in ["--show", "-show"]:
@@ -350,11 +351,13 @@ def parse_args(argv: List[str]) -> object:
                 os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--export", "-export", "--exports", "-exports"]:
                 args.exports = True
+                args.show = True
             elif arg in ["--export-file", "-export-file", "--exports-file", "-exports-file"]:
                 if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                     _usage()
-                args.exports = True
                 args.exports_file = argv[argi] ; argi += 1  # noqa
+                args.exports = True
+                args.show = True
             elif arg.startswith("-"):
                 _usage()
             else:
