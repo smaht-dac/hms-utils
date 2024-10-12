@@ -311,7 +311,11 @@ def parse_args(argv: List[str]) -> object:
         argi = 0 ; argn = len(argv)  # noqa
         while argi < argn:
             arg = argv[argi].strip() ; argi += 1  # noqa
-            if arg in ["--show", "-show"]:
+            if arg in ["--functions", "-functions", "--function", "-function",
+                       "--shell", "-shell", "--script", "-script", "--scripts", "-scripts"]:
+                print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hms_config.sh"))
+                exit(0)
+            elif arg in ["--show", "-show"]:
                 args.show = True
             elif arg in ["--identity", "-identity", "--aws-secrets-name", "-aws-secrets-name"]:
                 if not ((argi < argn) and (arg := argv[argi].strip())):
