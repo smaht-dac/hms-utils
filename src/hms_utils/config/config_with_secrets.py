@@ -142,9 +142,7 @@ class ConfigWithSecrets(ConfigBasic):
             secret_value, secret_value_typed = self._secrets_plaintext_value(secret_value)
             if callable(plaintext_value):
                 secret_value = plaintext_value(secret_value)
-            value = (
-                value[0:start] + secret_value +
-                value[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
+            value = value[0:start] + secret_value + value[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:]
         if (secret_value_typed is not None) and (str(secret_value_typed) == secret_value):
             return secret_value_typed
         return value
