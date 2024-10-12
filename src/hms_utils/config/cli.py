@@ -106,9 +106,7 @@ def handle_exports_command(config: Config, args: object) -> int:
             exports_name = basename_path(lookup_path)
         if (value := config.lookup(lookup_path, show=args.show)) is None:
             status = 1
-            if not args.verbose:
-                continue
-            value = chars.null
+            continue
         # Since dash is not even allowed in environment/export name change to underscore.
         if isinstance(value, JSON):
             for key in value:
