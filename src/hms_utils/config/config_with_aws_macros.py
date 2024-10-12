@@ -122,17 +122,6 @@ class ConfigWithAwsMacros(ConfigBasic):
             return False
         return value.find(ConfigWithSecrets._SECRET_VALUE_END) > start
 
-    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
-        if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
-            super()._note_macro_not_found(macro_value, context)
-
-    @lru_cache
-    def _is_any_aws_environent_defined(self) -> bool:
-        try:
-            return BotoSession().get_credentials() is not None
-        except BotoProfileNotFound:
-            return False
-
     def _secrets_plaintext_value(self, value: str) -> Optional[str]:
         if (value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and (len(value_parts := value.split(":")) >= 5)):
             return ":".join(value_parts[4:])
@@ -148,3 +137,14 @@ class ConfigWithAwsMacros(ConfigBasic):
                     (aws_secret_name := secrets_encoded_parts[3])):  # noqa
                     return aws_account_number, aws_secrets_name, aws_secret_name
         return None, None, None
+
+    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
+        if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
+            super()._note_macro_not_found(macro_value, context)
+
+    @lru_cache
+    def _is_any_aws_environent_defined(self) -> bool:
+        try:
+            return BotoSession().get_credentials() is not None
+        except BotoProfileNotFound:
+            return False

@@ -259,12 +259,6 @@ class ConfigBasic:
                     break
         return resolved_macro_value, resolved_macro_context
 
-    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
-        # TODO: one of tests ends up here with context as a list - why.
-        self._warning(f"Macro not found: {macro_value}"
-                      f"{f' {chars.dot} context: {context.path}' if isinstance(context, JSON) else ''}",
-                      not self._ignore_missing_macros)
-
     def unpack_path(self, path: str) -> List[str]:
         return unpack_path(path, path_separator=self._path_separator,
                            path_current=ConfigBasic._PATH_COMPONENT_CURRENT,
@@ -287,6 +281,12 @@ class ConfigBasic:
             return ""
         return context.context_path(path_separator=self._path_separator,
                                     path_rooted=path_rooted, path_suffix=path_suffix)
+
+    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
+        # TODO: one of tests ends up here with context as a list - why.
+        self._warning(f"Macro not found: {macro_value}"
+                      f"{f' {chars.dot} context: {context.path}' if isinstance(context, JSON) else ''}",
+                      not self._ignore_missing_macros)
 
     def _warning(self, message: str, raise_exception: bool = False) -> None:
         if (raise_exception is True) or self._raise_exception:
