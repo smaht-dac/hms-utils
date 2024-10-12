@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Wrapper script for the poetry script hmsconfig (which is implemented in hms_config.py), to
+# Wrapper script for the poetry script hms_config (which is implemented in hms_config.py), to
 # allow setting (export-ing) environment variables from the calling process. To use this from
 # a shell script file which you wish to execute (or source), you need to put this at the top:
 #
-#    source $(hmsconfig --functions)
+#    source $(hms_config --functions)
 #
 # And then in this script file you can do:
 #
@@ -31,7 +31,7 @@ function hms_config_exports() {
         fi
     done
     __HMS_CONFIG_TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
-    hmsconfig --export-file $__HMS_CONFIG_TMPFILE $*
+    hms-config --export-file $__HMS_CONFIG_TMPFILE $*
     hms_config_status=$?
     if [ -f $__HMS_CONFIG_TMPFILE ] ; then
         source $__HMS_CONFIG_TMPFILE
@@ -47,7 +47,7 @@ function hms_config_export() {
     hms_config_exports $*
 }
 function hms_config() {
-    hmsconfig $*
+    hms-config $*
     hms_config_status=$?
     exit $hms_config_status
 }

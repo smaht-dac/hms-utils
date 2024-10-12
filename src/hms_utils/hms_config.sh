@@ -41,6 +41,7 @@ function hmx_config_exports() {
     fi
     unset __HMS_CONFIG_TMPFILE
     unset __HMS_CONFIG_DEBUG
+    exit $hmx_config_status
 }
 function hmx_config_export() {
     hmx_config_exports $*
@@ -48,4 +49,5 @@ function hmx_config_export() {
 function hmx_config() {
     hmx-config $*
     hmx_config_status=$?
+    exit $hmx_config_status
 }
