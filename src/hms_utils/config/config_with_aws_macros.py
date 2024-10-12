@@ -139,18 +139,16 @@ class ConfigWithAwsMacros(ConfigBasic):
         except BotoProfileNotFound:
             return False
 
-    def _secrets_plaintext_value(self, secret_value: str) -> Optional[str]:
-        if (secret_value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and
-            (len(secret_value_parts := secret_value.split(":")) >= 5)):  # noqa
-            return ":".join(secret_value_parts[4:])
+    def _secrets_plaintext_value(self, value: str) -> Optional[str]:
+        if (value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and (len(value_parts := value.split(":")) >= 5)):
+            return ":".join(value_parts[4:])
         return None
 
-    def _secrets_plaintext_info(self, secrets_encoded: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        if (secrets_encoded.startswith(ConfigWithSecrets._SECRET_VALUE_START) and
-            secrets_encoded.endswith(ConfigWithSecrets._SECRET_VALUE_END)):  # noqa
-            secrets_encoded = secrets_encoded[ConfigWithSecrets._SECRET_VALUE_START_LENGTH:
-                                              -ConfigWithSecrets._SECRET_VALUE_END_LENGTH]
-            if (len(secrets_encoded_parts := secrets_encoded.split(":")) >= 5):
+    def _secrets_plaintext_info(self, value: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        if (value.startswith(ConfigWithSecrets._SECRET_VALUE_START) and
+            value.endswith(ConfigWithSecrets._SECRET_VALUE_END)):  # noqa
+            value = value[ConfigWithSecrets._SECRET_VALUE_START_LENGTH:-ConfigWithSecrets._SECRET_VALUE_END_LENGTH]
+            if (len(secrets_encoded_parts := value.split(":")) >= 5):
                 if (secrets_encoded_parts[4] and
                     (aws_account_number := secrets_encoded_parts[1]) and
                     (aws_secrets_name := secrets_encoded_parts[2]) and
