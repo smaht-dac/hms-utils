@@ -126,11 +126,17 @@ class ConfigWithSecrets(ConfigBasic):
             start += match_end
         return secrets_encoded
 
-    def _secrets_plaintext(self, value: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
-        if (not isinstance(value, str)) or (not value):
-            return value
+    def _secrets_plaintext(self, value: Any, plaintext_value: Optional[Callable] = None) -> Any:
         if not callable(plaintext_value):
             plaintext_value = None
+        if (not isinstance(value, str)) or (not value):
+            if isinstance(value, list):
+                return [self._secrets_plaintext(e, plaintext_value=plaintext_value) for e in value]
+            elif isinstance(value, dict):
+                json = isinstance(value, JSON)
+                value = {k: self._secrets_plaintext(v, plaintext_value=plaintext_value) for k, v in value.items()}
+                return JSON(value) if json else value
+            return value
         secret_value_typed = None
         while True:
             if (start := value.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
@@ -165,9 +171,15 @@ class ConfigWithSecrets(ConfigBasic):
                 value = aws_value
         return value, value_typed
 
-    def _secrets_obfuscated(self, value: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
+    def _secrets_obfuscated(self, value: Any, obfuscated_value: Optional[Union[str, Callable]] = None) -> Any:
         if (not isinstance(value, str)) or (not value):
-            return ""
+            if isinstance(value, list):
+                return [self._secrets_obfuscated(e, obfuscated_value=obfuscated_value) for e in value]
+            elif isinstance(value, dict):
+                json = isinstance(value, JSON)
+                value = {k: self._secrets_obfuscated(v, obfuscated_value=obfuscated_value) for k, v in value.items()}
+                return JSON(value) if json else value
+            return value
         if not (callable(obfuscated_value) or ((isinstance(obfuscated_value, str)) and obfuscated_value)):
             obfuscated_value = self._obfuscated_value
         while True:
