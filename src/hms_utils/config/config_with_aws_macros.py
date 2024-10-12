@@ -121,6 +121,13 @@ class ConfigWithAwsMacros(ConfigBasic):
                                           value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
         return value
 
+    def _contains_aws_secret_values(self, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        if (start := value.find(ConfigWithSecrets._SECRET_VALUE_START + ConfigWithAwsMacros._TYPE_NAME_AWS)) < 0:
+            return False
+        return value.find(ConfigWithSecrets._SECRET_VALUE_END) > start
+
     def _contains_aws_secrets(self, value: Any) -> bool:
         if not isinstance(value, str):
             return False

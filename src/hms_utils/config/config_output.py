@@ -33,6 +33,7 @@ class ConfigOutput:
                 elif isinstance(config, ConfigWithAwsMacros) and (raw is not True) and (show is True):
                     if config._contains_aws_secrets(value):
                         if ConfigOutput._lookup(config, path, show=None) != value:
+                            import pdb ; pdb.set_trace()  # noqa
                             return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
             return None
         print_dictionary_tree(config.data(show=None),
@@ -47,11 +48,9 @@ class ConfigOutput:
             if raw is not True:
                 lookup_value = ConfigOutput._lookup(config, path, show=None)
                 aws_account_number = aws_secrets_name = aws_secret_name = None
-                if config._contains_aws_secrets(value) and config._contains_secrets(lookup_value):
-                    # TODO: annotate with AWS secrets/secret names.
-                    if isinstance(config, ConfigWithAwsMacros):
-                        aws_account_number, aws_secrets_name, aws_secret_name = \
-                            config._secrets_plaintext_info(lookup_value)
+                if isinstance(config, ConfigWithAwsMacros) and config._contains_aws_secret_values(lookup_value):
+                    aws_account_number, aws_secrets_name, aws_secret_name = \
+                        config._secrets_plaintext_info(lookup_value)
                 value = ConfigOutput._display_value(config, lookup_value, show=show, nocolor=nocolor)
                 if aws_account_number:
                     value += (f" {chars.dot} {aws_account_number}"
