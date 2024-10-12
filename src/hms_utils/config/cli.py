@@ -249,9 +249,12 @@ def parse_args(argv: List[str]) -> object:
             arg_merge_config = _merges and arg in ["--merge", "-merge"]
             arg_merge_secrets = _merges and arg in ["--merge-secrets", "-merge-secrets",
                                                     "--merge-secret", "-merge-secret"]
-            arg_include_config = _includes and arg in ["--includes", "-includes", "--include", "-include"]
+            arg_include_config = _includes and arg in ["--includes", "-includes", "--include", "-include",
+                                                       "--imports", "-imports", "--import", "-import"]
             arg_include_secrets = _includes and arg in ["--include-secrets", "-include-secrets",
-                                                        "--include-secret", "-include-secret"]
+                                                        "--include-secret", "-include-secret",
+                                                        "--import-secrets", "-import-secrets",
+                                                        "--import-secret", "-import-secret"]
             if (arg_config or arg_secrets or
                 arg_merge_config or arg_merge_secrets or arg_include_config or arg_include_secrets):  # noqa
                 if not config_dir_option_specified:
