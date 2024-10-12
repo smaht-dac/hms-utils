@@ -151,22 +151,22 @@ class ConfigWithSecrets(ConfigBasic):
 
     def _secrets_plaintext_value(self, value: str) -> Tuple[primitive_type, Any]:
         from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros  # here to avoid circular imports
-        secret_value_typed = None
+        value_typed = None
         if value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
             value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
         elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
             value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
-            secret_value_typed = int(value)
+            value_typed = int(value)
         elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
             value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
-            secret_value_typed = float(value)
+            value_typed = float(value)
         elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
             value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
-            secret_value_typed = True if (value.lower() == "true") else False
+            value_typed = True if (value.lower() == "true") else False
         elif isinstance(self, ConfigWithAwsMacros):
-            if (decoded_value := ConfigWithAwsMacros._secrets_plaintext_value(self, value)) is not None:
-                value = decoded_value
-        return value, secret_value_typed
+            if (aws_value := ConfigWithAwsMacros._secrets_plaintext_value(self, value)) is not None:
+                value = aws_value
+        return value, value_typed
 
     def _secrets_obfuscated(self, value: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
         if (not isinstance(value, str)) or (not value):
