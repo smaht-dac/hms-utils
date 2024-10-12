@@ -203,7 +203,7 @@ def main():
 
 
 def main_show_script_path():
-    sys.argv = ["hms-config", "--functions"]
+    sys.argv = ["hmx-config", "--functions"]
     main()
 
 
@@ -350,7 +350,7 @@ def parse_args(argv: List[str]) -> object:
         elif arg in ["--verbose", "-verbose"]:
             args.verbose = True
         elif arg in ["--version", "-version"]:
-            print(f"hms-utils version: {get_version()}")
+            print(f"hmx-utils version: {get_version()}")
             exit(0)
         elif (arg in ["--help", "-help"]) or arg.startswith("-"):
             _usage()
@@ -1013,7 +1013,7 @@ def error(message: str, usage: bool = False, status: int = 1,
 
 
 def _usage():
-    print(f"{chars.rarrow} hms-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
+    print(f"{chars.rarrow} hmx-config reads named value from {DEFAULT_CONFIG_FILE_NAME} or"
           f" {DEFAULT_SECRETS_FILE_NAME} in: {DEFAULT_CONFIG_DIR}")
     print(f"  {chars.rarrow_hollow} usage: python hms_config.py"
           f" [ path/name [-json] | [-nocolor | -nomerge | -nosort | -json | -yaml | -show] ]")
