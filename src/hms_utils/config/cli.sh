@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Wrapper script for the poetry script hms-config (which is implemented in hmsconfig.py), to
+# Wrapper script for the poetry script hmsconfig (which is implemented in hms_config.py), to
 # allow setting (export-ing) environment variables from the calling process. To use this from
 # a shell script file which you wish to execute (or source), you need to put this at the top:
 #
-#    source $(hms-config --functions)
+#    source $(hmsconfig --functions)
 #
 # And then in this script file you can do:
 #
-#    hmsconfig_exports \
+#    hms_config_exports \
 #        auth0/local/Auth0Client \
 #        auth0/local/Auth0Secret \
 #        etc...
@@ -18,19 +18,19 @@
 # to be set for the file, or for your environment (terminal session) if you source it.
 # If you want different names the do it like this:
 #
-#    hmsconfig_exports \
+#    hms_config_exports \
 #        AUTH0_CLIENT_ID:auth0/local/Auth0Client \
 #        AUTH0_SECRET:auth0/local/Auth0Secret \
 #        etc...
 #
-function hmsconfig_exports() {
+function hms_config_exports() {
     for arg in "$@"; do
         if [[ "$arg" == "--debug" || "$arg" == "-debug" ]]; then
             __HMS_CONFIG_DEBUG=true
             break
         fi
     done
-    __HMS_CONFIG_TMPFILE=/tmp/.hmsconfig-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
+    __HMS_CONFIG_TMPFILE=/tmp/.hms_config-$RANDOM$RANDOM-`date +%Y%m%d%H%M%S`
     hmsconfig --export-file $__HMS_CONFIG_TMPFILE $*
     hms_config_status=$?
     if [ -f $__HMS_CONFIG_TMPFILE ] ; then
@@ -42,10 +42,10 @@ function hmsconfig_exports() {
     unset __HMS_CONFIG_TMPFILE
     unset __HMS_CONFIG_DEBUG
 }
-function hmsconfig_export() {
-    hmsconfig_exports $*
+function hms_config_export() {
+    hms_config_exports $*
 }
-function hmsconfig() {
+function hms_config() {
     hmsconfig $*
-    hmsconfig_status=$?
+    hms_config_status=$?
 }

@@ -313,7 +313,7 @@ def parse_args(argv: List[str]) -> object:
             arg = argv[argi].strip() ; argi += 1  # noqa
             if arg in ["--functions", "-functions", "--function", "-function",
                        "--shell", "-shell", "--script", "-script", "--scripts", "-scripts"]:
-                print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "hmsconfig.sh"))
+                print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cli.sh"))
                 exit(0)
             elif arg in ["--show", "-show"]:
                 args.show = True
