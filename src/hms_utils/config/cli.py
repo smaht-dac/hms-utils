@@ -250,7 +250,9 @@ def parse_args(argv: List[str]) -> object:
             arg_merge_secrets = _merges and arg in ["--merge-secrets", "-merge-secrets",
                                                     "--merge-secret", "-merge-secret"]
             arg_include_config = _includes and arg in ["--includes", "-includes", "--include", "-include",
-                                                       "--imports", "-imports", "--import", "-import"]
+                                                       "--imports", "-imports", "--import", "-import",
+                                                       "--import-config", "-import-config",
+                                                       "--import-configs", "-import-configs"]
             arg_include_secrets = _includes and arg in ["--include-secrets", "-include-secrets",
                                                         "--include-secret", "-include-secret",
                                                         "--import-secrets", "-import-secrets",
