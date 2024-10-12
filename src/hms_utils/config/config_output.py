@@ -46,12 +46,18 @@ class ConfigOutput:
             nonlocal config, nocolor, show, raw
             if raw is not True:
                 lookup_value = ConfigOutput._lookup(config, path, show=None)
+                aws_account_number = aws_secrets_name = aws_secret_name = None
                 if config._contains_aws_secrets(value) and config._contains_secrets(lookup_value):
-                    # import pdb ; pdb.set_trace()  # noqa
-                    pass
                     # TODO: annotate with AWS secrets/secret names.
-                    pass
+                    if isinstance(config, ConfigWithAwsMacros):
+                        aws_account_number, aws_secrets_name, aws_secret_name = \
+                            config._secrets_plaintext_info(lookup_value)
                 value = ConfigOutput._display_value(config, lookup_value, show=show, nocolor=nocolor)
+                if aws_account_number:
+                    value += (f" {chars.dot} {aws_account_number}"
+                              f" {chars.dot_hollow} {aws_secrets_name}/{aws_secret_name}")
+            elif show is True:
+                value = ConfigOutput._lookup(config, path, show=None)
             return value
         print_dictionary_list(config.data(show=None), value_modifier=value_modifier)
 

@@ -5,7 +5,7 @@ from functools import lru_cache
 import json
 import os
 import re
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 from hms_utils.config.config_basic import ConfigBasic
 from hms_utils.dictionary_parented import JSON
 from hms_utils.chars import chars
@@ -21,6 +21,7 @@ class ConfigWithAwsMacros(ConfigBasic):
     _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
     _AWS_SECRET_NAME_NAME = "IDENTITY"
     _AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
+    _TYPE_NAME_AWS = "aws"
 
     def __init__(self, config: JSON,
                  name: Optional[str] = None,
@@ -115,8 +116,9 @@ class ConfigWithAwsMacros(ConfigBasic):
                           f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             return None
         if isinstance(self, ConfigWithSecrets):
-            # value = ConfigWithSecrets._secrets_encoded(f"aws:{account_number}:{secrets_name}:{secret_name}:{value}")
-            value = self._secrets_encoded(value)
+            # See: ConfigWithAwsMacros._secrets_plaintext_value
+            value = self._secrets_encoded(f"{account_number}:{secrets_name}:{secret_name}:{value}",
+                                          value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
         return value
 
     def _contains_aws_secrets(self, value: Any) -> bool:
@@ -138,3 +140,22 @@ class ConfigWithAwsMacros(ConfigBasic):
             return BotoSession().get_credentials() is not None
         except BotoProfileNotFound:
             return False
+
+    def _secrets_plaintext_value(self, secret_value: str) -> Optional[str]:
+        if (secret_value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and
+            (len(secret_value_parts := secret_value.split(":")) >= 5)):  # noqa
+            return ":".join(secret_value_parts[4:])
+        return None
+
+    def _secrets_plaintext_info(self, secrets_encoded: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        if (secrets_encoded.startswith(ConfigWithSecrets._SECRET_VALUE_START) and
+            secrets_encoded.endswith(ConfigWithSecrets._SECRET_VALUE_END)):  # noqa
+            secrets_encoded = secrets_encoded[ConfigWithSecrets._SECRET_VALUE_START_LENGTH:
+                                              -ConfigWithSecrets._SECRET_VALUE_END_LENGTH]
+            if (len(secrets_encoded_parts := secrets_encoded.split(":")) >= 5):
+                if (secrets_encoded_parts[4] and
+                    (aws_account_number := secrets_encoded_parts[1]) and
+                    (aws_secrets_name := secrets_encoded_parts[2]) and
+                    (aws_secret_name := secrets_encoded_parts[3])):  # noqa
+                    return aws_account_number, aws_secrets_name, aws_secret_name
+        return None, None, None

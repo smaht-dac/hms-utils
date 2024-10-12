@@ -47,7 +47,7 @@ def main(argv: Optional[List] = None):
     if args.tree:
         ConfigOutput.print_tree(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
     elif args.list:
-        ConfigOutput.print_list(config, show=None if args.raw else args.show, raw=args.raw, nocolor=args.nocolor)
+        ConfigOutput.print_list(config, show=args.show, raw=args.raw, nocolor=args.nocolor)
     elif args.dump:
         config._dump_for_testing(show=None if args.raw else args.show,
                                  sorted=not args.raw, verbose=args.verbose, check=args.check)

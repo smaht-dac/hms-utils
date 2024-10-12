@@ -99,18 +99,21 @@ class ConfigWithSecrets(ConfigBasic):
     # any strings which came from a "secret" configuration can be obfuscated by default, or shown if desired;
     # we do go to the trouble of not marking macros within secret config values as secret.
 
-    def _secrets_encoded(self, value: primitive_type) -> str:
+    def _secrets_encoded(self, value: primitive_type, value_type: Optional[str] = None) -> str:
         if not is_primitive_type(value):
             return ""
-        if (value_type := type(value).__name__) != ConfigWithSecrets._TYPE_NAME_STR:
-            return f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:{value}{ConfigWithSecrets._SECRET_VALUE_END}"
+        if (actual_value_type := type(value).__name__) != ConfigWithSecrets._TYPE_NAME_STR:
+            return (f"{ConfigWithSecrets._SECRET_VALUE_START}{actual_value_type}:"
+                    f"{value}{ConfigWithSecrets._SECRET_VALUE_END}")
+        if not (isinstance(value_type, str) and value_type):
+            value_type = ConfigWithSecrets._TYPE_NAME_STR
         secrets_encoded = ""
         start = 0
         while True:
             if not (match := ConfigBasic._MACRO_PATTERN.search(value[start:])):
                 if secret_part := value[start:]:
                     secrets_encoded += (
-                        f"{ConfigWithSecrets._SECRET_VALUE_START}str:"
+                        f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:"
                         f"{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
                 break
             match_start = match.start()
@@ -118,7 +121,7 @@ class ConfigWithSecrets(ConfigBasic):
             macro_part = value[start + match_start:start + match_end]
             if secret_part := value[start:start + match_start]:
                 secrets_encoded += (
-                    f"{ConfigWithSecrets._SECRET_VALUE_START}str:"
+                    f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:"
                     f"{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
             secrets_encoded += macro_part
             start += match_end
@@ -136,7 +139,7 @@ class ConfigWithSecrets(ConfigBasic):
             if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
             secret_value = secrets_encoded[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
-            secret_value, secret_value_typed = ConfigWithSecrets._secrets_plaintext_value(secret_value)
+            secret_value, secret_value_typed = self._secrets_plaintext_value(secret_value)
 #           if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
 #               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
 #           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
@@ -160,15 +163,11 @@ class ConfigWithSecrets(ConfigBasic):
             return secret_value_typed
         return secrets_encoded
 
-    @staticmethod
-    def _secrets_plaintext_value(secret_value: str) -> Tuple[primitive_type, Any]:
+    def _secrets_plaintext_value(self, secret_value: str) -> Tuple[primitive_type, Any]:
+        from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros  # here to avoid circular imports
         secret_value_typed = None
         if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
-            if secret_value.startswith("str:aws:") and (len(value := secret_value.split(":")) >= 6):
-                # TODO
-                secret_value = ":".join(value[5:])
-            else:
-                secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
+            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
         elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
             secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
             secret_value_typed = int(secret_value)
@@ -178,6 +177,9 @@ class ConfigWithSecrets(ConfigBasic):
         elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
             secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
             secret_value_typed = True if (secret_value.lower() == "true") else False
+        elif isinstance(self, ConfigWithAwsMacros):
+            if (value := ConfigWithAwsMacros._secrets_plaintext_value(self, secret_value)) is not None:
+                secret_value = value
         return secret_value, secret_value_typed
 
     def _secrets_obfuscated(self, secrets_encoded: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
