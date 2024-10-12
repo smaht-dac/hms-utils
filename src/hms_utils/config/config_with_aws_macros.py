@@ -88,9 +88,9 @@ class ConfigWithAwsMacros(ConfigBasic):
         if self._noaws:
             return None
         try:
-            boto_secrets = BotoClient("secretsmanager")
             self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
+            boto_secrets = BotoClient("secretsmanager")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             account_number = extract_aws_account_number(secrets)  # noqa TODO
             secrets = json.loads(secrets.get("SecretString"))

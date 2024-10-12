@@ -44,7 +44,10 @@ def main(argv: Optional[List] = None):
                 if config_for_include.name:
                     print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
-    if args.tree:
+    if args.json:
+        # TODO: Does not work as expected ... need to lookup each element recursively.
+        print(json.dumps(config.data(show=args.show), indent=4 if args.formatted else 0))
+    elif args.tree:
         ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
     elif args.list:
         ConfigOutput.print_list(config, show=args.show, nocolor=args.nocolor)
@@ -150,6 +153,7 @@ def parse_args(argv: List[str]) -> object:
         configs_for_merge = []
         configs_for_include = []
         lookup_paths = []
+        json = False
         exports = False
         exports_file = None
         tree = False
@@ -353,6 +357,8 @@ def parse_args(argv: List[str]) -> object:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
                 os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
+            elif arg in ["--json", "-json"]:
+                args.json = True
             elif arg in ["--export", "-export", "--exports", "-exports"]:
                 args.exports = True
                 args.show = True
@@ -374,7 +380,7 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
 
     if args.lookup_paths:
-        if args.tree or args.list or args.dump or args.raw:
+        if args.tree or args.json or args.list or args.dump or args.raw:
             _usage()
     elif args.exports:
         _usage()
@@ -382,7 +388,7 @@ def parse_args(argv: List[str]) -> object:
         _usage()
     if args.show and (args.dump or args.raw):
         _usage()
-    if not (args.lookup_paths or args.tree or args.list or args.dump):
+    if not (args.lookup_paths or args.tree or args.json or args.list or args.dump):
         args.tree = True
     if args.raw:
         args.show = None
@@ -406,8 +412,9 @@ def _usage():
     print("USAGE: hmsconfig OPTIONS [path]")
     print("OPTIONS:")
     print("--config:  list of JSON config files")
+    print("--tree:    show all config data in tree format (default)")
+    print("--json:    show all config data in json format")
     print("--list:    show all config data in list format")
-    print("--tree:    show all config data in tree format")
     print("--dump:    show all config data in demp/debug format")
     print("--verbose: verbose output")
     print("--debug:   debugging output")
