@@ -140,20 +140,6 @@ class ConfigWithSecrets(ConfigBasic):
                 break
             secret_value = secrets_encoded[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
             secret_value, secret_value_typed = self._secrets_plaintext_value(secret_value)
-#           if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
-#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
-#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
-#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
-#               secret_value_typed = int(secret_value)
-#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
-#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
-#               secret_value_typed = float(secret_value)
-#           elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
-#               secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
-#               secret_value_typed = True if (secret_value.lower() == "true") else False
-#           elif secret_value.startswith(f"aws:"):
-#               import pdb ; pdb.set_trace()  # noqa
-#               pass
             if callable(plaintext_value):
                 secret_value = plaintext_value(secret_value)
             secrets_encoded = (
