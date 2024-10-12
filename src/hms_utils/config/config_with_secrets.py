@@ -127,73 +127,71 @@ class ConfigWithSecrets(ConfigBasic):
             start += match_end
         return secrets_encoded
 
-    def _secrets_plaintext(self, secrets_encoded: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
-        if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
-            return secrets_encoded
+    def _secrets_plaintext(self, value: Any, plaintext_value: Optional[Callable] = None) -> primitive_type:
+        if (not isinstance(value, str)) or (not value):
+            return value
         if not callable(plaintext_value):
             plaintext_value = None
         secret_value_typed = None
         while True:
-            if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
+            if (start := value.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
                 break
-            if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
+            if (end := value.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
-            secret_value = secrets_encoded[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
+            secret_value = value[start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH:end]
             secret_value, secret_value_typed = self._secrets_plaintext_value(secret_value)
             if callable(plaintext_value):
                 secret_value = plaintext_value(secret_value)
-            secrets_encoded = (
-                secrets_encoded[0:start] + secret_value +
-                secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
+            value = (
+                value[0:start] + secret_value +
+                value[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
         if (secret_value_typed is not None) and (str(secret_value_typed) == secret_value):
             return secret_value_typed
-        return secrets_encoded
+        return value
 
-    def _secrets_plaintext_value(self, secret_value: str) -> Tuple[primitive_type, Any]:
+    def _secrets_plaintext_value(self, value: str) -> Tuple[primitive_type, Any]:
         from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros  # here to avoid circular imports
         secret_value_typed = None
-        if secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
-            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
-        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
-            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
-            secret_value_typed = int(secret_value)
-        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
-            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
-            secret_value_typed = float(secret_value)
-        elif secret_value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
-            secret_value = secret_value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
-            secret_value_typed = True if (secret_value.lower() == "true") else False
+        if value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
+            secret_value_typed = int(value)
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
+            secret_value_typed = float(value)
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
+            secret_value_typed = True if (value.lower() == "true") else False
         elif isinstance(self, ConfigWithAwsMacros):
-            if (value := ConfigWithAwsMacros._secrets_plaintext_value(self, secret_value)) is not None:
-                secret_value = value
-        return secret_value, secret_value_typed
+            if (decoded_value := ConfigWithAwsMacros._secrets_plaintext_value(self, value)) is not None:
+                value = decoded_value
+        return value, secret_value_typed
 
-    def _secrets_obfuscated(self, secrets_encoded: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
-        if (not isinstance(secrets_encoded, str)) or (not secrets_encoded):
+    def _secrets_obfuscated(self, value: str, obfuscated_value: Optional[Union[str, Callable]] = None) -> str:
+        if (not isinstance(value, str)) or (not value):
             return ""
         if not (callable(obfuscated_value) or ((isinstance(obfuscated_value, str)) and obfuscated_value)):
             obfuscated_value = self._obfuscated_value
         while True:
-            if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
+            if (start := value.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
                 break
-            if (end := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
+            if (end := value.find(ConfigWithSecrets._SECRET_VALUE_END)) < start:
                 break
             if callable(obfuscated_value):
                 obfuscated = (obfuscated_value(self._obfuscated_value)
                               if end > start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH else "")
             else:
                 obfuscated = obfuscated_value if end > start + ConfigWithSecrets._SECRET_VALUE_START_LENGTH else ""
-            secrets_encoded = (
-                secrets_encoded[0:start] + obfuscated +
-                secrets_encoded[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:])
-        return secrets_encoded
+            value = value[0:start] + obfuscated + value[end + ConfigWithSecrets._SECRET_VALUE_END_LENGTH:]
+        return value
 
-    def _contains_secret_values(self, secrets_encoded: Any) -> bool:
-        if not isinstance(secrets_encoded, str):
+    def _contains_secret_values(self, value: Any) -> bool:
+        if not isinstance(value, str):
             return False
-        if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
+        if (start := value.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
             return False
-        return secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END) > start
+        return value.find(ConfigWithSecrets._SECRET_VALUE_END) > start
 
     def _dump_for_testing(self, sorted: bool = False,
                           verbose: bool = False, check: bool = False, show: bool = False) -> None:

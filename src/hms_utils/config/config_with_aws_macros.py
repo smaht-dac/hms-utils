@@ -148,9 +148,8 @@ class ConfigWithAwsMacros(ConfigBasic):
         if (value.startswith(ConfigWithSecrets._SECRET_VALUE_START) and
             value.endswith(ConfigWithSecrets._SECRET_VALUE_END)):  # noqa
             value = value[ConfigWithSecrets._SECRET_VALUE_START_LENGTH:-ConfigWithSecrets._SECRET_VALUE_END_LENGTH]
-            if (len(secrets_encoded_parts := value.split(":")) >= 5):
-                if (secrets_encoded_parts[4] and
-                    (aws_account_number := secrets_encoded_parts[1]) and
+            if (len(secrets_encoded_parts := value.split(":")) >= 5) and secrets_encoded_parts[4]:
+                if ((aws_account_number := secrets_encoded_parts[1]) and
                     (aws_secrets_name := secrets_encoded_parts[2]) and
                     (aws_secret_name := secrets_encoded_parts[3])):  # noqa
                     return aws_account_number, aws_secrets_name, aws_secret_name
