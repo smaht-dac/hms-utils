@@ -110,7 +110,7 @@ def handle_exports_command(config: Config, args: object) -> int:
             value = chars.null
             status = 1
         # Since dash is not even allowed in environment/export name change to underscore.
-        if isinstance(value, JSON):  # xyzzy dict
+        if isinstance(value, JSON):
             for key in value:
                 key_value = value[key]
                 if is_primitive_type(key_value):
@@ -128,7 +128,6 @@ def handle_exports_command(config: Config, args: object) -> int:
                         if exports_key not in exports:
                             exports[exports_key] = parent[key]
                 parent = parent.parent
-        # xyzzy
     if args.exports_file:
         if os.path.exists(args.exports_file):
             _error(f"Export file must not already exist: {args.exports_file}")

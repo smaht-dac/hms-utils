@@ -193,9 +193,7 @@ class ConfigWithSecrets(ConfigBasic):
             return False
         if (start := secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_START)) < 0:
             return False
-        if secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END) < start:
-            return False
-        return True
+        return secrets_encoded.find(ConfigWithSecrets._SECRET_VALUE_END) > start
 
     def _dump_for_testing(self, sorted: bool = False,
                           verbose: bool = False, check: bool = False, show: bool = False) -> None:
