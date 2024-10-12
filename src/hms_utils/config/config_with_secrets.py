@@ -13,7 +13,6 @@ class ConfigWithSecrets(ConfigBasic):
     _SECRET_VALUE_END = "]__mark_secret_end__@@@@@@@"
     _SECRET_VALUE_START_LENGTH = len(_SECRET_VALUE_START)
     _SECRET_VALUE_END_LENGTH = len(_SECRET_VALUE_END)
-
     _TYPE_NAME_STR = type("").__name__
     _TYPE_NAME_INT = type(1).__name__
     _TYPE_NAME_FLOAT = type(1.0).__name__
