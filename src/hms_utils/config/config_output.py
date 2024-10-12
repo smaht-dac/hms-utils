@@ -13,13 +13,6 @@ class ConfigOutput:
 
     @staticmethod
     def print_tree(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
-        def root_indicator():
-            indicator = f"\b\b{chars.rarrow} {config.name}"
-            if config._merged:
-                for merged in config._merged:
-                    indicator += f"\n{chars.rarrow_hollow} {merged} (merged)"
-                pass
-            return indicator
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, show, raw
             if raw is not True:
@@ -33,13 +26,11 @@ class ConfigOutput:
                 elif isinstance(config, ConfigWithAwsMacros) and (raw is not True) and (show is True):
                     if config._contains_aws_secrets(value):
                         if ConfigOutput._lookup(config, path, show=None) != value:
-                            import pdb ; pdb.set_trace()  # noqa
                             return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
             return None
         print_dictionary_tree(config.data(show=None),
                               value_modifier=value_modifier,
-                              arrow_indicator=tree_arrow_indicator,
-                              root_indicator=None, indent=2)
+                              arrow_indicator=tree_arrow_indicator, indent=2)
 
     @staticmethod
     def print_list(config: Config, show: bool = False, raw: bool = False, nocolor: bool = False) -> None:
