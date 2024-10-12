@@ -3,9 +3,10 @@ import os
 import re
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
-from hms_utils.path_utils import repack_path, unpack_path
+from hms_utils.chars import chars
 from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
+from hms_utils.path_utils import repack_path, unpack_path
 from hms_utils.type_utils import is_primitive_type
 
 
@@ -261,7 +262,7 @@ class ConfigBasic:
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         # TODO: one of tests ends up here with context as a list - why.
         self._warning(f"Macro not found: {macro_value}"
-                      f"{f' (context: {context.path})' if isinstance(context, JSON) else ''}",
+                      f"{f' {chars.dot} context: {context.path}' if isinstance(context, JSON) else ''}",
                       not self._ignore_missing_macros)
 
     def unpack_path(self, path: str) -> List[str]:
