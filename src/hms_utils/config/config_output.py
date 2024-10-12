@@ -27,8 +27,7 @@ class ConfigOutput:
         def tree_arrow_indicator(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, show, raw
             if (raw is not True) or (show is True):
-                value = ConfigOutput._lookup(config, path, show=None)
-                if config._contains_secret_values(value):
+                if config._contains_secret_values(ConfigOutput._lookup(config, path, show=None)):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
         print_dictionary_tree(config.data(show=None),
                               value_modifier=value_modifier,
