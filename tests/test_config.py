@@ -333,15 +333,32 @@ def test_hms_config_rewrite_tricky_b():
 
 def test_hms_config_rewrite_secrets_a():
 
-    # config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
-    # secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
-    # config = Config(config_file)
-    # secrets = Config(secrets_file)
-    # config.merge(secrets)
+    config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
+    secrets_file = os.path.join(TESTS_DATA_DIR, "secrets_but_not_really_a.json")
+    config = Config(config_file)
+    secrets = Config(secrets_file)
+    config.merge(secrets)
     # x = config.data(None)
     # y = config.data(True)
     # z = config.data(False)
-    pass
+    # import pdb ; pdb.set_trace()  # noqa
+
+
+def test_hms_config_rewrite_secrets_b():
+
+    secrets = Config({
+        "aaa": {
+            "ccc": "cccvalue"  # ,
+            # "ddd": "${aws-secret:C4AppConfigSmahtWolf/ENCODED_AUTH0_CLIENT}"
+        }
+    }, secrets=True)
+
+    assert secrets.lookup("/aaa", show=None) == {"ccc": "@@@@@@@__mark_secret_start__[str:cccvalue]__mark_secret_end__@@@@@@@"}  # noqa
+    assert secrets.lookup("/aaa", show=False) == {"ccc": "********"}
+    assert secrets.lookup("/aaa", show=True) == {"ccc": "cccvalue"}
+    assert secrets.lookup("/", show=None) == {"aaa": {"ccc": "@@@@@@@__mark_secret_start__[str:cccvalue]__mark_secret_end__@@@@@@@"}}  # noqa
+    assert secrets.lookup("/", show=False) == {"aaa": {"ccc": "********"}}
+    assert secrets.lookup("/", show=True) == {"aaa": {"ccc": "cccvalue"}}
 
 
 # ----------------------------------------------------------------------------------------------------------------------
