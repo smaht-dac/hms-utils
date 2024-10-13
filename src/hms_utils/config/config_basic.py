@@ -54,7 +54,7 @@ class ConfigBasic:
     def data(self, sorted: bool = True) -> JSON:
         return self._json.sorted() if sorted is True else self._json
 
-    def copy(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
+    def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
         from copy import deepcopy
         def traverse(data: Optional[Any]) -> None:  # noqa
             if not isinstance(data, JSON):
