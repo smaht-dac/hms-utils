@@ -128,7 +128,9 @@ def handle_exports_command(config: Config, args: object) -> int:
                     if not isinstance(parent[key], dict):
                         exports_key = basename_path(key).replace("-", "_")
                         if exports_key not in exports:
-                            exports[exports_key] = parent[key]
+                            path = config.path(parent, path_suffix=key)
+                            if value := config.lookup(path, context=parent, show=args.show):
+                                exports[exports_key] = value
                 parent = parent.parent
     exports = dict(sorted(exports.items()))
     if args.exports_file:
