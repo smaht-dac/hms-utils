@@ -85,17 +85,20 @@ class ConfigWithAwsMacros(ConfigBasic):
     def _aws_get_secret(self, secrets_name: str, secret_name: str, aws_profile: Optional[str] = None) -> Optional[str]:
         if self._noaws:
             return None
-        value, account_number = self._aws_get_secret_value(secrets_name, secret_name, aws_profile)
+        value, account_number = self._aws_read_secret_value(secrets_name, secret_name, aws_profile)
         if value is not None:
             if isinstance(self, ConfigWithSecrets) and self.secrets:
                 # See: ConfigWithAwsMacros._secrets_plaintext_value
-                value = self._secrets_encoded(f"{account_number}:{secrets_name}:{secret_name}:{value}",
-                                              value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
+                value = self._secrets_encoded(
+                    f"{account_number}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"
+                    f"{secrets_name}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"
+                    f"{secret_name}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}{value}",
+                    value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
         return value
 
     @lru_cache
-    def _aws_get_secret_value(self, secrets_name: str, secret_name: str,
-                              aws_profile: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    def _aws_read_secret_value(self, secrets_name: str, secret_name: str,
+                               aws_profile: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
         def extract_aws_account_number(secrets: dict) -> str:
             try:
                 return secrets["ARN"].split(':')[4].strip()
@@ -134,15 +137,18 @@ class ConfigWithAwsMacros(ConfigBasic):
         return value.find(ConfigWithSecrets._SECRET_VALUE_END) > start
 
     def _secrets_plaintext_value(self, value: str) -> Optional[str]:
-        if (value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and (len(value_parts := value.split(":")) >= 5)):
-            return ":".join(value_parts[4:])
+        # See: ConfigWithAwsMacros._aws_get_secret
+        if (value.startswith(ConfigWithAwsMacros._TYPE_NAME_AWS) and
+            (len(value_parts := value.split(ConfigWithSecrets._TYPE_NAME_SEPARATOR)) >= 5)):  # noqa
+            return ConfigWithSecrets._TYPE_NAME_SEPARATOR.join(value_parts[4:])
         return None
 
     def _secrets_plaintext_info(self, value: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         if (value.startswith(ConfigWithSecrets._SECRET_VALUE_START) and
             value.endswith(ConfigWithSecrets._SECRET_VALUE_END)):  # noqa
             value = value[ConfigWithSecrets._SECRET_VALUE_START_LENGTH:-ConfigWithSecrets._SECRET_VALUE_END_LENGTH]
-            if (len(secrets_encoded_parts := value.split(":")) >= 5) and secrets_encoded_parts[4]:
+            if ((len(secrets_encoded_parts := value.split(ConfigWithSecrets._TYPE_NAME_SEPARATOR)) >= 5) and
+                secrets_encoded_parts[4]):  # noqa
                 if ((aws_account_number := secrets_encoded_parts[1]) and
                     (aws_secrets_name := secrets_encoded_parts[2]) and
                     (aws_secret_name := secrets_encoded_parts[3])):  # noqa

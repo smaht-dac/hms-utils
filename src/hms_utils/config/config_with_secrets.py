@@ -17,10 +17,12 @@ class ConfigWithSecrets(ConfigBasic):
     _TYPE_NAME_INT = type(1).__name__
     _TYPE_NAME_FLOAT = type(1.0).__name__
     _TYPE_NAME_BOOL = type(True).__name__
+    _TYPE_NAME_SEPARATOR = ":"
     _TYPE_NAME_LENGTH_STR = len(_TYPE_NAME_STR)
     _TYPE_NAME_LENGTH_INT = len(_TYPE_NAME_INT)
     _TYPE_NAME_LENGTH_FLOAT = len(_TYPE_NAME_FLOAT)
     _TYPE_NAME_LENGTH_BOOL = len(_TYPE_NAME_BOOL)
+    _TYPE_NAME_LENGTH_SEPARATOR = len(_TYPE_NAME_SEPARATOR)
 
     def __init__(self, config: Union[dict, str],
                  name: Optional[str] = None,
@@ -100,8 +102,8 @@ class ConfigWithSecrets(ConfigBasic):
         if not is_primitive_type(value):
             return ""
         if (actual_value_type := type(value).__name__) != ConfigWithSecrets._TYPE_NAME_STR:
-            return (f"{ConfigWithSecrets._SECRET_VALUE_START}{actual_value_type}:"
-                    f"{value}{ConfigWithSecrets._SECRET_VALUE_END}")
+            return (f"{ConfigWithSecrets._SECRET_VALUE_START}{actual_value_type}"
+                    f"{ConfigWithSecrets._TYPE_NAME_SEPARATOR}{value}{ConfigWithSecrets._SECRET_VALUE_END}")
         if not (isinstance(value_type, str) and value_type):
             value_type = ConfigWithSecrets._TYPE_NAME_STR
         secrets_encoded = ""
@@ -110,16 +112,16 @@ class ConfigWithSecrets(ConfigBasic):
             if not (match := ConfigBasic._MACRO_PATTERN.search(value[start:])):
                 if secret_part := value[start:]:
                     secrets_encoded += (
-                        f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:"
-                        f"{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
+                        f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}"
+                        f"{ConfigWithSecrets._TYPE_NAME_SEPARATOR}{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
                 break
             match_start = match.start()
             match_end = match.end()
             macro_part = value[start + match_start:start + match_end]
             if secret_part := value[start:start + match_start]:
                 secrets_encoded += (
-                    f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}:"
-                    f"{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
+                    f"{ConfigWithSecrets._SECRET_VALUE_START}{value_type}"
+                    f"{ConfigWithSecrets._TYPE_NAME_SEPARATOR}{secret_part}{ConfigWithSecrets._SECRET_VALUE_END}")
             secrets_encoded += macro_part
             start += match_end
         return secrets_encoded
@@ -153,16 +155,16 @@ class ConfigWithSecrets(ConfigBasic):
     def _secrets_plaintext_value(self, value: str) -> Tuple[primitive_type, Any]:
         from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros  # here to avoid circular imports
         value_typed = None
-        if value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}:"):
-            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + 1:]
-        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}:"):
-            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + 1:]
+        if value.startswith(f"{ConfigWithSecrets._TYPE_NAME_STR}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_STR + ConfigWithSecrets._TYPE_NAME_LENGTH_SEPARATOR:]
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_INT}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_INT + ConfigWithSecrets._TYPE_NAME_LENGTH_SEPARATOR:]
             value_typed = int(value)
-        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}:"):
-            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + 1:]
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_FLOAT}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_FLOAT + ConfigWithSecrets._TYPE_NAME_LENGTH_SEPARATOR:]
             value_typed = float(value)
-        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}:"):
-            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + 1:]
+        elif value.startswith(f"{ConfigWithSecrets._TYPE_NAME_BOOL}{ConfigWithSecrets._TYPE_NAME_SEPARATOR}"):
+            value = value[ConfigWithSecrets._TYPE_NAME_LENGTH_BOOL + ConfigWithSecrets._TYPE_NAME_LENGTH_SEPARATOR:]
             value_typed = True if (value.lower() == "true") else False
         elif isinstance(self, ConfigWithAwsMacros):
             if (aws_value := ConfigWithAwsMacros._secrets_plaintext_value(self, value)) is not None:
