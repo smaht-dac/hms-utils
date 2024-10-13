@@ -47,6 +47,8 @@ def main(argv: Optional[List] = None):
 
     if args.json:
         data = config.lookup("/", show=args.show).sorted()
+        import pdb ; pdb.set_trace()  # noqa
+        pass
         print(json.dumps(data, indent=4 if args.formatted else None))
     elif args.tree:
         ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
