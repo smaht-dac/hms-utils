@@ -63,7 +63,8 @@ def main(argv: Optional[List] = None):
             status = handle_lookup_command(config, args)
 
     if config._warnings:
-        if ((not args.nowarnings) and args.lookup_paths) or args.warnings:
+        # if ((not args.nowarnings) and args.lookup_paths) or args.warnings:
+        if args.warnings:
             print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
             for warning in config._warnings:
                 print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
