@@ -77,6 +77,8 @@ class ConfigBasic:
                 data = data.json
             else:
                 data = self.json
+        if show not in [True, False, None]:
+            show = False
         traverse(data := deepcopy(data))
         return data
 
