@@ -87,6 +87,8 @@ def handle_lookup_command(config: Config, args: object) -> int:
             if not args.verbose:
                 continue
             value = chars.null
+        if args.show and Config._contains_macro(value):
+            status = 1
         if isinstance(value, JSON) and args.formatted:
             value = json.dumps(value, indent=4)
         if args.verbose:
