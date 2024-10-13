@@ -363,6 +363,9 @@ def parse_args(argv: List[str]) -> object:
                 os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
             elif arg in ["--json", "-json"]:
                 args.json = True
+            elif arg in ["--jsonf", "-jsonf"]:
+                args.json = True
+                args.formatted = True
             elif arg in ["--export", "-export", "--exports", "-exports"]:
                 args.exports = True
                 args.show = True
