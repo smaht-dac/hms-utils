@@ -46,8 +46,8 @@ def main(argv: Optional[List] = None):
                     print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
     if args.json:
-        # TODO: Does not work as expected ... need to lookup each element recursively.
-        print(json.dumps(config.data(show=args.show), indent=4 if args.formatted else 0))
+        data = config.lookup("/", show=args.show).sorted()
+        print(json.dumps(data, indent=4 if args.formatted else None))
     elif args.tree:
         ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
     elif args.list:
