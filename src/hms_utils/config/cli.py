@@ -97,6 +97,8 @@ def handle_lookup_command(config: Config, args: object) -> int:
 
 
 def handle_exports_command(config: Config, args: object) -> int:
+    def make_export_key(key: str) -> str:
+        return basename_path(key).replace("-", "_")
     if not args.lookup_paths:
         return 0
     exports = {}
@@ -116,21 +118,18 @@ def handle_exports_command(config: Config, args: object) -> int:
             for key in value:
                 key_value = value[key]
                 if is_primitive_type(key_value):
-                    exports_key = basename_path(key).replace("-", "_")
-                    exports[exports_key] = key_value
+                    exports[make_export_key(key)] = key_value
         else:
-            exports_key = basename_path(exports_name).replace("-", "_")
-            exports[exports_key] = value
+            exports[make_export_key(exports_name)] = value
         if isinstance(value, JSON):
             parent = value.parent
             while parent:
                 for key in parent:
                     if not isinstance(parent[key], dict):
-                        exports_key = basename_path(key).replace("-", "_")
-                        if exports_key not in exports:
+                        if (export_key := make_export_key(key)) not in exports:
                             path = config.path(parent, path_suffix=key)
                             if value := config.lookup(path, context=parent, show=args.show):
-                                exports[exports_key] = value
+                                exports[export_key] = value
                 parent = parent.parent
     exports = dict(sorted(exports.items()))
     for export_key in exports:
