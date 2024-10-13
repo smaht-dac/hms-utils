@@ -310,6 +310,11 @@ class ConfigBasic:
         return context.context_path(path_separator=self._path_separator,
                                     path_rooted=path_rooted, path_suffix=path_suffix)
 
+    def _contains_macro(value: str) -> bool:
+        if not isinstance(value, str):
+            return False
+        return ConfigBasic._MACRO_PATTERN.search(value) is not None
+
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         # TODO: one of tests ends up here with context as a list - why.
         self._warning(f"Macro not found: {macro_value}"

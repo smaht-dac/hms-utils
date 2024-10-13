@@ -133,6 +133,10 @@ def handle_exports_command(config: Config, args: object) -> int:
                                 exports[exports_key] = value
                 parent = parent.parent
     exports = dict(sorted(exports.items()))
+    for export_key in exports:
+        if Config._contains_macro(exports[export_key]):
+            status = 1
+            break
     if args.exports_file:
         if os.path.exists(args.exports_file):
             _error(f"Export file must not already exist: {args.exports_file}")

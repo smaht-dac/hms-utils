@@ -111,13 +111,14 @@ class ConfigWithAwsMacros(ConfigBasic):
         except Exception as e:
             if self._raise_exception is True:
                 raise e
-            if self._is_any_aws_environent_defined():
-                message = f"Cannot read AWS secrets: {secrets_name}"
-                if aws_profile:
-                    message += f" {chars.dot} profile: {aws_profile}"
-                if ("token" in str(e)) and ("expired" in str(e)):
-                    message += f" {chars.dot} expired"
-                self._warning(message)
+            message = f"Cannot read AWS secrets: {secrets_name}"
+            if aws_profile:
+                message += f" {chars.dot} profile: {aws_profile}"
+            if ("token" in str(e)) and ("expired" in str(e)):
+                message += f" {chars.dot} expired"
+            if not self._is_any_aws_environent_defined():
+                message += f" {chars.dot} no aws profile defined"
+            self._warning(message)
             return None, None
         if (value := secrets.get(secret_name)) is None:
             self._warning(f"Cannot find AWS secret {secrets_name}/{secret_name}"
