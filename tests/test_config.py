@@ -1,7 +1,10 @@
+from contextlib import contextmanager
 import os
 import pytest
 from unittest.mock import patch
 from hms_utils.config.config import Config
+from hms_utils.config.config_with_secrets import ConfigWithSecrets
+from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 
 TESTS_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -331,6 +334,49 @@ def test_hms_config_rewrite_tricky_b():
     assert config.lookup("/bravo/charlie/bravo_sub") == "bravo_sub_value_foo_value_123_delta_value"
 
 
+def test_hms_config_rewrite_secrets_c():
+    config = Config({
+        "bbb": {
+            "AWS_PROFILE": "${foo}",
+            "foo": "smaht-wolf",
+            "secret": "${aws-secret:C4AppConfigSmahtWolf/ENCODED_AUTH0_CLIENT}"
+        }
+    }, secrets=True)
+    with mock_aws_secret("C4AppConfigSmahtWolf", "ENCODED_AUTH0_CLIENT", "some_secret_value_0123456789"):
+        assert config.evaluate(show=None) == {
+            "bbb": {
+                "AWS_PROFILE": (f"{ConfigWithSecrets._SECRET_VALUE_START}{ConfigWithSecrets._TYPE_NAME_STR}:"
+                                f"smaht-wolf{ConfigWithSecrets._SECRET_VALUE_END}"),
+                "foo": (f"{ConfigWithSecrets._SECRET_VALUE_START}{ConfigWithSecrets._TYPE_NAME_STR}:"
+                        f"smaht-wolf{ConfigWithSecrets._SECRET_VALUE_END}"),
+                "secret": (f"{ConfigWithSecrets._SECRET_VALUE_START}{ConfigWithAwsMacros._TYPE_NAME_AWS}:123456789:"
+                           f"C4AppConfigSmahtWolf:ENCODED_AUTH0_CLIENT:some_secret_value_0123456789"
+                           f"{ConfigWithSecrets._SECRET_VALUE_END}")
+            }
+        }
+        assert config.evaluate(show=True) == {
+            "bbb": {
+                "AWS_PROFILE": "smaht-wolf",
+                "foo": "smaht-wolf",
+                "secret": "some_secret_value_0123456789"
+            }
+        }
+        assert config.evaluate(show=False) == {
+            "bbb": {
+                "AWS_PROFILE": ConfigWithSecrets._SECRET_OBFUSCATED_VALUE,
+                "foo": ConfigWithSecrets._SECRET_OBFUSCATED_VALUE,
+                "secret": ConfigWithSecrets._SECRET_OBFUSCATED_VALUE
+            }
+        }
+        assert config.lookup("/bbb/secret", show=True) == "some_secret_value_0123456789"
+        assert config.lookup("/bbb/secret", show=False) == "********"
+        assert config.lookup("/bbb/secret", show=None) == (
+            f"{ConfigWithSecrets._SECRET_VALUE_START}"
+            f"{ConfigWithAwsMacros._TYPE_NAME_AWS}:123456789:"
+            f"C4AppConfigSmahtWolf:ENCODED_AUTH0_CLIENT:"
+            f"some_secret_value_0123456789{ConfigWithSecrets._SECRET_VALUE_END}")
+
+
 def test_hms_config_rewrite_secrets_a():
 
     config_file = os.path.join(TESTS_DATA_DIR, "config_a.json")
@@ -591,7 +637,7 @@ def test_hms_config_g():
     value = config.lookup("foursight/smaht/Auth0Client")
     assert value == "UfM_REDACTED_Hf9"
 
-    def mock_aws_get_secret(config, secrets_name, secret_name, aws_profil):  # noqa
+    def mock_aws_get_secret(config, secrets_name, secret_name, aws_profile):  # noqa
         value = config.lookup("auth0/prod/secret")
         assert value == "${aws-secret:ENCODED_AUTH0_SECRET}"
         assert secrets_name == "C4DatastoreCgapWolfC4DatastorecgapwolfapplicationconfigurationApplicationConfiguration"
@@ -602,3 +648,15 @@ def test_hms_config_g():
     with patch(hms_config_with_aws_secrets_get_secrets_function_name, new=mock_aws_get_secret):
         value = config.lookup("foursight/cgap/wolf/Auth0Secret")
         assert value == "mocked_aws_secret_value_1234567890"
+
+
+@contextmanager
+def mock_aws_secret(secrets_name, secret_name, secret_value):
+    hms_config_with_aws_secrets_class_name = "hms_utils.config.config_with_aws_macros.ConfigWithAwsMacros"
+    hms_config_with_aws_secrets_get_secrets_function_name = (
+        f"{hms_config_with_aws_secrets_class_name}._aws_get_secret_value")
+    def mock_aws_get_secret(config, secrets_name, secret_name, aws_profile=None):  # noqa
+        nonlocal secret_value
+        return secret_value, "123456789"
+    with patch(hms_config_with_aws_secrets_get_secrets_function_name, new=mock_aws_get_secret):
+        yield

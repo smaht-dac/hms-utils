@@ -55,6 +55,10 @@ class ConfigWithAwsMacros(ConfigBasic):
 
     def _lookup_aws_secret(self, secret_specifier: str, context: Optional[JSON] = None) -> Optional[str]:
         def lookup_environment_variable(name: str, context: Optional[JSON] = None) -> Optional[str]:
+            nonlocal self
+            if aws_profile := self.lookup(name, context=context, show=True):
+                return aws_profile
+            return os.environ.get(name)
             if isinstance(context, JSON):
                 while True:
                     if aws_profile := context.get(name):
@@ -78,15 +82,25 @@ class ConfigWithAwsMacros(ConfigBasic):
                 return self._aws_get_secret(secrets_name, secret_name, aws_profile)
         return self._aws_get_secret(secrets_name, secret_name, aws_profile)
 
-    @lru_cache
     def _aws_get_secret(self, secrets_name: str, secret_name: str, aws_profile: Optional[str] = None) -> Optional[str]:
+        if self._noaws:
+            return None
+        value, account_number = self._aws_get_secret_value(secrets_name, secret_name, aws_profile)
+        if value is not None:
+            if isinstance(self, ConfigWithSecrets) and self.secrets:
+                # See: ConfigWithAwsMacros._secrets_plaintext_value
+                value = self._secrets_encoded(f"{account_number}:{secrets_name}:{secret_name}:{value}",
+                                              value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
+        return value
+
+    @lru_cache
+    def _aws_get_secret_value(self, secrets_name: str, secret_name: str,
+                              aws_profile: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
         def extract_aws_account_number(secrets: dict) -> str:
             try:
                 return secrets["ARN"].split(':')[4].strip()
             except Exception:
                 return ""
-        if self._noaws:
-            return None
         try:
             self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
@@ -104,16 +118,12 @@ class ConfigWithAwsMacros(ConfigBasic):
                 if ("token" in str(e)) and ("expired" in str(e)):
                     message += f" {chars.dot} expired"
                 self._warning(message)
-            return None
+            return None, None
         if (value := secrets.get(secret_name)) is None:
             self._warning(f"Cannot find AWS secret {secrets_name}/{secret_name}"
                           f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
-            return None
-        if isinstance(self, ConfigWithSecrets):
-            # See: ConfigWithAwsMacros._secrets_plaintext_value
-            value = self._secrets_encoded(f"{account_number}:{secrets_name}:{secret_name}:{value}",
-                                          value_type=ConfigWithAwsMacros._TYPE_NAME_AWS)
-        return value
+            return None, None
+        return value, account_number
 
     def _contains_aws_secret_values(self, value: Any) -> bool:
         if not isinstance(value, str):
