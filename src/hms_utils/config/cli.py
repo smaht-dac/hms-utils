@@ -45,15 +45,16 @@ def main(argv: Optional[List] = None):
                 if config_for_include.name:
                     print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
 
-    if args.json:
-        data = config.lookup("/", show=args.show).sorted()
-        print(json.dumps(data, indent=4 if args.formatted else None))
-    elif args.tree:
-        ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
-    elif args.list:
-        ConfigOutput.print_list(config, show=args.show, nocolor=args.nocolor)
-    elif args.dump:
-        config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
+    if not args.lookup_paths:
+        if args.json:
+            data = config.lookup("/", show=args.show).sorted()
+            print(json.dumps(data, indent=4 if args.formatted else None))
+        elif args.tree:
+            ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
+        elif args.list:
+            ConfigOutput.print_list(config, show=args.show, nocolor=args.nocolor)
+        elif args.dump:
+            config._dump_for_testing(sorted=not args.raw, verbose=args.verbose, check=args.check)
 
     status = 0
     if args.lookup_paths:
