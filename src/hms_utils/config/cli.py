@@ -393,7 +393,7 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
 
     if args.lookup_paths:
-        if args.tree or args.json or args.list or args.dump or args.raw:
+        if args.tree or args.list or args.dump or args.raw:
             _usage()
     elif args.exports:
         _usage()
