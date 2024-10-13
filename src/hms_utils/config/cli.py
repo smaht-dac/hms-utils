@@ -8,10 +8,11 @@ from typing import List, Optional
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
+from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
+from hms_utils.version_utils import get_version
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
 from hms_utils.type_utils import is_primitive_type
-from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -353,6 +354,9 @@ def parse_args(argv: List[str]) -> object:
                 args.warnings = True
             elif arg in ["--format", "-format", "--formatted", "-formatted"]:
                 args.formatted = True
+            elif arg in ["--version", "-version"]:
+                print(get_version())
+                exit(0)
             elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
