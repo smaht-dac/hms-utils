@@ -39,7 +39,7 @@ class JSON(dict):
             elif isinstance(value, list):
                 value_list = []
                 for element in value:
-                    if isinstance(element, dict) and (not isinstance(element, JSON)):
+                    if isinstance(element, dict):
                         value_list.append(JSON(element, rvalue=rvalue))
                     else:
                         value_list.append(element)
