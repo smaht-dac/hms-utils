@@ -41,13 +41,13 @@ function hms_config_exports() {
     fi
     unset __HMS_CONFIG_TMPFILE
     unset __HMS_CONFIG_DEBUG
-    exit $hms_config_status
+    return $hms_config_status
 }
 function hms_config_export() {
-    hms_config_exports $*
+    hms-config-exports $*
 }
 function hms_config() {
     hms-config $*
     hms_config_status=$?
-    exit $hms_config_status
+    return $hms_config_status
 }
