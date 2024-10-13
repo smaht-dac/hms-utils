@@ -20,11 +20,6 @@ class JSON(dict):
 
     def __init__(self, data: Optional[Union[dict, JSON]] = None, rvalue: Optional[Callable] = None) -> None:
         if isinstance(data, JSON):
-            if rvalue_from_data := data._rvalue:
-                if callable(rvalue_from_arg := rvalue):
-                    rvalue = lambda value: rvalue_from_arg(rvalue_from_data(value))  # noqa
-                else:
-                    rvalue = rvalue_from_data
             data = dict(data)
         elif not isinstance(data, dict):
             data = {}
@@ -35,13 +30,11 @@ class JSON(dict):
         if not callable(rvalue):
             rvalue = None
         self._parent = None
-        self._rvalue = rvalue
         for key in self:
             value = super(JSON, self).__getitem__(key)
             if isinstance(value, dict):
                 value = JSON(value, rvalue=rvalue)
                 value._parent = self
-                value._rvalue = rvalue
                 super(JSON, self).__setitem__(key, value)
             elif isinstance(value, list):
                 value_list = []
@@ -133,7 +126,8 @@ class JSON(dict):
         if not (path_components := unpack_path(path, path_separator=path_separator)):
             return None, data
         if path_components[0] == path_separator:
-            path_components = path_components[1:]
+            if not (path_components := path_components[1:]):
+                return data
             context = data.root
         else:
             context = data
@@ -148,12 +142,8 @@ class JSON(dict):
                 break
         return value
 
-    def copy(self, rvalue: Optional[Callable] = None) -> JSON:
-        if not self._parent:
-            return deepcopy(self)
-        root = self.root
-        root = JSON(root, rvalue=rvalue)
-        return root.lookup(self.path)
+    def duplicate(self, rvalue: Optional[Callable] = None) -> JSON:
+        return JSON(self.root, rvalue=rvalue).lookup(self.path)
 
     def __setitem__(self, key: Any, value: Any) -> None:
         if isinstance(value, dict):
@@ -166,8 +156,6 @@ class JSON(dict):
                 else:
                     value = JSON(value)
                 value._parent = self
-        elif self._rvalue and is_primitive_type(value):
-            value = self._rvalue(value)
         super().__setitem__(key, value)
 
     def __deepcopy__(self, memo) -> JSON:

@@ -72,14 +72,12 @@ class ConfigWithSecrets(ConfigBasic):
                 return value
             elif show is True:
                 if isinstance(value, JSON):
-                    return value.copy(rvalue=self._secrets_plaintext)
-                    # return JSON(value, rvalue=self._secrets_plaintext)
+                    return value.duplicate(rvalue=self._secrets_plaintext)
                 else:
                     return self._secrets_plaintext(value)
             elif show is False:
                 if isinstance(value, JSON):
-                    return value.copy(rvalue=self._secrets_obfuscated)
-                    # return JSON(value, rvalue=self._secrets_obfuscated)
+                    return value.duplicate(rvalue=self._secrets_obfuscated)
                 else:
                     return self._secrets_obfuscated(value)
         return value
@@ -130,12 +128,12 @@ class ConfigWithSecrets(ConfigBasic):
         if not callable(plaintext_value):
             plaintext_value = None
         if (not isinstance(value, str)) or (not value):
-            if isinstance(value, list):
-                return [self._secrets_plaintext(e, plaintext_value=plaintext_value) for e in value]
-            elif isinstance(value, dict):
+            if isinstance(value, dict):
                 json = isinstance(value, JSON)
                 value = {k: self._secrets_plaintext(v, plaintext_value=plaintext_value) for k, v in value.items()}
                 return JSON(value) if json else value
+            elif isinstance(value, list):
+                return [self._secrets_plaintext(e, plaintext_value=plaintext_value) for e in value]
             return value
         secret_value_typed = None
         while True:
@@ -173,12 +171,12 @@ class ConfigWithSecrets(ConfigBasic):
 
     def _secrets_obfuscated(self, value: Any, obfuscated_value: Optional[Union[str, Callable]] = None) -> Any:
         if (not isinstance(value, str)) or (not value):
-            if isinstance(value, list):
-                return [self._secrets_obfuscated(e, obfuscated_value=obfuscated_value) for e in value]
-            elif isinstance(value, dict):
+            if isinstance(value, dict):
                 json = isinstance(value, JSON)
                 value = {k: self._secrets_obfuscated(v, obfuscated_value=obfuscated_value) for k, v in value.items()}
                 return JSON(value) if json else value
+            elif isinstance(value, list):
+                return [self._secrets_obfuscated(e, obfuscated_value=obfuscated_value) for e in value]
             return value
         if not (callable(obfuscated_value) or ((isinstance(obfuscated_value, str)) and obfuscated_value)):
             obfuscated_value = self._obfuscated_value

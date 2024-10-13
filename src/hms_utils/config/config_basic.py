@@ -54,6 +54,33 @@ class ConfigBasic:
     def data(self, sorted: bool = True) -> JSON:
         return self._json.sorted() if sorted is True else self._json
 
+    def copy(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
+        from copy import deepcopy
+        def traverse(data: Optional[Any]) -> None:  # noqa
+            if not isinstance(data, JSON):
+                return data
+            for key in data:
+                value = data[key]
+                if isinstance(value, JSON):
+                    traverse(value)
+                elif isinstance(value, list):
+                    for element in value:
+                        traverse(element)
+                else:
+                    continue
+                    path = self.path(data, path_suffix=key)
+                    value = self.lookup(path, context=data, show=show)
+                    data[key] = value
+        if not isinstance(data, JSON):
+            if isinstance(data, dict):
+                data = JSON(data)
+            elif isinstance(data, ConfigBasic):
+                data = data.json
+            else:
+                data = self.json
+        traverse(data := deepcopy(data))
+        return data
+
     @property
     def json(self) -> JSON:
         return self._json
@@ -144,7 +171,7 @@ class ConfigBasic:
             return value, context
         if path_rooted := (path_components[0] == ConfigBasic._PATH_COMPONENT_ROOT):
             if not (path_components := path_components[1:]):
-                return value, context
+                return context, context
             context = context.root
 
         value, context, path_component_index = lookup_path_components(path_components, context)
@@ -227,7 +254,7 @@ class ConfigBasic:
             if resolved_macro_value is not None:
                 if not is_primitive_type(resolved_macro_value):
                     self._warning(f"Macro must resolve to primitive type:"
-                                  f" {self.path(context, macro_value)}", not self._ignore_structured_macros)
+                                  f" {self.path(context, path_suffix=macro_value)}", not self._ignore_structured_macros)
                     return value
                 value = value.replace(f"${{{macro_value}}}", str(resolved_macro_value))
                 if macro_value in expanding_macros:
