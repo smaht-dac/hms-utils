@@ -1,4 +1,5 @@
 from __future__ import annotations
+from copy import deepcopy
 import os
 import re
 import sys
@@ -55,8 +56,7 @@ class ConfigBasic:
         return self._json.sorted() if sorted is True else self._json
 
     def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
-        from copy import deepcopy
-        def traverse(data: Optional[Any]) -> None:  # noqa
+        def traverse(data: Optional[Any]) -> None:
             if not isinstance(data, JSON):
                 return data
             for key in data:
