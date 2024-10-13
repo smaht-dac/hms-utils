@@ -67,7 +67,6 @@ class ConfigBasic:
                     for element in value:
                         traverse(element)
                 else:
-                    continue
                     path = self.path(data, path_suffix=key)
                     value = self.lookup(path, context=data, show=show)
                     data[key] = value
