@@ -56,7 +56,7 @@ class ConfigBasic:
         return self._json.sorted() if sorted is True else self._json
 
     def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
-        def traverse(data: Optional[Any]) -> None:
+        def traverse(data: Optional[Any]) -> None:  # Not currently used.
             if not isinstance(data, JSON):
                 return data
             for key in data:
