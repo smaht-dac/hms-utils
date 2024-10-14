@@ -11,8 +11,7 @@ from hms_utils.config.config_output import ConfigOutput
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 from hms_utils.version_utils import get_version
 from hms_utils.dictionary_parented import JSON
-from hms_utils.path_utils import basename_path, is_current_or_parent_relative_path
-from hms_utils.type_utils import is_primitive_type
+from hms_utils.path_utils import is_current_or_parent_relative_path
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -107,43 +106,7 @@ def handle_lookup_command(config: Config, args: object) -> int:
 
 
 def handle_exports_command(config: Config, args: object) -> int:
-    def make_export_key(key: str) -> str:
-        return basename_path(key).replace("-", "_")
-    if not args.lookup_paths:
-        return 0
-    exports = {}
-    status = 0
-    for lookup_path in args.lookup_paths:
-        if (index := lookup_path.find(DEFAULT_EXPORT_NAME_SEPARATOR)) > 0:
-            exports_name = lookup_path[0:index]
-            if not (lookup_path := lookup_path[index + 1:].strip()):
-                continue
-        else:
-            exports_name = basename_path(lookup_path)
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
-            status = 1
-            continue
-        # Since dash is not even allowed in environment/export name change to underscore.
-        if isinstance(value, JSON):
-            context = value
-            for key in value:
-                key_value = value[key]
-                if is_primitive_type(key_value):
-                    exports[make_export_key(key)] = key_value
-        else:
-            exports[make_export_key(exports_name)] = value
-            context = None
-        if isinstance(value, JSON):
-            parent = value.parent
-            while parent:
-                for key in parent:
-                    if not isinstance(parent[key], dict):
-                        if (export_key := make_export_key(key)) not in exports:
-                            path = config.path(parent, path_suffix=key)
-                            if value := config.lookup(path, context=context or parent, show=args.show):
-                                exports[export_key] = value
-                parent = parent.parent
-    exports = dict(sorted(exports.items()))
+    exports, status = config.exports(args.lookup_paths, show=args.show)
     for export_key in exports:
         if Config._contains_macro(exports[export_key]):
             status = 1
