@@ -310,10 +310,20 @@ class ConfigBasic:
         return context.context_path(path_separator=self._path_separator,
                                     path_rooted=path_rooted, path_suffix=path_suffix)
 
-    def _contains_macro(value: str) -> bool:
-        if not isinstance(value, str):
-            return False
-        return ConfigBasic._MACRO_PATTERN.search(value) is not None
+    def _contains_macro(value: Any) -> bool:
+        def contains_macro(value: str) -> bool:
+            return isinstance(value, str) and ConfigBasic._MACRO_PATTERN.search(value) is not None
+        if is_primitive_type(value):
+            return contains_macro(value)
+        elif isinstance(value, dict):
+            for key in value:
+                if contains_macro(value[key]):
+                    return True
+        elif isinstance(value, list):
+            for element in value:
+                if contains_macro(value[key]):
+                    return True
+        return False
 
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         # TODO: one of tests ends up here with context as a list - why.
