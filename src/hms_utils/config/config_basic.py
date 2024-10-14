@@ -377,8 +377,12 @@ class ConfigBasic:
 
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
         # TODO: one of tests ends up here with context as a list - why.
+        if isinstance(context, JSON):
+            context_path = context.context_path(path_separator=self._path_separator, path_rooted=True)
+        else:
+            context_path = None
         self._warning(f"Macro not found: {macro_value}"
-                      f"{f' {chars.dot} context: {context.path}' if isinstance(context, JSON) else ''}",
+                      f"{f' {chars.dot} context: {context_path}' if context_path else ''}",
                       not self._ignore_missing_macros)
 
     def _warning(self, message: str, raise_exception: bool = False) -> None:
