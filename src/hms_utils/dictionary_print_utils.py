@@ -35,6 +35,10 @@ def print_dictionary_tree(data: dict,
         indent = 0
     output = (lambda value: printf(f"{' ' * indent}{value}")) if indent > 0 else printf
     def traverse(data: dict, indent: str = "", first: bool = False, last: bool = True, path: str = ""):  # noqa
+        if not path:
+            from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
+            if isinstance(data, JSON):
+                path = data.path
         nonlocal output, paths, key_modifier, value_annotator, value_modifier
         space = "    " if not first else "  "
         for index, key in enumerate(keys := list(data.keys())):

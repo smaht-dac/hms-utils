@@ -93,10 +93,11 @@ def handle_lookup_command(config: Config, args: object) -> int:
             if args.json and args.formatted:
                 value = json.dumps(value, indent=4)
             elif args.tree:
+                # value = config.lookup(lookup_path, show=None)
                 prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
                 value = (prefix +
                          ConfigOutput.print_tree(config, data=value, nocolor=args.nocolor,
-                                                 string=True, indent=2 if args.verbose else None))
+                                                 string=True, indent=2 if args.verbose else None, show=args.show))
         if args.verbose:
             print(f"{lookup_path}: {value}")
         else:
