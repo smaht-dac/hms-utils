@@ -292,10 +292,12 @@ class ConfigBasic:
                     break
         return resolved_macro_value, resolved_macro_context
 
-    def exports(self, lookup_paths: List[str], show: bool) -> Tuple[dict, int]:
+    def exports(self, lookup_paths: List[str], show: Optional[bool] = False) -> Tuple[dict, int]:
         make_export_key = lambda key: basename_path(key).replace("-", "_")  # noqa
         EXPORT_NAME_SEPARATOR = ":"
         exports = {} ; status = 0  # noqa
+        if isinstance(lookup_paths, str):
+            lookup_paths = [lookup_paths]
         if not (isinstance(lookup_paths, list) and lookup_paths):
             return exports, status
         for lookup_path in lookup_paths:

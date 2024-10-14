@@ -137,6 +137,13 @@ def test_hms_config_rewrite_e():
         }
     })
     assert config.lookup("foursight/smaht/prod/SSH_TUNNEL_ES_NAME") == "SOMEPREFIX-smaht-green-SOMEPORT"
+    assert config.exports("foursight/smaht/prod") == (
+        {
+            "AWS_PROFILE": "smaht-prod",
+            "SSH_TUNNEL_ES_ENV": "smaht-green",
+            "SSH_TUNNEL_ES_NAME": "SOMEPREFIX-smaht-green-SOMEPORT"
+        }, 0
+    )
 
 
 def test_hms_config_rewrite_f():
