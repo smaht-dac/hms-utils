@@ -2,6 +2,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Optional
 from hms_utils.chars import chars
+from hms_utils.dictionary_parented import JSON
 from hms_utils.dictionary_print_utils import print_dictionary_list, print_dictionary_tree
 from hms_utils.config.config import Config
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
@@ -11,7 +12,16 @@ from hms_utils.terminal_utils import terminal_color
 class ConfigOutput:
 
     @staticmethod
-    def print_tree(config: Config, show: Optional[bool] = False, nocolor: bool = False) -> None:
+    def print_tree(config: Config,
+                   data: Optional[JSON] = None,
+                   show: Optional[bool] = False,
+                   nocolor: bool = False,
+                   indent: Optional[int] = None,
+                   string: bool = False) -> Optional[str]:
+        output_to_string = ""
+        def print_to_string(value: str) -> None:  # noqa
+            nonlocal output_to_string
+            output_to_string += value + "\n"
         def value_modifier(path: str, value: Any) -> Optional[str]:  # noqa
             nonlocal config, show
             if show is not None:
@@ -28,9 +38,20 @@ class ConfigOutput:
             if show is not None:
                 if config._contains_secret_values(ConfigOutput._lookup(config, path, show=None)):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
-        print_dictionary_tree(config.data(show=None),
+        if isinstance(data, Config):
+            data = config.data(show=None)
+            indent = 2
+        elif not isinstance(data, JSON):
+            return
+        print_dictionary_tree(data,
                               value_modifier=value_modifier,
-                              arrow_indicator=tree_arrow_indicator, indent=2)
+                              arrow_indicator=tree_arrow_indicator,
+                              indent=indent,
+                              printf=print_to_string if string is True else None)
+        if string is True:
+            if output_to_string.endswith("\n"):
+                output_to_string = output_to_string[:-1]
+            return output_to_string
 
     @staticmethod
     def print_list(config: Config, show: Optional[bool] = False, nocolor: bool = False) -> None:

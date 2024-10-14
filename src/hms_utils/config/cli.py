@@ -33,7 +33,7 @@ def main(argv: Optional[List] = None):
     if args.noaws:
         config._noaws = True
 
-    if args.tree or args.list or args.dump:
+    if not args.lookup_paths and (args.tree or args.list or args.dump):
         if config.name:
             print(f"{chars.rarrow} {config.name}")
         if args.configs_for_merge:
@@ -81,7 +81,7 @@ def main_show_script_path():
 def handle_lookup_command(config: Config, args: object) -> int:
     if not args.lookup_paths:
         return 0
-    status = 0
+    status = 0 ; n = 0  # noqa
     for lookup_path in args.lookup_paths:
         if (value := config.lookup(lookup_path, show=args.show)) is None:
             status = 1
@@ -90,12 +90,19 @@ def handle_lookup_command(config: Config, args: object) -> int:
             value = chars.null
         if args.show and Config._contains_macro(value):
             status = 1
-        if isinstance(value, JSON) and args.formatted:
-            value = json.dumps(value, indent=4)
+        if isinstance(value, JSON):
+            if args.json and args.formatted:
+                value = json.dumps(value, indent=4)
+            elif args.tree:
+                prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
+                value = (prefix +
+                         ConfigOutput.print_tree(config, data=value, nocolor=args.nocolor,
+                                                 string=True, indent=2 if args.verbose else None))
         if args.verbose:
             print(f"{lookup_path}: {value}")
         else:
             print(f"{value}")
+        n += 1
     return status
 
 
@@ -396,7 +403,8 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
 
     if args.lookup_paths:
-        if args.tree or args.list or args.dump or args.raw:
+        # if args.tree or args.list or args.dump or args.raw:
+        if args.list or args.dump or args.raw:
             _usage()
     elif args.exports:
         _usage()
