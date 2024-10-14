@@ -413,6 +413,8 @@ def parse_args(argv: List[str]) -> object:
         args.tree = True
     if args.raw:
         args.show = None
+    if args.json and not args.lookup_paths:
+        args.formatted = True
 
     return args
 
