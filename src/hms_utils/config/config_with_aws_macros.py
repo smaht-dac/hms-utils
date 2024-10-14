@@ -107,7 +107,7 @@ class ConfigWithAwsMacros(ConfigBasic):
         try:
             self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
-            boto_secrets = BotoClient("secretsmanager")
+            boto_secrets = ConfigWithAwsMacros._boto_client("secretsmanager")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             account_number = extract_aws_account_number(secrets)  # noqa TODO
             secrets = json.loads(secrets.get("SecretString"))
@@ -165,3 +165,12 @@ class ConfigWithAwsMacros(ConfigBasic):
             return BotoSession().get_credentials() is not None
         except BotoProfileNotFound:
             return False
+
+    @staticmethod
+    def _boto_client(service: str) -> object:
+        # This boto3.DEFAULT_SESSION works around an oddity discovered way back (circa 2022-06-19) with the
+        # boto3 session getting stuck/cached or something once used once and then again with a different profile.
+        # https://hms-dbmi.slack.com/archives/D03ENS13XA7/p1655648553779689
+        import boto3
+        boto3.DEFAULT_SESSION = None
+        return BotoClient(service)
