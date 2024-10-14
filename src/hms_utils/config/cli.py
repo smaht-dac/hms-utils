@@ -94,7 +94,7 @@ def handle_lookup_command(config: Config, args: object) -> int:
             elif args.tree:
                 prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
                 value = (prefix +
-                         ConfigOutput.print_tree(config, data=value, nocolor=args.nocolor,
+                         ConfigOutput.print_tree(config, data=value.sorted(), nocolor=args.nocolor,
                                                  string=True, indent=2 if args.verbose else None, show=args.show))
         if args.verbose:
             print(f"{lookup_path}: {value}")
