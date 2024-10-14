@@ -38,11 +38,11 @@ class ConfigOutput:
             if show is not None:
                 if config._contains_secret_values(ConfigOutput._lookup(config, path, show=None)):
                     return terminal_color(chars.rarrow, "red", bold=True, nocolor=nocolor)
-        if isinstance(data, Config):
+        if not isinstance(config, Config):
+            return
+        if not isinstance(data, JSON):
             data = config.data(show=None)
             indent = 2
-        elif not isinstance(data, JSON):
-            return
         print_dictionary_tree(data,
                               value_modifier=value_modifier,
                               arrow_indicator=tree_arrow_indicator,
