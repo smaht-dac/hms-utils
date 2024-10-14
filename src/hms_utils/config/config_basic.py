@@ -23,6 +23,7 @@ class ConfigBasic:
     _MACRO_HIDE_START = "@@@@@@@__macro_hide_start_["
     _MACRO_HIDE_END = "]__macro_hide_end_@@@@@@@"
     _MACRO_PATTERN = re.compile(r"\$\{([^}]+)\}")
+    _EXPORT_NAME_SEPARATOR = ":"
     _TRICKY_FIX = True
 
     def __init__(self, config: Union[dict, str],
@@ -294,14 +295,13 @@ class ConfigBasic:
 
     def exports(self, lookup_paths: List[str], show: Optional[bool] = False) -> Tuple[dict, int]:
         make_export_key = lambda key: basename_path(key).replace("-", "_")  # noqa
-        EXPORT_NAME_SEPARATOR = ":"
         exports = {} ; status = 0  # noqa
         if isinstance(lookup_paths, str):
             lookup_paths = [lookup_paths]
         if not (isinstance(lookup_paths, list) and lookup_paths):
             return exports, status
         for lookup_path in lookup_paths:
-            if (index := lookup_path.find(EXPORT_NAME_SEPARATOR)) > 0:
+            if (index := lookup_path.find(ConfigBasic._EXPORT_NAME_SEPARATOR)) > 0:
                 exports_name = lookup_path[0:index]
                 if not (lookup_path := lookup_path[index + 1:].strip()):
                     continue

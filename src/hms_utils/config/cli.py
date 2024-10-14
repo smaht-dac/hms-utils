@@ -17,7 +17,6 @@ DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
 DEFAULT_SECRETS_FILE_NAME = "secrets.json"
 DEFAULT_PATH_SEPARATOR = "/"
-DEFAULT_EXPORT_NAME_SEPARATOR = ":"
 OBFUSCATED_VALUE = "********"
 
 
@@ -93,7 +92,6 @@ def handle_lookup_command(config: Config, args: object) -> int:
             if args.json and args.formatted:
                 value = json.dumps(value, indent=4)
             elif args.tree:
-                # value = config.lookup(lookup_path, show=None)
                 prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
                 value = (prefix +
                          ConfigOutput.print_tree(config, data=value, nocolor=args.nocolor,
