@@ -125,12 +125,14 @@ def handle_exports_command(config: Config, args: object) -> int:
             continue
         # Since dash is not even allowed in environment/export name change to underscore.
         if isinstance(value, JSON):
+            context = value
             for key in value:
                 key_value = value[key]
                 if is_primitive_type(key_value):
                     exports[make_export_key(key)] = key_value
         else:
             exports[make_export_key(exports_name)] = value
+            context = None
         if isinstance(value, JSON):
             parent = value.parent
             while parent:
@@ -138,7 +140,7 @@ def handle_exports_command(config: Config, args: object) -> int:
                     if not isinstance(parent[key], dict):
                         if (export_key := make_export_key(key)) not in exports:
                             path = config.path(parent, path_suffix=key)
-                            if value := config.lookup(path, context=parent, show=args.show):
+                            if value := config.lookup(path, context=context or parent, show=args.show):
                                 exports[export_key] = value
                 parent = parent.parent
     exports = dict(sorted(exports.items()))

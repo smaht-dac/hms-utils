@@ -129,9 +129,14 @@ class ConfigBasic:
                noexpand: bool = False,
                inherit_simple: bool = False,
                inherit_none: bool = False, **kwargs) -> Optional[Union[Any, JSON]]:
-        context = context if isinstance(context, JSON) else self._json
+        if isinstance(context, JSON):
+            specified_context = context
+        else:
+            context = self._json
+            specified_context = None
         value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
-        value = value if ((value is None) or (noexpand is True)) else self.expand_macros(value, context)
+        if (value is not None) and (noexpand is not True):
+            value = self.expand_macros(value, context=specified_context or context)
         if (value is None) and self._includes:
             for includes in self._includes:
                 if (value := includes.lookup(path, noexpand=noexpand,
@@ -224,7 +229,7 @@ class ConfigBasic:
             value = self._expand_macros_within_string(value, context)
         elif isinstance(value, JSON):
             for key in value:
-                value[key] = self.expand_macros(value[key], value)
+                value[key] = self.expand_macros(value[key], context=value)
         return value
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
