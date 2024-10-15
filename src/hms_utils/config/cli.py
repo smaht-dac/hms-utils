@@ -90,8 +90,13 @@ def handle_lookup_command(config: Config, args: object) -> int:
         if args.show and Config._contains_macro(value):
             status = 1
         if isinstance(value, JSON):
+            if lookup_path.endswith(config.path_separator):
+                if inherited_values := config.lookup_inherited_values(value, show=args.show):
+                    for inherited_value_key in inherited_values:
+                        if inherited_value_key not in value:
+                            value[inherited_value_key] = inherited_values[inherited_value_key]
             if args.json and args.formatted:
-                value = json.dumps(value, indent=4)
+                value = json.dumps(value.sorted(), indent=4)
             elif args.tree:
                 prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
                 value = (prefix +

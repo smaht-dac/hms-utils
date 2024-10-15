@@ -56,6 +56,10 @@ class ConfigBasic:
     def data(self, sorted: bool = True) -> JSON:
         return self._json.sorted() if sorted is True else self._json
 
+    @property
+    def path_separator(self) -> str:
+        return self._path_separator
+
     def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
         def traverse(data: Optional[Any]) -> None:  # Not currently used.
             if not isinstance(data, JSON):
@@ -146,6 +150,20 @@ class ConfigBasic:
                     break
         return value
 
+    def lookup_inherited_values(self, value: JSON, show: Optional[bool] = False) -> dict:
+        results = {}
+        if isinstance(value, JSON):
+            parent = value.parent
+            while parent:
+                for key in parent:
+                    if not isinstance(parent[key], dict):
+                        if (key not in value) and (key not in results):
+                            path = self.path(parent, path_suffix=key)
+                            if value := self.lookup(path, context=value, show=show):
+                                results[key] = value
+                parent = parent.parent
+        return results
+
     def exports(self, lookup_paths: List[str], show: Optional[bool] = False) -> Tuple[dict, int]:
         make_export_key = lambda key: basename_path(key).replace("-", "_")  # noqa
         exports = {} ; status = 0  # noqa
@@ -165,24 +183,16 @@ class ConfigBasic:
                 continue
             # Since dash is not even allowed in environment/export name change to underscore.
             if isinstance(value, JSON):
-                context = value
                 for key in value:
                     key_value = value[key]
                     if is_primitive_type(key_value):
                         exports[make_export_key(key)] = key_value
             else:
                 exports[make_export_key(exports_name)] = value
-                context = None
-            if isinstance(value, JSON):
-                parent = value.parent
-                while parent:
-                    for key in parent:
-                        if not isinstance(parent[key], dict):
-                            if (export_key := make_export_key(key)) not in exports:
-                                path = self.path(parent, path_suffix=key)
-                                if value := self.lookup(path, context=context or parent, show=show):
-                                    exports[export_key] = value
-                    parent = parent.parent
+            if isinstance(value, JSON) and (inherited_values := self.lookup_inherited_values(value, show=show)):
+                for inherited_value_key in inherited_values:
+                    if (export_key := make_export_key(inherited_value_key)) not in exports:
+                        exports[export_key] = inherited_values[inherited_value_key]
         exports = dict(sorted(exports.items()))
         for export_key in exports:
             if ConfigBasic._contains_macro(exports[export_key]):
