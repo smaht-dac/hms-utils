@@ -330,7 +330,7 @@ def _get_portal_object(portal: Portal, uuid: str,
             with io.open(file_path, "w") as f:
                 json.dump(schema_data, f, indent=4)
 
-    if os.path.exists(uuid) and inserts:
+    if os.path.isfile(uuid) and inserts:
         # Very special case: If given "uuid" (or other path) as actually a file then assume it
         # contains a list of references (e.g. /Donor/3039a6ca-9849-432d-ad49-2c5630bcbee7) to fetch.
         response = {}
