@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 from typing import List, Optional
+import yaml
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
@@ -212,8 +213,12 @@ def parse_args(argv: List[str]) -> object:
             if not os.path.isfile(config_file):
                 _error(f"Configuration file does not exist: {config_file}")
             try:
-                with io.open(config_file) as f:
-                    config_json = json.load(f)
+                with io.open(config_file, "r") as f:
+                    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+                        config_json = yaml.safe_load(f)
+                        pass
+                    else:
+                        config_json = json.load(f)
                     config = Config(config_json, name=config_file, secrets=secrets)
             except Exception:
                 _error(f"Configuration JSON file cannot be loaded: {config_file}")
@@ -254,7 +259,8 @@ def parse_args(argv: List[str]) -> object:
                 argi += 1
                 while argi < argn:
                     arg = argv[argi]
-                    if arg.startswith("-") or not (config_file := arg).endswith(".json"):
+                    if (arg.startswith("-") or (not (config_file := arg).endswith(".json")) or
+                        (not config_file.endswith(".yaml")) or (not config_file.endswith(".yml"))):  # noqa
                         del argv[argi_config:argi] ; argi = 0 ; argn = len(argv)  # noqa
                         break
                     configs.append(verify_config(config_file, config_dir, secrets=secrets))
