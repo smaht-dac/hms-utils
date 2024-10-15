@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.2.156"
+version = "1.2.157"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -34,23 +34,21 @@ pytest-runner = ">=5.1"
 hms-aws-ecs = "hms_utils.aws_ecs:main"
 hms-aws-env = "hms_utils.aws_env:main"
 
+hms-config = "hms_utils.config.cli:main" # new
+hms-config-export = "hms_utils.config.cli:main_show_script_path"
+hms-config-exports = "hms_utils.config.cli:main_show_script_path"
+
+hms-portals = "hms_utils.portal.portal_envs:main" # new
+hms-portal-view = "hms_utils.portal.view_portal_object:main"
+hms-portal-update = "hms_utils.portal.update_portal_object:main"
+hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
+
 hmx-config = "hms_utils.hms_config:main"
 hmx-config-script = "hms_utils.hms_config:main_show_script_path"
 hmx-config-export = "hms_utils.hms_config:main_show_script_path"
 hmx-config-exports = "hms_utils.hms_config:main_show_script_path"
 
-hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
-hmsawsenv = "hms_utils.aws_env:main" # new
-hmsawsecs = "hms_utils.aws_ecs:main" # new
-
-hms-config = "hms_utils.config.cli:main" # new
-hms-config-export = "hms_utils.config.cli:main_show_script_path"
-hms-config-exports = "hms_utils.config.cli:main_show_script_path"
-
-hmsportals = "hms_utils.portal.portal_envs:main" # new
 publish-to-pypi = "dcicutils.scripts.publish_to_pypi:main"
-hmsportal-view = "hms_utils.portal.view_portal_object:main"
-hmsportal-update = "hms_utils.portal.update_portal_object:main"
 
 [build-system]
 requires = ["setuptools>=74.0.0", "wheel"]
