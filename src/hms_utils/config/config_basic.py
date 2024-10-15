@@ -146,6 +146,50 @@ class ConfigBasic:
                     break
         return value
 
+    def exports(self, lookup_paths: List[str], show: Optional[bool] = False) -> Tuple[dict, int]:
+        make_export_key = lambda key: basename_path(key).replace("-", "_")  # noqa
+        exports = {} ; status = 0  # noqa
+        if isinstance(lookup_paths, str):
+            lookup_paths = [lookup_paths]
+        if not (isinstance(lookup_paths, list) and lookup_paths):
+            return exports, status
+        for lookup_path in lookup_paths:
+            if (index := lookup_path.find(ConfigBasic._EXPORT_NAME_SEPARATOR)) > 0:
+                exports_name = lookup_path[0:index]
+                if not (lookup_path := lookup_path[index + 1:].strip()):
+                    continue
+            else:
+                exports_name = basename_path(lookup_path)
+            if (value := self.lookup(lookup_path, show=show)) is None:
+                status = 1
+                continue
+            # Since dash is not even allowed in environment/export name change to underscore.
+            if isinstance(value, JSON):
+                context = value
+                for key in value:
+                    key_value = value[key]
+                    if is_primitive_type(key_value):
+                        exports[make_export_key(key)] = key_value
+            else:
+                exports[make_export_key(exports_name)] = value
+                context = None
+            if isinstance(value, JSON):
+                parent = value.parent
+                while parent:
+                    for key in parent:
+                        if not isinstance(parent[key], dict):
+                            if (export_key := make_export_key(key)) not in exports:
+                                path = self.path(parent, path_suffix=key)
+                                if value := self.lookup(path, context=context or parent, show=show):
+                                    exports[export_key] = value
+                    parent = parent.parent
+        exports = dict(sorted(exports.items()))
+        for export_key in exports:
+            if ConfigBasic._contains_macro(exports[export_key]):
+                status = 1
+                break
+        return exports, status
+
     def _lookup(self, path: str, context: Optional[JSON] = None,
                 inherit_simple: bool = False, inherit_none: bool = False) -> Tuple[Optional[Union[Any, JSON]], JSON]:
 
@@ -292,50 +336,6 @@ class ConfigBasic:
                 if resolved_macro_value is not None:
                     break
         return resolved_macro_value, resolved_macro_context
-
-    def exports(self, lookup_paths: List[str], show: Optional[bool] = False) -> Tuple[dict, int]:
-        make_export_key = lambda key: basename_path(key).replace("-", "_")  # noqa
-        exports = {} ; status = 0  # noqa
-        if isinstance(lookup_paths, str):
-            lookup_paths = [lookup_paths]
-        if not (isinstance(lookup_paths, list) and lookup_paths):
-            return exports, status
-        for lookup_path in lookup_paths:
-            if (index := lookup_path.find(ConfigBasic._EXPORT_NAME_SEPARATOR)) > 0:
-                exports_name = lookup_path[0:index]
-                if not (lookup_path := lookup_path[index + 1:].strip()):
-                    continue
-            else:
-                exports_name = basename_path(lookup_path)
-            if (value := self.lookup(lookup_path, show=show)) is None:
-                status = 1
-                continue
-            # Since dash is not even allowed in environment/export name change to underscore.
-            if isinstance(value, JSON):
-                context = value
-                for key in value:
-                    key_value = value[key]
-                    if is_primitive_type(key_value):
-                        exports[make_export_key(key)] = key_value
-            else:
-                exports[make_export_key(exports_name)] = value
-                context = None
-            if isinstance(value, JSON):
-                parent = value.parent
-                while parent:
-                    for key in parent:
-                        if not isinstance(parent[key], dict):
-                            if (export_key := make_export_key(key)) not in exports:
-                                path = self.path(parent, path_suffix=key)
-                                if value := self.lookup(path, context=context or parent, show=show):
-                                    exports[export_key] = value
-                    parent = parent.parent
-        exports = dict(sorted(exports.items()))
-        for export_key in exports:
-            if ConfigBasic._contains_macro(exports[export_key]):
-                status = 1
-                break
-        return exports, status
 
     def unpack_path(self, path: str) -> List[str]:
         return unpack_path(path, path_separator=self._path_separator,
