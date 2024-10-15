@@ -387,6 +387,9 @@ def parse_args(argv: List[str]) -> object:
             _usage()
     if args.raw and (not args.dump):
         _usage()
+    if args.exports:
+        if args.tree or args.json or args.dump:
+            _usage()
     if not (args.lookup_paths or args.tree or args.json or args.list or args.dump):
         args.tree = True
     if args.raw:
