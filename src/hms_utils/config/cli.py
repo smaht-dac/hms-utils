@@ -121,9 +121,12 @@ def handle_exports_command(config: Config, args: object) -> int:
                 if args.verbose:
                     print(f"{chars.rarrow_hollow} {export}")
     else:
-        for export in sorted(exports):
-            export = f"export {export}={exports[export]}"
-            print(export)
+        if args.json:
+            print(json.dumps(exports, indent=4 if args.formatted else None))
+        else:
+            for export in sorted(exports):
+                export = f"export {export}={exports[export]}"
+                print(export)
     return status
 
 
@@ -383,12 +386,12 @@ def parse_args(argv: List[str]) -> object:
     if args.show and (args.dump or args.raw):
         _usage()
     if args.formatted:
-        if args.exports or args.tree or args.list or args.dump:
+        if args.tree or args.list or args.dump:
             _usage()
     if args.raw and (not args.dump):
         _usage()
     if args.exports:
-        if args.tree or args.json or args.dump:
+        if args.tree or args.dump:
             _usage()
     if not (args.lookup_paths or args.tree or args.json or args.list or args.dump):
         args.tree = True
