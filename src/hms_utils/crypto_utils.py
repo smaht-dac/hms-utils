@@ -20,13 +20,17 @@ def encrypt_file(plaintext_file: str, password: str, encrypted_file: str, prefix
 
 
 def decrypt_file(encrypted_file: str, password: str, decrypted_file: str, prefix: Optional[str] = None) -> bool:
-    with open(encrypted_file, "rb") as f:
-        data = f.read().split(b"\n")
-    salt, encrypted_data = base64.urlsafe_b64decode(data[1]), base64.urlsafe_b64decode(data[2])
-    decrypted_data = Fernet(_derive_key_from_password(password, salt)).decrypt(encrypted_data)
+    decrypted_data = read_encrypted_file(encrypted_file, password, prefix=prefix)
     with open(decrypted_file, "wb") as f:
         f.write(decrypted_data)
     return True
+
+
+def read_encrypted_file(encrypted_file: str, password: str, prefix: Optional[str] = None) -> str:
+    with open(encrypted_file, "rb") as f:
+        data = f.read().split(b"\n")
+    salt, encrypted_data = base64.urlsafe_b64decode(data[1]), base64.urlsafe_b64decode(data[2])
+    return Fernet(_derive_key_from_password(password, salt)).decrypt(encrypted_data)
 
 
 def _derive_key_from_password(password: str, salt: bytes) -> bytes:

@@ -10,6 +10,7 @@ from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
+from hms_utils.crypto_utils import read_encrypted_file
 from hms_utils.version_utils import get_version
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import is_current_or_parent_relative_path
@@ -178,6 +179,21 @@ def parse_args(argv: List[str]) -> object:
         # If and only if either of the the --config or --secrets options are given then the
         # default config/secrets file (e.g. i.e. in  the ~/.config/hms directory) will NOT be used.
 
+        def read_file(file: str) -> Optional[dict]:
+            try:
+                if data := read_encrypted_file(file, password=args.password):
+                    if file.endswith(".yaml") or config_file.endswith(".yml"):
+                        data = yaml.safe_load(data)
+                    else:
+                        data = json.loads(data)
+            except Exception:
+                with io.open(file, "r") as f:
+                    if file.endswith(".yaml") or file.endswith(".yml"):
+                        data = yaml.safe_load(f)
+                    else:
+                        data = json.load(f)
+            return data
+
         def get_config_dir() -> None:
             nonlocal argv, args
             config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
@@ -221,13 +237,8 @@ def parse_args(argv: List[str]) -> object:
             if not os.path.isfile(config_file):
                 _error(f"Configuration file does not exist: {config_file}")
             try:
-                with io.open(config_file, "r") as f:
-                    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
-                        config_json = yaml.safe_load(f)
-                        pass
-                    else:
-                        config_json = json.load(f)
-                    config = Config(config_json, name=config_file, secrets=secrets)
+                config_json = read_file(config_file)
+                config = Config(config_json, name=config_file, secrets=secrets)
             except Exception:
                 _error(f"Configuration JSON file cannot be loaded: {config_file}")
             return config
