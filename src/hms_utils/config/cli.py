@@ -158,6 +158,7 @@ def parse_args(argv: List[str]) -> object:
         nocolor = False
         formatted = False
         verbose = False
+        password = False
         nowarnings = False
         warnings = False
         debug = False
@@ -359,6 +360,8 @@ def parse_args(argv: List[str]) -> object:
                 args.warnings = True
             elif arg in ["--format", "-format", "--formatted", "-formatted"]:
                 args.formatted = True
+            elif arg in ["--password", "-password", "--passwd", "-passwd"]:
+                args.password = True
             elif arg in ["--version", "-version"]:
                 print(get_version())
                 exit(0)
