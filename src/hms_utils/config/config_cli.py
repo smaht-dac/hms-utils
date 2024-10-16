@@ -7,6 +7,7 @@ import traceback
 from typing import List, Optional, Tuple
 import yaml
 from hms_utils.chars import chars
+from hms_utils.type_utils import boolean_any_of, boolean_at_most_one_of
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
@@ -414,15 +415,14 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
 
     if args.lookup_paths:
-        # if args.tree or args.list or args.dump or args.raw:
-        if args.list or args.dump or args.raw:
+        if boolean_any_of(args.list, args.dump, args.raw):
             _usage()
     else:
         if args.exports:
             _usage()
-        if ((1 if args.json else 0) + (1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
+        if not boolean_at_most_one_of(args.json, args.tree, args.list, args.dump):
             _usage()
-    if ((1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
+    if not boolean_at_most_one_of(args.tree, args.list, args.json, args.dump):
         _usage()
     if args.show and (args.dump or args.raw):
         _usage()
@@ -438,8 +438,6 @@ def parse_args(argv: List[str]) -> object:
         args.tree = True
     if args.raw:
         args.show = None
-#   if args.json and not args.lookup_paths:
-#       args.formatted = True
 
     return args
 
