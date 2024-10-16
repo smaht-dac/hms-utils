@@ -46,7 +46,8 @@ def main():
     def usage():  # noqa
         print("usage: encrypt/decrypt --password password file")
         exit(1)
-    file = None ; encrypt = decrypt = False ; password = None ; output = None ; verbose = False # noqa
+    file = None ; encrypt = decrypt = False ; password = None ; output = None  # noqa
+    yes = False ; verbose = False ; debug = False  # noqa
     argi = 0 ; argn = len(sys.argv)  # noqa
     while argi < argn:
         arg = sys.argv[argi] ; argi += 1  # noqa
@@ -58,17 +59,17 @@ def main():
             if not ((argi < argn) and (password := sys.argv[argi])):
                 usage()
             argi += 1
+        elif arg in ["--yes", "-yes", "--force", "-force"]:
+            yes = True
         elif arg in ["--verbose", "-verbose"]:
             verbose = True
+        elif arg in ["--debug", "-debug"]:
+            debug = True
         elif arg in ["--output", "-output", "--out", "-out", "--to", "-to"]:
             if not ((argi < argn) and (output := sys.argv[argi])):
                 usage()
-            if os.path.exists(output):
-                print(f"Output file already exists: {output}")
-                exit(1)
-            if (output_directory := os.path.dirname(output)) and (not os.path.isdir(output_directory)):
-                print(f"Output file directory does not exist: {output_directory}")
-                exit(1)
+            if output == "-":
+                output = "/dev/stdout"
             argi += 1
         else:
             file = arg
@@ -78,6 +79,13 @@ def main():
     if not os.path.isfile(file):
         print(f"Cannot find file: {file}")
         exit(1)
+    if output:
+        if (not yes) and os.path.isfile(output):
+            print(f"Output file already exists: {output}")
+            exit(1)
+        if (output_directory := os.path.dirname(output)) and (not os.path.isdir(output_directory)):
+            print(f"Output file directory does not exist: {output_directory}")
+            exit(1)
     with temporary_file() as tmpfile:
         if encrypt:
             verb = "Encrypt"
@@ -90,16 +98,20 @@ def main():
             exit(1)
         if (not output) and (not yes_or_no(f"{verb} file {file} in place?")):
             exit(0)
-        if verbose:
+        if debug:
             print(f"{verb}ing file {file} to {tmpfile}")
+        elif verbose:
+            print(f"{verb}ing file in place: {file}")
         function(file, password, tmpfile)
-        if verbose:
+        if debug:
             print(f"Done {verb.lower()}ing file {file} to {tmpfile}")
         if output:
             file = output
-        if verbose:
+        if debug:
             print(f"Copying file {tmpfile} to: {file}")
         shutil.copy(tmpfile, file)
+        if debug:
+            print(f"Done copying file {tmpfile} to: {file}")
 
 
 if __name__ == "__main__":

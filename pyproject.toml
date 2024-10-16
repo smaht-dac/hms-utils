@@ -43,8 +43,8 @@ hms-portal-view = "hms_utils.portal.view_portal_object:main"
 hms-portal-update = "hms_utils.portal.update_portal_object:main"
 hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
 
-hms-encrypt= "hms_utils.crypto_utils:main"
-hms-decrypt= "hms_utils.crypto_utils:main"
+hms-encrypt= "hms_utils.cli.crypt_cli:main_encrypt"
+hms-decrypt= "hms_utils.cli.crypt_cli:main_decrypt"
 
 hmx-config = "hms_utils.hms_config:main"
 hmx-config-script = "hms_utils.hms_config:main_show_script_path"
