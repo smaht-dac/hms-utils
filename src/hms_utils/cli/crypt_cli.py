@@ -7,8 +7,18 @@ from hms_utils.crypt_utils import decrypt_file, encrypt_file
 
 
 def main():
+
     STDIN = "/dev/stdin"
     STDOUT = "/dev/stdout"
+
+    def copy_file(source: str, destination: str) -> None:
+        nonlocal STDOUT
+        if destination == STDOUT:
+            with open(source, "r") as f:
+                sys.stdout.write(f.read())
+        else:
+            shutil.copy(source, destination)
+
     file = None ; encrypt = decrypt = False ; password = None ; output = None  # noqa
     yes = False ; verbose = False ; debug = False  # noqa
     argi = 0 ; argn = len(sys.argv)  # noqa
@@ -46,23 +56,19 @@ def main():
             file = arg
     if not file:
         file = STDIN
-    if file == "-":
+    if (file == "-") or (file == STDIN):
         file = STDIN
     if (file != STDIN) and (not os.path.isfile(file)):
-        print(f"Cannot find file: {file}")
-        exit(1)
+        _error(f"Cannot find file: {file}")
     if not password:
-        print("Must specify a password.")
-        exit(1)
+        _error("Must specify a password.")
     if output:
-        if output == "-":
+        if (output == "-") or (output == STDOUT):
             output = STDOUT
         elif (not yes) and os.path.isfile(output):
-            print(f"Output file already exists: {output}")
-            exit(1)
+            _error(f"Output file already exists: {output}")
         elif (output_directory := os.path.dirname(output)) and (not os.path.isdir(output_directory)):
-            print(f"Output file directory does not exist: {output_directory}")
-            exit(1)
+            _error(f"Output file directory does not exist: {output_directory}")
     elif file == STDIN:
         output = STDOUT
     with temporary_file() as tmpfile:
@@ -73,24 +79,24 @@ def main():
             verb = "Decrypt"
             function = decrypt_file
         else:
-            print("Must specify --encrypt or --decrypt")
-            exit(1)
+            _error("Must specify --encrypt or --decrypt")
         if (not output) and (not yes_or_no(f"{verb} file {file} in place?")):
             exit(0)
         if debug:
-            print(f"{verb}ing file {file} to {tmpfile}")
+            _print(f"{verb}ing file {file} to {tmpfile}")
         elif verbose:
-            print(f"{verb}ing file in place: {file}")
+            _print(f"{verb}ing file in place: {file}")
         function(file, password, tmpfile)
+        copy_file(tmpfile, "/tmp/foo")
         if debug:
-            print(f"Done {verb.lower()}ing file {file} to {tmpfile}")
+            _print(f"Done {verb.lower()}ing file {file} to {tmpfile}")
         if output:
             file = output
         if debug:
-            print(f"Copying file {tmpfile} to: {file}")
-        shutil.copy(tmpfile, file)
+            _print(f"Copying file {tmpfile} to: {file}")
+        copy_file(tmpfile, file)
         if debug:
-            print(f"Done copying file {tmpfile} to: {file}")
+            _print(f"Done copying file {tmpfile} to: {file}")
 
 
 def main_encrypt():
@@ -102,8 +108,18 @@ def main_decrypt():
     sys.argv = ["--decrypt"] + sys.argv[1:]
     main()
 
-def _usage():  # noqa
-    print("usage: encrypt/decrypt --password password file")
+
+def _print(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def _error(message: str) -> None:
+    _print(message, file=sys.stderr)
+    exit(1)
+
+
+def _usage():
+    _error("usage: encrypt/decrypt --password password file")
     exit(1)
 
 
