@@ -7,9 +7,8 @@ from hms_utils.crypt_utils import decrypt_file, encrypt_file
 
 
 def main():
-    def usage():  # noqa
-        print("usage: encrypt/decrypt --password password file")
-        exit(1)
+    STDIN = "/dev/stdin"
+    STDOUT = "/dev/stdout"
     file = None ; encrypt = decrypt = False ; password = None ; output = None  # noqa
     yes = False ; verbose = False ; debug = False  # noqa
     argi = 0 ; argn = len(sys.argv)  # noqa
@@ -27,7 +26,7 @@ def main():
                 argi += 1
         elif arg in ["--password", "-password", "--passwd", "-passwd"]:
             if not ((argi < argn) and (password := sys.argv[argi])):
-                usage()
+                _usage()
             argi += 1
         elif arg in ["--yes", "-yes", "--force", "-force"]:
             yes = True
@@ -37,32 +36,36 @@ def main():
             debug = True
         elif arg in ["--output", "-output", "--out", "-out", "--to", "-to"]:
             if not ((argi < argn) and (output := sys.argv[argi])):
-                usage()
+                _usage()
             argi += 1
+        elif (arg == "-") and (not file):
+            file = arg
         elif arg.startswith("-"):
-            usage()
+            _usage()
         elif not file:
             file = arg
     if not file:
         print("Must specify a --encrypt or --decrypt file.")
         exit(1)
-    if not os.path.isfile(file):
+    if file == "-":
+        file = STDIN
+    if (file != STDIN) and (not os.path.isfile(file)):
         print(f"Cannot find file: {file}")
         exit(1)
     if not password:
         print("Must specify a password.")
         exit(1)
-    if file == "-":
-        file = "/dev/stdin"
     if output:
         if output == "-":
-            output = "/dev/stdout"
+            output = STDOUT
         elif (not yes) and os.path.isfile(output):
             print(f"Output file already exists: {output}")
             exit(1)
         elif (output_directory := os.path.dirname(output)) and (not os.path.isdir(output_directory)):
             print(f"Output file directory does not exist: {output_directory}")
             exit(1)
+    elif file == STDIN:
+        output = STDOUT
     with temporary_file() as tmpfile:
         if encrypt:
             verb = "Encrypt"
@@ -100,6 +103,11 @@ def main_decrypt():
     sys.argv = ["--decrypt"] + sys.argv[1:]
     main()
 
+def _usage():  # noqa
+    print("usage: encrypt/decrypt --password password file")
+    exit(1)
+
 
 if __name__ == "__main__":
+    sys.argv = sys.argv[1:]
     main()
