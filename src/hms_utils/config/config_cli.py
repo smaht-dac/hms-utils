@@ -182,21 +182,21 @@ def parse_args(argv: List[str]) -> object:
         # default config/secrets file (e.g. i.e. in  the ~/.config/hms directory) will NOT be used.
 
         def read_file(file: str) -> Tuple[Optional[dict], bool]:
-            decrypted = False
-            try:
-                if data := read_encrypted_file(file, password=args.password):
-                    decrypted = True
-                    if file.endswith(".yaml") or config_file.endswith(".yml"):
-                        data = yaml.safe_load(data)
-                    else:
-                        data = json.loads(data)
-            except Exception:
-                with io.open(file, "r") as f:
-                    if file.endswith(".yaml") or file.endswith(".yml"):
-                        data = yaml.safe_load(f)
-                    else:
-                        data = json.load(f)
-            return data, decrypted
+            if args.password:
+                try:
+                    if data := read_encrypted_file(file, password=args.password):
+                        if file.endswith(".yaml") or config_file.endswith(".yml"):
+                            return yaml.safe_load(data), True
+                        else:
+                            return json.loads(data), True
+                except Exception:
+                    pass
+            with io.open(file, "r") as f:
+                if file.endswith(".yaml") or file.endswith(".yml"):
+                    data = yaml.safe_load(f)
+                else:
+                    data = json.load(f)
+            return data, False
 
         def get_config_dir() -> None:
             nonlocal argv, args
