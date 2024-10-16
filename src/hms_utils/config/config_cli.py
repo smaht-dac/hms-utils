@@ -10,7 +10,7 @@ from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
-from hms_utils.crypto_utils import read_encrypted_file
+from hms_utils.crypt_utils import read_encrypted_file
 from hms_utils.version_utils import get_version
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import is_current_or_parent_relative_path
@@ -341,7 +341,7 @@ def parse_args(argv: List[str]) -> object:
             if arg in ["--shell", "-shell", "--script", "-script", "--scripts", "-scripts",
                        "--command", "-command", "--commands", "-commands",
                        "--function", "-function", "--functions", "-functions"]:
-                print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cli.sh"))
+                print(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config_cli.sh"))
                 exit(0)
             elif arg in ["--show", "-show"]:
                 args.show = True
