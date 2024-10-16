@@ -29,6 +29,7 @@ class ConfigBasic:
     def __init__(self, config: Union[dict, str],
                  name: Optional[str] = None,
                  path_separator: Optional[str] = None,
+                 decrypted: bool = False,
                  custom_macro_lookup: Optional[Callable] = None,
                  raise_exception: bool = False) -> None:
 
@@ -43,6 +44,7 @@ class ConfigBasic:
         self._includes = None
         self._path_separator = path_separator
         self._custom_macro_lookup = custom_macro_lookup if callable(custom_macro_lookup) else None
+        self._decrypted = decrypted is True
         self._ignore_missing_macros = True
         self._ignore_circular_macros = True
         self._ignore_structured_macros = True
@@ -59,6 +61,10 @@ class ConfigBasic:
     @property
     def path_separator(self) -> str:
         return self._path_separator
+
+    @property
+    def decrypted(self) -> bool:
+        return self._decrypted
 
     def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
         def traverse(data: Optional[Any]) -> None:  # Not currently used.

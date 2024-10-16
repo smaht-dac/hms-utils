@@ -4,7 +4,7 @@ import json
 import os
 import sys
 import traceback
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import yaml
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
@@ -35,15 +35,18 @@ def main(argv: Optional[List] = None):
 
     if not args.lookup_paths and (args.tree or args.list or args.dump):
         if config.name:
-            print(f"{chars.rarrow} {config.name}")
+            print(f"{chars.rarrow} {config.name}"
+                  f"{f' {chars.dot} decrypted' if config.decrypted else ''}")
         if args.configs_for_merge:
             for config_for_merge in args.configs_for_merge:
-                if config_for_merge.name:
-                    print(f"{chars.rarrow_hollow} {config_for_merge.name} (merged)")
+                print(f"{chars.rarrow_hollow} {config_for_merge.name} {chars.dot} merged"
+                      f"{f' {chars.dot} decrypted' if config_for_merge.decrypted else ''}")
         if args.configs_for_include:
             for config_for_include in args.configs_for_include:
-                if config_for_include.name:
-                    print(f"{chars.rarrow_hollow} {config_for_include.name} (included)")
+                print(f"{chars.rarrow_hollow} {config_for_include.name} {chars.dot} included"
+                      f"{f' {chars.dot} decrypted' if config_for_include.decrypted else ''}")
+#               if config_for_include.name:
+#                   print(f"{chars.rarrow_hollow} {config_for_include.name} {chars.dot} included")
 
     if not args.lookup_paths:
         if args.json:
@@ -180,9 +183,11 @@ def parse_args(argv: List[str]) -> object:
         # If and only if either of the the --config or --secrets options are given then the
         # default config/secrets file (e.g. i.e. in  the ~/.config/hms directory) will NOT be used.
 
-        def read_file(file: str) -> Optional[dict]:
+        def read_file(file: str) -> Tuple[Optional[dict], bool]:
+            decrypted = False
             try:
                 if data := read_encrypted_file(file, password=args.password):
+                    decrypted = True
                     if file.endswith(".yaml") or config_file.endswith(".yml"):
                         data = yaml.safe_load(data)
                     else:
@@ -193,7 +198,7 @@ def parse_args(argv: List[str]) -> object:
                         data = yaml.safe_load(f)
                     else:
                         data = json.load(f)
-            return data
+            return data, decrypted
 
         def get_config_dir() -> None:
             nonlocal argv, args
@@ -239,8 +244,8 @@ def parse_args(argv: List[str]) -> object:
             if not os.path.isfile(config_file):
                 _error(f"Configuration file does not exist: {config_file}")
             try:
-                config_json = read_file(config_file)
-                config = Config(config_json, name=config_file, secrets=secrets)
+                config_json, decrypted = read_file(config_file)
+                config = Config(config_json, name=config_file, secrets=secrets, decrypted=decrypted)
             except Exception:
                 _error(f"Configuration JSON file cannot be loaded: {config_file}")
             return config
@@ -280,8 +285,8 @@ def parse_args(argv: List[str]) -> object:
                 argi += 1
                 while argi < argn:
                     arg = argv[argi]
-                    if (arg.startswith("-") or (not (config_file := arg).endswith(".json")) or
-                        (not config_file.endswith(".yaml")) or (not config_file.endswith(".yml"))):  # noqa
+                    if (arg.startswith("-") or (not ((config_file := arg).endswith(".json") or
+                                                     config_file.endswith(".yaml") or config_file.endswith(".yml")))):  # noqa
                         del argv[argi_config:argi] ; argi = 0 ; argn = len(argv)  # noqa
                         break
                     configs.append(verify_config(config_file, config_dir, secrets=secrets))
