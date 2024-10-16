@@ -158,14 +158,29 @@ class ConfigBasic:
 
     def lookup_inherited_values(self, value: JSON, show: Optional[bool] = False) -> dict:
         results = {}
+        context = value
         if isinstance(value, JSON):
             parent = value.parent
             while parent:
                 for key in parent:
                     if not isinstance(parent[key], dict):
-                        if (key not in value) and (key not in results):
+                        if (not isinstance(value, dict) or (key not in value)) and (key not in results):
                             path = self.path(parent, path_suffix=key)
-                            if value := self.lookup(path, context=value, show=show):
+                            # TODO: Test for /foursight/smaht/wolf/ ...
+                            # ▷ AWS_PROFILE: smaht-wolf
+                            # ▷ CHALICE_LOCAL: True
+                            # ▷ ES_HOST_LOCAL: http://localhost:9209
+                            # ▶ GITHUB_TOKEN: ********
+                            # ▷ IDENTITY: C4AppConfigFoursightSmahtDevelopment
+                            # ▷ NOT_NEEDED_AUTH0_CLIENT_LOCAL: ${aws-secret:ENCODED_AUTH0_CLIENT}
+                            # ▷ NOT_NEEDED_AUTH0_SECRET_LOCAL: ${aws-secret:ENCODED_AUTH0_SECRET}
+                            # ▷ REDIS_HOST_LOCAL: redis://localhost:6379
+                            # ▷ SSH_TUNNEL_ELASTICSEARCH_ENV: smaht-wolf
+                            # ▷ SSH_TUNNEL_ELASTICSEARCH_NAME: ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209
+                            # ▷ SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX: ssh-tunnel-elasticsearch-proxy
+                            # ▷ SSH_TUNNEL_ELASTICSEARCH_PORT: 9209
+                            # ▷ STACK_NAME: c4-foursight-development-stack
+                            if value := self.lookup(path, context=context, show=show):
                                 results[key] = value
                 parent = parent.parent
         return results
