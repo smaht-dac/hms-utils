@@ -45,8 +45,7 @@ def main():
         elif not file:
             file = arg
     if not file:
-        print("Must specify a --encrypt or --decrypt file.")
-        exit(1)
+        file = STDIN
     if file == "-":
         file = STDIN
     if (file != STDIN) and (not os.path.isfile(file)):
