@@ -36,3 +36,35 @@ def read_encrypted_file(encrypted_file: str, password: str, prefix: Optional[str
 def _derive_key_from_password(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=100000, backend=default_backend())
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
+
+
+def main():
+    import shutil
+    import sys
+    from dcicutils.tmpfile_utils import temporary_file
+    def usage():  # noqa
+        print("usage: encrypt/decrypt --password password file")
+        exit(1)
+    file = None ; encrypt = decrypt = False ; password = None  # noqa
+    argi = 0 ; argn = len(sys.argv)  # noqa
+    while argi < argn:
+        arg = sys.argv[argi] ; argi += 1  # noqa
+        if arg in ["--encrypt", "-encrypt"]:
+            encrypt = True
+        elif arg in ["--decrypt", "-decrypt"]:
+            decrypt = True
+        elif arg in ["--password", "-password", "--passwd", "-passwd"]:
+            if not ((argi < argn) and (password := sys.argv[argi])):
+                usage()
+        else:
+            file = arg
+    with temporary_file() as tmpfile:
+        if encrypt:
+            encrypt_file(file, password, tmpfile)
+        elif decrypt:
+            decrypt_file(file, password, tmpfile)
+        shutil.copy(tmpfile, file)
+
+
+if __name__ == "__main__":
+    main()
