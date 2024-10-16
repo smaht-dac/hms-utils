@@ -45,8 +45,6 @@ def main(argv: Optional[List] = None):
             for config_for_include in args.configs_for_include:
                 print(f"{chars.rarrow_hollow} {config_for_include.name} {chars.dot} included"
                       f"{f' {chars.dot} decrypted' if config_for_include.decrypted else ''}")
-#               if config_for_include.name:
-#                   print(f"{chars.rarrow_hollow} {config_for_include.name} {chars.dot} included")
 
     if not args.lookup_paths:
         if args.json:
