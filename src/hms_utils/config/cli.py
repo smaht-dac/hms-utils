@@ -197,6 +197,7 @@ def parse_args(argv: List[str]) -> object:
 
         def get_config_dir() -> None:
             nonlocal argv, args
+            get_password_arg()
             config_dir = os.path.expanduser(DEFAULT_CONFIG_DIR)
             if value := os.environ.get("HMS_CONFIG_DIR"):
                 config_dir = value
@@ -320,6 +321,17 @@ def parse_args(argv: List[str]) -> object:
             del argv[argi_lookup_paths:argi_end_lookup_paths]
         args.lookup_paths = lookup_paths
 
+    def get_password_arg():
+        nonlocal argv, args
+        argi = 0 ; argn = len(argv)  # noqa
+        while argi < argn:
+            arg = argv[argi].strip() ; argi += 1  # noqa
+            if arg in ["--password", "-password", "--passwd", "-passwd"]:
+                if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                    _usage()
+                args.password = argv[argi]
+                del argv[argi - 1:argi + 1]
+
     def get_other_args():
         nonlocal argv, args
         argi = 0 ; argn = len(argv)  # noqa
@@ -361,7 +373,10 @@ def parse_args(argv: List[str]) -> object:
             elif arg in ["--format", "-format", "--formatted", "-formatted"]:
                 args.formatted = True
             elif arg in ["--password", "-password", "--passwd", "-passwd"]:
-                args.password = True
+                if (argi >= argn) or not (arg := argv[argi]) or (not arg):
+                    _usage()
+                pass
+                args.password = argv[argi] ; argi += 1  # noqa
             elif arg in ["--version", "-version"]:
                 print(get_version())
                 exit(0)
