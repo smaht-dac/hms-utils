@@ -331,6 +331,7 @@ def parse_args(argv: List[str]) -> object:
                     _usage()
                 args.password = argv[argi]
                 del argv[argi - 1:argi + 1]
+                break
 
     def get_other_args():
         nonlocal argv, args
