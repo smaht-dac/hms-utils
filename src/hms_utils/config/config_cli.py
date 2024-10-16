@@ -417,8 +417,11 @@ def parse_args(argv: List[str]) -> object:
         # if args.tree or args.list or args.dump or args.raw:
         if args.list or args.dump or args.raw:
             _usage()
-    elif args.exports:
-        _usage()
+    else:
+        if args.exports:
+            _usage()
+        if ((1 if args.json else 0) + (1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
+            _usage()
     if ((1 if args.tree else 0) + (1 if args.list else 0) + (1 if args.dump else 0)) > 1:
         _usage()
     if args.show and (args.dump or args.raw):
@@ -435,8 +438,8 @@ def parse_args(argv: List[str]) -> object:
         args.tree = True
     if args.raw:
         args.show = None
-    if args.json and not args.lookup_paths:
-        args.formatted = True
+#   if args.json and not args.lookup_paths:
+#       args.formatted = True
 
     return args
 
