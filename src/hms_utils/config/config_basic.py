@@ -156,7 +156,8 @@ class ConfigBasic:
                     break
         if path.endswith(self.path_separator) and isinstance(value, JSON):
             value = value.duplicate()
-            if inherited_values := self.lookup_inherited_values(value):
+            # TODO: Referencing show from kwargs here (from ConfigWithSecrets.lookup) is smelly.
+            if inherited_values := self.lookup_inherited_values(value, show=kwargs.get("show", False)):
                 for inherited_value_key in inherited_values:
                     if inherited_value_key not in value:
                         value[inherited_value_key] = inherited_values[inherited_value_key]
