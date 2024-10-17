@@ -93,6 +93,9 @@ def handle_lookup_command(config: Config, args: object) -> int:
         if args.show and Config._contains_macro(value):
             status = 1
         if isinstance(value, JSON):
+            if args.dump:
+                value._dump_for_testing(root=lookup_path)
+                continue
             if args.json and args.formatted:
                 value = json.dumps(value.sorted(), indent=4)
             elif args.tree:
@@ -410,7 +413,7 @@ def parse_args(argv: List[str]) -> object:
     get_other_args()
 
     if args.lookup_paths:
-        if any_of_bool(args.list, args.dump, args.raw):
+        if any_of_bool(args.list):
             _usage()
     else:
         if args.exports:
@@ -424,8 +427,6 @@ def parse_args(argv: List[str]) -> object:
     if args.formatted:
         if args.tree or args.list or args.dump:
             _usage()
-    if args.raw and (not args.dump):
-        _usage()
     if args.exports:
         if args.tree or args.dump:
             _usage()

@@ -161,7 +161,7 @@ class JSON(dict):
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
 
-    def _dump_for_testing(self, verbose: bool = False, check: bool = False) -> None:
+    def _dump_for_testing(self, verbose: bool = False, check: bool = False, root: Optional[str] = None) -> None:
         def parent_annotator(parent: JSON) -> str:  # noqa
             nonlocal self, check
             annotation = (f" {chars.dot} id: {id(parent)}"
@@ -185,7 +185,7 @@ class JSON(dict):
                 checked_value, _ = parent.lookup(path)
                 annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
             return annotation
-        root_indicator = f"{chars.rarrow} root {chars.dot} id: {id(self)}"
+        root_indicator = f"{chars.rarrow} {root if isinstance(root, str) else 'root'} {chars.dot} id: {id(self)}"
         if self.parent:
             root_indicator += f" {chars.dot} parent: {id(self.parent)}"
         print(root_indicator)
