@@ -422,8 +422,6 @@ def parse_args(argv: List[str]) -> object:
             _usage()
     if not at_most_one_of_bool(args.tree, args.list, args.json, args.dump):
         _usage()
-    if args.show and (args.dump or args.raw):
-        _usage()
     if args.formatted:
         if args.tree or args.list or args.dump:
             _usage()
