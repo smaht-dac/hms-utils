@@ -10,7 +10,6 @@ def print_dictionary_tree(data: dict,
                           indent: Optional[int] = None,
                           paths: bool = False,
                           path_separator: str = "/",
-                          leafs_first: bool = False,
                           key_modifier: Optional[Callable] = None,
                           value_modifier: Optional[Callable] = None,
                           value_annotator: Optional[Callable] = None,
@@ -116,23 +115,15 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
     return data
 
 
-def sort_dictionary(data: dict, reverse: bool = False, leafs_first: bool = False, sensitive: bool = False) -> dict:
+def sort_dictionary(data: dict, reverse: bool = False, sensitive: bool = False) -> dict:
     """
     Sorts the given dictionary and returns the result; does not change the given dictionary.
     """
     if not isinstance(data, dict):
         return data
     sorted_data = {}
-    if leafs_first is True:
-        leafs = {key: value for key, value in data.items() if not isinstance(value, dict)}
-        nonleafs = {key: value for key, value in data.items() if isinstance(value, dict)}
-        for key in sorted(leafs.keys(), reverse=reverse is True, key=None if sensitive is True else str.lower):
-            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=leafs_first)
-        for key in sorted(nonleafs.keys(), reverse=reverse is True, key=None if sensitive is True else str.lower):
-            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=leafs_first)
-    else:
-        for key in sorted(data.keys(), reverse=reverse is True, key=None if sensitive is True else str.lower):
-            sorted_data[key] = sort_dictionary(data[key], reverse=reverse, leafs_first=False)
+    for key in sorted(data.keys(), reverse=reverse is True, key=None if sensitive is True else str.lower):
+        sorted_data[key] = sort_dictionary(data[key], reverse=reverse)
     return sorted_data
 
 

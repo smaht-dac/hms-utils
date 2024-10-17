@@ -87,8 +87,8 @@ class JSON(dict):
     def path(self) -> str:
         return self.context_path(path_separator=True, path_rooted=id(self) == id(self.root))
 
-    def sorted(self, reverse: bool = False, leafs_first: bool = False) -> JSON:
-        return JSON(sort_dictionary(self.root, reverse=reverse, leafs_first=leafs_first)).lookup(self.path)
+    def sorted(self, reverse: bool = False) -> JSON:
+        return JSON(sort_dictionary(self.root, reverse=reverse)).lookup(self.path)
 
     def merge(self, secondary: JSON, path_separator: Optional[str] = None) -> Tuple[JSON, List[str], List[str]]:
         # Merges the given secondary JSON object into a COPY of this JSON object; but does not overwrite
