@@ -156,14 +156,14 @@ class ConfigBasic:
                     break
         if path.endswith(self.path_separator) and isinstance(value, JSON):
             value = value.duplicate()
-            # TODO: Referencing show from kwargs here (from ConfigWithSecrets.lookup) is smelly.
-            if inherited_values := self.lookup_inherited_values(value, show=kwargs.get("show", False)):
+            # TODO: Referencing kwargs here (for show from ConfigWithSecrets.lookup) is slightly icky.
+            if inherited_values := self.lookup_inherited_values(value, **kwargs):
                 for inherited_value_key in inherited_values:
                     if inherited_value_key not in value:
                         value[inherited_value_key] = inherited_values[inherited_value_key]
         return value
 
-    def lookup_inherited_values(self, value: JSON, show: Optional[bool] = False) -> dict:
+    def lookup_inherited_values(self, value: JSON, **kwargs) -> dict:
         results = {}
         context = value
         if isinstance(value, JSON):
@@ -187,7 +187,7 @@ class ConfigBasic:
                             # ▷ SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX: ssh-tunnel-elasticsearch-proxy
                             # ▷ SSH_TUNNEL_ELASTICSEARCH_PORT: 9209
                             # ▷ STACK_NAME: c4-foursight-development-stack
-                            if value := self.lookup(path, context=context, show=show):
+                            if value := self.lookup(path, context=context, **kwargs):
                                 if is_primitive_type(value):
                                     results[key] = value
                 parent = parent.parent
