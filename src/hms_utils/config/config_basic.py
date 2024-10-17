@@ -154,6 +154,12 @@ class ConfigBasic:
                                              inherit_simple=inherit_simple,
                                              inherit_none=inherit_none, **kwargs)) is not None:
                     break
+        if path.endswith(self.path_separator) and isinstance(value, JSON):
+            value = value.duplicate()
+            if inherited_values := self.lookup_inherited_values(value):
+                for inherited_value_key in inherited_values:
+                    if inherited_value_key not in value:
+                        value[inherited_value_key] = inherited_values[inherited_value_key]
         return value
 
     def lookup_inherited_values(self, value: JSON, show: Optional[bool] = False) -> dict:
@@ -181,7 +187,8 @@ class ConfigBasic:
                             # ▷ SSH_TUNNEL_ELASTICSEARCH_PORT: 9209
                             # ▷ STACK_NAME: c4-foursight-development-stack
                             if value := self.lookup(path, context=context, show=show):
-                                results[key] = value
+                                if is_primitive_type(value):
+                                    results[key] = value
                 parent = parent.parent
         return results
 

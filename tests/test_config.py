@@ -50,9 +50,11 @@ def test_hms_config_rewrite_a():
     assert config.lookup("bravo") == {"bravo_sub": "bravo_sub_value"}
     assert config.lookup("/bravo") == {"bravo_sub": "bravo_sub_value"}
     assert config.lookup("/bravo/foo/..") == {"bravo_sub": "bravo_sub_value"}
-    assert config.lookup("/bravo/") == {"bravo_sub": "bravo_sub_value"}
+    # assert config.lookup("/bravo/") == {"bravo_sub": "bravo_sub_value"}  # xyzzy
+    assert config.lookup("/bravo/") == {"alfa": "alfa_value", "bravo_sub": "bravo_sub_value", "delta": "delta_value"}
     assert config.lookup("/bravo/.") == {"bravo_sub": "bravo_sub_value"}
-    assert config.lookup("/bravo/./") == {"bravo_sub": "bravo_sub_value"}
+    # assert config.lookup("/bravo/./") == {"bravo_sub": "bravo_sub_value"}  # xyzzy
+    assert config.lookup("/bravo/./") == {"alfa": "alfa_value", "bravo_sub": "bravo_sub_value", "delta": "delta_value"}
     assert config.lookup("bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/bravo_sub") == "bravo_sub_value"
     assert config.lookup("/bravo/alfa") == "alfa_value"
@@ -628,6 +630,12 @@ def test_hms_config_g():
 
     value = config.lookup("foursight/smaht/prod/SSH_TUNNEL_ELASTICSEARCH_NAME")
     assert value == "ssh-tunnel-elasticsearch-proxy-smaht-green-9208"
+
+    value = config.lookup("foursight/smaht/wolf/")  # TODO
+    assert value == {'AWS_PROFILE': 'smaht-wolf', 'IDENTITY': 'C4AppConfigFoursightSmahtDevelopment', 'STACK_NAME': 'c4-foursight-development-stack', 'SSH_TUNNEL_ELASTICSEARCH_PORT': 9209, 'Auth0Client': 'UfM_REDACTED_Hf9', 'Auth0Secret': '********', 'SSH_TUNNEL_ELASTICSEARCH_NAME': 'ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209', 'SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX': 'ssh-tunnel-elasticsearch-proxy', 'SSH_TUNNEL_ELASTICSEARCH_ENV': 'smaht-wolf', 'ES_HOST_LOCAL': 'http://localhost:9209', 'REDIS_HOST_LOCAL': 'redis://localhost:6379', 'CHALICE_LOCAL': True, 'zzzfloat': '********', 'zzzint': '********', 'zzzbool': '********'}  # noqa
+
+    xvalue = config.lookup("foursight/smaht/wolf")  # TODO
+    assert xvalue == {'AWS_PROFILE': 'smaht-wolf', 'IDENTITY': 'C4AppConfigFoursightSmahtDevelopment', 'STACK_NAME': 'c4-foursight-development-stack', 'SSH_TUNNEL_ELASTICSEARCH_PORT': 9209}  # noqa
 
     value = config.lookup("foursight/smaht/Auth0Secret", show=True)
     assert value == "REDACTED_auth0_local_secret_value"

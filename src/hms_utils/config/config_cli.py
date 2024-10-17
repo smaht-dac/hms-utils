@@ -93,7 +93,7 @@ def handle_lookup_command(config: Config, args: object) -> int:
         if args.show and Config._contains_macro(value):
             status = 1
         if isinstance(value, JSON):
-            if lookup_path.endswith(config.path_separator):
+            if False and lookup_path.endswith(config.path_separator):
                 if inherited_values := config.lookup_inherited_values(value, show=args.show):
                     for inherited_value_key in inherited_values:
                         if inherited_value_key not in value:
