@@ -173,20 +173,6 @@ class ConfigBasic:
                     if not isinstance(parent[key], dict):
                         if (not isinstance(value, dict) or (key not in value)) and (key not in results):
                             path = self.path(parent, path_suffix=key)
-                            # TODO: Test for /foursight/smaht/wolf/ ...
-                            # ▷ AWS_PROFILE: smaht-wolf
-                            # ▷ CHALICE_LOCAL: True
-                            # ▷ ES_HOST_LOCAL: http://localhost:9209
-                            # ▶ GITHUB_TOKEN: ********
-                            # ▷ IDENTITY: C4AppConfigFoursightSmahtDevelopment
-                            # ▷ NOT_NEEDED_AUTH0_CLIENT_LOCAL: ${aws-secret:ENCODED_AUTH0_CLIENT}
-                            # ▷ NOT_NEEDED_AUTH0_SECRET_LOCAL: ${aws-secret:ENCODED_AUTH0_SECRET}
-                            # ▷ REDIS_HOST_LOCAL: redis://localhost:6379
-                            # ▷ SSH_TUNNEL_ELASTICSEARCH_ENV: smaht-wolf
-                            # ▷ SSH_TUNNEL_ELASTICSEARCH_NAME: ssh-tunnel-elasticsearch-proxy-smaht-wolf-9209
-                            # ▷ SSH_TUNNEL_ELASTICSEARCH_NAME_PREFIX: ssh-tunnel-elasticsearch-proxy
-                            # ▷ SSH_TUNNEL_ELASTICSEARCH_PORT: 9209
-                            # ▷ STACK_NAME: c4-foursight-development-stack
                             if value := self.lookup(path, context=context, **kwargs):
                                 if is_primitive_type(value):
                                     results[key] = value
