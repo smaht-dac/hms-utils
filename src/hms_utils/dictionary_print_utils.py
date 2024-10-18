@@ -46,7 +46,7 @@ def print_dictionary_tree(data: dict,
             corner = "▷" if first else ("└──" if last else "├──")
             key_path = f"{path}{path_separator}{key}" if path else key
             if isinstance(value := data[key], dict):
-                if parent_annotator and (parent_annotation := parent_annotator(data[key])):
+                if parent_annotator and (parent_annotation := parent_annotator(value)):
                     key = key + parent_annotation
                 output(indent + corner + " " + key)
                 inner_indent = indent + (space if last else f"{' ' if first else '│'}{space[1:]}")
