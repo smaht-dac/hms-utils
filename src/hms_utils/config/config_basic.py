@@ -441,7 +441,5 @@ class ConfigBasic:
             else:
                 return value
         if not isinstance(data, JSON):
-            import pdb ; pdb.set_trace()  # noqa
-            pass
             data = self.data(show=None, sorted=sorted)
         data._dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)
