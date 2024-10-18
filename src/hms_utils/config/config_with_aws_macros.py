@@ -105,7 +105,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             except Exception:
                 return ""
         try:
-            self._debug(f"DEBUG: Reading AWS secret {secrets_name}/{secret_name}"
+            self._debug(f"Reading AWS secret {secrets_name}/{secret_name}"
                         f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             boto_secrets = ConfigWithAwsMacros._boto_client("secretsmanager")
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
@@ -121,6 +121,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                 message += f" {chars.dot} expired"
             if not self._is_any_aws_environent_defined():
                 message += f" {chars.dot} no aws profile defined"
+            self._debug(message)
             self._warning(message)
             return None, None
         if (value := secrets.get(secret_name)) is None:

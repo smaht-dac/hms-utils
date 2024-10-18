@@ -421,7 +421,7 @@ class ConfigBasic:
 
     def _debug(self, message: str) -> None:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
-            print(message, file=sys.stderr, flush=True)
+            print("DEBUG: " + message, file=sys.stderr, flush=True)
 
     # TODO: Move this to config_output; otherwise the calls to _secrets_plaintext and
     # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
