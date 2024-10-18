@@ -304,7 +304,6 @@ class ConfigBasic:
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
 
-        xvalue = value
         def hide_macros(value: str, macro_values: Union[str, List[str]]) -> str:
             for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
                 value = value.replace(f"{ConfigBasic._MACRO_START}{macro_value}{ConfigBasic._MACRO_END}",
