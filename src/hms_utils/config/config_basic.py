@@ -423,8 +423,9 @@ class ConfigBasic:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
             print(message, file=sys.stderr, flush=True)
 
-    # TOOD: Move this to config_output; otherwise the calls to _secrets_plaintext and
+    # TODO: Move this to config_output; otherwise the calls to _secrets_plaintext and
     # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
+    # TODO: Does not yet work for hms-config / -dump -show # i.e. with a path.
     def _dump_for_testing(self, sorted: bool = False, verbose: bool = False,
                           check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
         def display_secret_value(value: Any) -> str:
