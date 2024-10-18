@@ -8,7 +8,6 @@ from hms_utils.chars import chars
 from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.path_utils import basename_path, repack_path, unpack_path
-from hms_utils.terminal_utils import terminal_color
 from hms_utils.type_utils import is_primitive_type
 
 
