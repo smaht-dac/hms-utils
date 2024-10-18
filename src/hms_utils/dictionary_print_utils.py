@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Optional
+from hms_utils.chars import chars
 
 
 def print_dictionary_tree(data: dict,
@@ -12,7 +13,8 @@ def print_dictionary_tree(data: dict,
                           key_modifier: Optional[Callable] = None,
                           value_modifier: Optional[Callable] = None,
                           arrow_indicator: Optional[Callable] = None,
-                          printf: Optional[Callable] = None) -> None:
+                          printf: Optional[Callable] = None,
+                          debug: bool = True) -> None:
     """
     Pretty prints the given dictionary. ONLY handles dictionaries
     containing primitive values or other dictionaries recursively.
@@ -46,6 +48,11 @@ def print_dictionary_tree(data: dict,
             corner = "▷" if first else ("└──" if last else "├──")
             key_path = f"{path}{path_separator}{key}" if path else key
             if isinstance(value := data[key], dict):
+                from hms_utils.dictionary_parented import JSON
+                if (debug is True) and isinstance(value, JSON):
+                    key += f" {chars.dot} id: {id(value)}"
+                    if parent := value.parent:
+                        key += f" {chars.dot} parent: {id(parent)}"
                 if parent_annotator and (parent_annotation := parent_annotator(value)):
                     key = key + parent_annotation
                 output(indent + corner + " " + key)
