@@ -147,6 +147,7 @@ class ConfigBasic:
             specified_context = None
         value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         if (value is not None) and (noexpand is not True):
+            # N.B. context_path only used for warning message from _note_macro_not_found.
             value = self.expand_macros(value, context=specified_context or context, context_path=path)
         if (value is None) and self._includes:
             for includes in self._includes:
