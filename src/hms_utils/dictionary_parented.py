@@ -1,8 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable, List, Optional, Tuple, Union
-from hms_utils.chars import chars
-from hms_utils.dictionary_print_utils import print_dictionary_tree
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.path_utils import unpack_path
 from hms_utils.type_utils import is_primitive_type
@@ -160,38 +158,6 @@ class JSON(dict):
 
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
-
-    def _obsolete_dump_for_testing(self, verbose: bool = False, check: bool = False,
-                                   root: Optional[str] = None, value_modifier: Optional[Callable] = None) -> None:
-        def parent_annotator(parent: JSON) -> str:  # noqa
-            nonlocal self, check
-            annotation = (f" {chars.dot} id: {id(parent)}"
-                          f"{f' {chars.dot_hollow} parent: {id(parent.parent)}' if parent.parent else ''}")
-            if check is True:
-                path = parent.context_path(path_separator=True, path_rooted=True)
-                checked_value, _ = self.lookup(path)
-                annotation += f" {chars.check if id(checked_value) == id(parent) else chars.xmark}"
-            return annotation
-        def value_annotator(parent: JSON, key: Any, value: Any) -> str:  # noqa
-            nonlocal self, check
-            annotation = f" {chars.dot} parent: {id(parent)}"
-            path = None
-            if (verbose is True) or (check is True):
-                if isinstance(parent, JSON):
-                    path = parent.context_path(path_separator=True, path_rooted=True, path_suffix=key)
-            if (verbose is True) and path:
-                pass
-                annotation += f" {chars.rarrow_hollow} {path}"
-            if (check is True) and path:
-                checked_value, _ = parent.lookup(path)
-                annotation += f" {chars.check if id(checked_value) == id(value) else chars.xmark}"
-            return annotation
-        root_indicator = f"{chars.rarrow} {root if isinstance(root, str) else 'root'} {chars.dot} id: {id(self)}"
-        if self.parent:
-            root_indicator += f" {chars.dot} parent: {id(self.parent)}"
-        print(root_indicator)
-        print_dictionary_tree(self, parent_annotator=parent_annotator,
-                              value_annotator=value_annotator, value_modifier=value_modifier, indent=2)
 
 
 DictionaryParented = JSON

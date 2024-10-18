@@ -422,26 +422,3 @@ class ConfigBasic:
     def _debug(self, message: str) -> None:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
             print("DEBUG: " + message, file=sys.stderr, flush=True)
-
-    # TODO: Move this to config_output; otherwise the calls to _secrets_plaintext and
-    # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
-    # TODO: Does not yet work for hms-config / -dump -show # i.e. with a path.
-    def _obsolete__dump_for_testing(self, data: Optional[JSON] = None, root: Optional[str] = None,
-                                    sorted: bool = False, verbose: bool = False,
-                                    check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
-        def display_secret_value(value: Any) -> str:
-            nonlocal nocolor
-            return terminal_color(str(value), "red", bold=True, nocolor=nocolor)
-        def value_modifier(key: Any, value: Any) -> str:  # noqa
-            nonlocal show
-            if show is True:
-                return self._secrets_plaintext(value, plaintext_value=display_secret_value)
-            elif show is False:
-                return self._secrets_obfuscated(value, obfuscated_value=display_secret_value)
-            else:
-                return value
-        if not isinstance(data, JSON):
-            data = self.data(show=None)
-        if sorted is True:
-            data = data.sorted()
-        data._obsolete_dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)

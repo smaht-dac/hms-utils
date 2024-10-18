@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Optional
 from hms_utils.chars import chars
+from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
 
 
 def print_dictionary_tree(data: dict,
@@ -15,7 +16,6 @@ def print_dictionary_tree(data: dict,
                           arrow_indicator: Optional[Callable] = None,
                           printf: Optional[Callable] = None,
                           debug: bool = False) -> None:
-    from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
     """
     Pretty prints the given dictionary. ONLY handles dictionaries
     containing primitive values or other dictionaries recursively.
