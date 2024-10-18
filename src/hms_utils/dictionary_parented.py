@@ -161,7 +161,8 @@ class JSON(dict):
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
 
-    def _dump_for_testing(self, verbose: bool = False, check: bool = False, root: Optional[str] = None) -> None:
+    def _dump_for_testing(self, verbose: bool = False, check: bool = False,
+                          root: Optional[str] = None, value_modifier: Optional[Callable] = None) -> None:
         def parent_annotator(parent: JSON) -> str:  # noqa
             nonlocal self, check
             annotation = (f" {chars.dot} id: {id(parent)}"
@@ -189,7 +190,8 @@ class JSON(dict):
         if self.parent:
             root_indicator += f" {chars.dot} parent: {id(self.parent)}"
         print(root_indicator)
-        print_dictionary_tree(self, parent_annotator=parent_annotator, value_annotator=value_annotator, indent=2)
+        print_dictionary_tree(self, parent_annotator=parent_annotator,
+                              value_annotator=value_annotator, value_modifier=value_modifier, indent=2)
 
 
 DictionaryParented = JSON

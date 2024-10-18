@@ -8,6 +8,7 @@ from hms_utils.chars import chars
 from hms_utils.dictionary_utils import load_json_file
 from hms_utils.dictionary_parented import DictionaryParented as JSON
 from hms_utils.path_utils import basename_path, repack_path, unpack_path
+from hms_utils.terminal_utils import terminal_color
 from hms_utils.type_utils import is_primitive_type
 
 
@@ -422,5 +423,20 @@ class ConfigBasic:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
             print(message, file=sys.stderr, flush=True)
 
-    def _dump_for_testing(self, sorted: bool = False, verbose: bool = False, check: bool = False) -> None:
-        self.data(show=None, sorted=sorted)._dump_for_testing(verbose=verbose, check=check)
+    # TOOD: Move this to config_output; otherwise the calls to _secrets_plaintext and
+    # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
+    def _dump_for_testing(self, sorted: bool = False, verbose: bool = False,
+                          check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
+        def display_secret_value(value: Any) -> str:
+            nonlocal nocolor
+            return terminal_color(str(value), "red", bold=True, nocolor=nocolor)
+        def value_modifier(key: Any, value: Any) -> str:  # noqa
+            nonlocal show
+            if show is True:
+                return self._secrets_plaintext(value, plaintext_value=display_secret_value)
+            elif show is False:
+                return self._secrets_obfuscated(value, obfuscated_value=display_secret_value)
+            else:
+                return value
+        self.data(show=None, sorted=sorted)._dump_for_testing(verbose=verbose, check=check,
+                                                              value_modifier=value_modifier)
