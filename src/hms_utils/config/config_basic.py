@@ -441,5 +441,7 @@ class ConfigBasic:
             else:
                 return value
         if not isinstance(data, JSON):
-            data = self.data(show=None, sorted=sorted)
+            data = self.data(show=None)
+        if sorted is True:
+            data = data.sorted()
         data._dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)
