@@ -304,6 +304,7 @@ class ConfigBasic:
 
     def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
 
+        xvalue = value
         def hide_macros(value: str, macro_values: Union[str, List[str]]) -> str:
             for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
                 value = value.replace(f"{ConfigBasic._MACRO_START}{macro_value}{ConfigBasic._MACRO_END}",
@@ -401,7 +402,10 @@ class ConfigBasic:
         return False
 
     def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
-        # TODO: one of tests ends up here with context as a list - why.
+        if isinstance(context, list) and context:
+            # TODO: one of tests ends up here with context as a list; why.
+            # Oh yeah, I'm using a list of contexts in some cases.
+            context = context[0]
         if isinstance(context, JSON):
             context_path = context.context_path(path_separator=self._path_separator, path_rooted=True)
         else:

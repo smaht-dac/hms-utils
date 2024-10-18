@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Optional
 from hms_utils.chars import chars
-from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
+from hms_utils.dictionary_parented import JSON
 
 
 def print_dictionary_tree(data: dict,
@@ -46,7 +46,11 @@ def print_dictionary_tree(data: dict,
         for index, key in enumerate(keys := list(data.keys())):
             last = (index == len(keys) - 1)
             corner = "▷" if first else ("└──" if last else "├──")
-            key_path = f"{path}{path_separator}{key}" if path else key
+            if isinstance(data, JSON):
+                key_path = data.context_path(path_separator=path_separator, path_suffix=key, path_rooted=True)
+            else:
+                key_path = f"{path}{path_separator}{key}" if path else key
+            # key_path = f"{path}{path_separator}{key}" if path else key
             if isinstance(value := data[key], dict):
                 if (debug is True) and isinstance(value, JSON):
                     key += f" {chars.dot} id: {id(value)}"
