@@ -1,6 +1,5 @@
 from __future__ import annotations
-from boto3 import client as BotoClient, Session as BotoSession
-from botocore.exceptions import ProfileNotFound as BotoProfileNotFound
+from boto3 import client as BotoClient
 from functools import lru_cache
 import json
 import os
@@ -21,6 +20,7 @@ class ConfigWithAwsMacros(ConfigBasic):
     _AWS_SECRET_MACRO_PATTERN = re.compile(r"\$\{aws-secret:([^}]+)\}")
     _AWS_SECRET_NAME_NAME = "IDENTITY"
     _AWS_PROFILE_ENV_NAME = "AWS_PROFILE"
+    _AWS_CACHED_ACCOUNT_NUMBERS = {}
     _TYPE_NAME_AWS = "aws"
 
     def __init__(self, config: JSON,
@@ -117,10 +117,12 @@ class ConfigWithAwsMacros(ConfigBasic):
             message = f"Cannot read AWS secrets: {secrets_name}"
             if aws_profile:
                 message += f" {chars.dot} profile: {aws_profile}"
+            if aws_account_number := self._get_current_aws_account_number():
+                message += f" {chars.dot} account: {aws_account_number}"
+            elif not aws_profile:
+                message += f" {chars.dot} profile: unspecified"
             if ("token" in str(e)) and ("expired" in str(e)):
                 message += f" {chars.dot} expired"
-            if not self._is_any_aws_environent_defined():
-                message += f" {chars.dot} no aws profile defined"
             self._debug(message)
             self._warning(message)
             return None, None
@@ -160,12 +162,15 @@ class ConfigWithAwsMacros(ConfigBasic):
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
             super()._note_macro_not_found(macro_value, context)
 
-    @lru_cache
-    def _is_any_aws_environent_defined(self) -> bool:
+    def _get_current_aws_account_number(self) -> Optional[str]:
         try:
-            return BotoSession().get_credentials() is not None
-        except BotoProfileNotFound:
-            return False
+            aws_profile = os.environ.get(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME)
+            if (aws_account_number := ConfigWithAwsMacros._AWS_CACHED_ACCOUNT_NUMBERS.get(aws_profile)) is None:
+                aws_account_number = self._boto_client("sts").get_caller_identity()["Account"]
+                ConfigWithAwsMacros._AWS_CACHED_ACCOUNT_NUMBERS[aws_profile] = aws_account_number
+            return aws_account_number
+        except Exception:
+            return None
 
     @staticmethod
     def _boto_client(service: str) -> object:

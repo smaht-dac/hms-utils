@@ -150,7 +150,7 @@ def parse_args(argv: List[str]) -> object:
         dump = False
         raw = False
         check = False
-        show = False
+        show = None
         noaws = False
         nocolor = False
         formatted = False
@@ -402,8 +402,6 @@ def parse_args(argv: List[str]) -> object:
                 _usage()
             else:
                 args.lookup_paths.append(arg)
-        if not args.show:
-            args.noaws = True
 
     get_configs()
     get_lookup_paths()
@@ -428,7 +426,13 @@ def parse_args(argv: List[str]) -> object:
     if not (args.lookup_paths or args.tree or args.json or args.list or args.dump):
         args.tree = True
     if args.raw:
+        if args.show is not None:
+            _usage()
         args.show = None
+    elif args.show is None:
+        args.show = False
+    if args.show is False:
+        args.noaws = True
 
     return args
 
