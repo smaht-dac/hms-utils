@@ -147,7 +147,7 @@ class ConfigBasic:
             specified_context = None
         value, context = self._lookup(path, context=context, inherit_simple=inherit_simple, inherit_none=inherit_none)
         if (value is not None) and (noexpand is not True):
-            value = self.expand_macros(value, context=specified_context or context)
+            value = self.expand_macros(value, context=specified_context or context, context_path=path)
         if (value is None) and self._includes:
             for includes in self._includes:
                 if (value := includes.lookup(path, noexpand=noexpand,
@@ -293,16 +293,17 @@ class ConfigBasic:
 
         return value, context
 
-    def expand_macros(self, value: Any, context: Optional[JSON] = None) -> Any:
+    def expand_macros(self, value: Any, context: Optional[JSON] = None, context_path: Optional[str] = None) -> Any:
         # Note FYI that we do not macros the nested of macros.
         if isinstance(value, str):
-            value = self._expand_macros_within_string(value, context)
+            value = self._expand_macros_within_string(value, context, context_path=context_path)
         elif isinstance(value, JSON):
             for key in value:
-                value[key] = self.expand_macros(value[key], context=value)
+                value[key] = self.expand_macros(value[key], context=value, context_path=context_path)
         return value
 
-    def _expand_macros_within_string(self, value: str, context: Optional[JSON] = None) -> Any:
+    def _expand_macros_within_string(self, value: str,
+                                     context: Optional[JSON] = None, context_path: Optional[str] = None) -> Any:
 
         def hide_macros(value: str, macro_values: Union[str, List[str]]) -> str:
             for macro_value in macro_values if isinstance(macro_values, (list, set)) else [macro_values]:
@@ -340,7 +341,7 @@ class ConfigBasic:
                 else:
                     expanding_macros.append(macro_value)
             else:
-                self._note_macro_not_found(macro_value, context)
+                self._note_macro_not_found(macro_value, context, context_path=context_path)
                 value = hide_macros(value, macro_value)
                 missing_macro_found = True
         if missing_macro_found:
@@ -400,15 +401,17 @@ class ConfigBasic:
                     return True
         return False
 
-    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
+    def _note_macro_not_found(self, macro_value: str,
+                              context: Optional[JSON] = JSON, context_path: Optional[str] = None) -> None:
         if isinstance(context, list) and context:
             # TODO: one of tests ends up here with context as a list; why.
             # Oh yeah, I'm using a list of contexts in some cases.
             context = context[0]
-        if isinstance(context, JSON):
-            context_path = context.context_path(path_separator=self._path_separator, path_rooted=True)
-        else:
-            context_path = None
+        if not (isinstance(context_path, str) and context_path):
+            if isinstance(context, JSON):
+                context_path = context.context_path(path_separator=self._path_separator, path_rooted=True)
+            else:
+                context_path = None
         self._warning(f"Macro not found: {macro_value}"
                       f"{f' {chars.dot} context: {context_path}' if context_path else ''}",
                       not self._ignore_missing_macros)

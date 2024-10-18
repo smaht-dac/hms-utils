@@ -190,9 +190,10 @@ class ConfigWithAwsMacros(ConfigBasic):
                     return aws_account_number, aws_secrets_name, aws_secret_name
         return None, None, None
 
-    def _note_macro_not_found(self, macro_value: str, context: Optional[JSON] = JSON) -> None:
+    def _note_macro_not_found(self, macro_value: str,
+                              context: Optional[JSON] = JSON, context_path: Optional[str] = None) -> None:
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
-            super()._note_macro_not_found(macro_value, context)
+            super()._note_macro_not_found(macro_value, context, context_path=context_path)
 
     def _get_current_aws_account_number(self) -> Optional[str]:
         try:
