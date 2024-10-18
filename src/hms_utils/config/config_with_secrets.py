@@ -49,11 +49,11 @@ class ConfigWithSecrets(ConfigBasic):
     def data(self, sorted: bool = True, show: Optional[bool] = False) -> JSON:
         if self._secrets:
             if show is True:
-                data = JSON(self._json, rvalue=self._secrets_plaintext)
+                data = JSON(self.json, rvalue=self._secrets_plaintext)
             elif show is False:
-                data = JSON(self._json, rvalue=self._secrets_obfuscated)
+                data = JSON(self.json, rvalue=self._secrets_obfuscated)
             else:
-                data = self._json
+                data = self.json
             return data.sorted() if sorted is True else data
         return super().data(sorted=sorted)
 
