@@ -161,8 +161,8 @@ class JSON(dict):
     def __deepcopy__(self, memo) -> JSON:
         return JSON(deepcopy(dict(self), memo))
 
-    def _dump_for_testing(self, verbose: bool = False, check: bool = False,
-                          root: Optional[str] = None, value_modifier: Optional[Callable] = None) -> None:
+    def _obsolete_dump_for_testing(self, verbose: bool = False, check: bool = False,
+                                   root: Optional[str] = None, value_modifier: Optional[Callable] = None) -> None:
         def parent_annotator(parent: JSON) -> str:  # noqa
             nonlocal self, check
             annotation = (f" {chars.dot} id: {id(parent)}"

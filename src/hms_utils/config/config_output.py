@@ -17,7 +17,9 @@ class ConfigOutput:
                    show: Optional[bool] = False,
                    nocolor: bool = False,
                    indent: Optional[int] = None,
-                   string: bool = False) -> Optional[str]:
+                   string: bool = False,
+                   root: Optional[str, bool] = False,
+                   debug: bool = False) -> Optional[str]:
         output_to_string = ""
         def print_to_string(value: str) -> None:  # noqa
             nonlocal output_to_string
@@ -42,12 +44,22 @@ class ConfigOutput:
             return
         if not isinstance(data, JSON):
             data = config.data(show=None)
+        if root is True:
+            root = "root"
+        elif not (isinstance(root, str) and root):
+            root = None
+        if root:
+            if debug is True:
+                print(f"{chars.rarrow} {root} {chars.dot} {id(data)}")
+            else:
+                print(f"{chars.rarrow} {root}")
             indent = 2
         print_dictionary_tree(data,
                               value_modifier=value_modifier,
                               arrow_indicator=tree_arrow_indicator,
                               indent=indent,
-                              printf=print_to_string if string is True else None)
+                              printf=print_to_string if string is True else None,
+                              debug=debug)
         if string is True:
             if output_to_string.endswith("\n"):
                 output_to_string = output_to_string[:-1]

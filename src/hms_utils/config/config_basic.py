@@ -426,9 +426,9 @@ class ConfigBasic:
     # TODO: Move this to config_output; otherwise the calls to _secrets_plaintext and
     # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
     # TODO: Does not yet work for hms-config / -dump -show # i.e. with a path.
-    def _dump_for_testing(self, data: Optional[JSON] = None, root: Optional[str] = None,
-                          sorted: bool = False, verbose: bool = False,
-                          check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
+    def _obsolete__dump_for_testing(self, data: Optional[JSON] = None, root: Optional[str] = None,
+                                    sorted: bool = False, verbose: bool = False,
+                                    check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
         def display_secret_value(value: Any) -> str:
             nonlocal nocolor
             return terminal_color(str(value), "red", bold=True, nocolor=nocolor)
@@ -444,4 +444,4 @@ class ConfigBasic:
             data = self.data(show=None)
         if sorted is True:
             data = data.sorted()
-        data._dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)
+        data._obsolete_dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)

@@ -51,15 +51,10 @@ def main(argv: Optional[List] = None):
         if args.json:
             data = config.lookup("/", show=args.show).sorted()
             print(json.dumps(data, indent=4 if args.formatted else None))
-        elif args.tree:
-            ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor)
+        elif args.tree or args.dump:
+            ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor, root=True, debug=args.dump)
         elif args.list:
             ConfigOutput.print_list(config, show=args.show, nocolor=args.nocolor)
-        elif args.dump:
-            if args.show:
-                data = config.lookup("/", show=None)
-            config._dump_for_testing(sorted=not args.raw, data=config, verbose=args.verbose,
-                                     check=args.check, show=args.show, nocolor=args.nocolor)
 
     status = 0
     if args.lookup_paths:
@@ -96,17 +91,15 @@ def handle_lookup_command(config: Config, args: object) -> int:
         if args.show and Config._contains_macro(value):
             status = 1
         if isinstance(value, JSON):
-            if args.dump:
-                config._dump_for_testing(root=lookup_path, data=value, sorted=not args.raw, verbose=args.verbose,
-                                         check=args.check, show=args.show, nocolor=args.nocolor)
-                continue
             if args.json and args.formatted:
                 value = json.dumps(value.sorted(), indent=4)
-            elif args.tree:
+            elif args.tree or args.dump:
                 prefix = "...\n" if args.verbose else ("" if n == 0 else "\n")
+                root = value.context_path(path_separator=config.path_separator, path_rooted=True) if args.dump else None
                 value = (prefix +
                          ConfigOutput.print_tree(config, data=value.sorted(), nocolor=args.nocolor,
-                                                 string=True, indent=2 if args.verbose else None, show=args.show))
+                                                 string=True, indent=2 if args.verbose else None,
+                                                 show=args.show, root=root, debug=args.dump))
         if args.verbose:
             print(f"{lookup_path}: {value}")
         else:

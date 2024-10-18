@@ -14,7 +14,8 @@ def print_dictionary_tree(data: dict,
                           value_modifier: Optional[Callable] = None,
                           arrow_indicator: Optional[Callable] = None,
                           printf: Optional[Callable] = None,
-                          debug: bool = True) -> None:
+                          debug: bool = False) -> None:
+    from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
     """
     Pretty prints the given dictionary. ONLY handles dictionaries
     containing primitive values or other dictionaries recursively.
@@ -38,7 +39,6 @@ def print_dictionary_tree(data: dict,
     output = (lambda value: printf(f"{' ' * indent}{value}")) if indent > 0 else printf
     def traverse(data: dict, indent: str = "", first: bool = False, last: bool = True, path: str = ""):  # noqa
         if not path:
-            from hms_utils.dictionary_parented import JSON  # here to avoid circular import (special case)
             if isinstance(data, JSON):
                 path = data.path
         nonlocal output, paths, key_modifier, value_annotator, value_modifier
@@ -48,7 +48,6 @@ def print_dictionary_tree(data: dict,
             corner = "▷" if first else ("└──" if last else "├──")
             key_path = f"{path}{path_separator}{key}" if path else key
             if isinstance(value := data[key], dict):
-                from hms_utils.dictionary_parented import JSON
                 if (debug is True) and isinstance(value, JSON):
                     key += f" {chars.dot} id: {id(value)}"
                     if parent := value.parent:
@@ -83,6 +82,10 @@ def print_dictionary_tree(data: dict,
                     value = value_modification
                 if arrow_indication:
                     corner = corner[:-1] + arrow_indication
+                if (debug is True) and isinstance(data, JSON):
+                    if not value_annotation:
+                        value_annotation = ""
+                    value_annotation += f" {chars.dot} parent: {id(data)}"
                 output(f"{indent}{corner} {key}: {value}{f'{value_annotation}' if value_annotation else ''}")
     if root_indicator:
         if isinstance(root_indication := root_indicator(), str) and root_indication:
