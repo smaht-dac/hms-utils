@@ -156,12 +156,12 @@ class ConfigWithAwsMacros(ConfigBasic):
     @lru_cache
     def _aws_current_account_number(self, aws_profile: Optional[str]) -> Optional[str]:
         try:
-            self._debug(f"Reading AWS account number{f': {aws_profile}' if aws_profile else ''} [{id(self)}]")
+            self._debug(f"Reading AWS account number{f': {aws_profile}' if aws_profile else ''}")
             aws_account_number = self._boto_client("sts").get_caller_identity()["Account"]
-            self._debug(f"Read AWS account number OK{f': {aws_profile}' if aws_profile else ''} [{id(self)}]")
+            self._debug(f"Read AWS account number OK{f': {aws_profile}' if aws_profile else ''}")
             return aws_account_number
         except Exception:
-            self._debug(f"Cannot read AWS account number{f' :{aws_profile}' if aws_profile else ''} [{id(self)}]")
+            self._debug(f"Cannot read AWS account number{f' :{aws_profile}' if aws_profile else ''}")
             return None
 
     def _contains_aws_secret_values(self, value: Any) -> bool:
