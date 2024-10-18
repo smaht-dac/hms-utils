@@ -669,7 +669,7 @@ def test_hms_config_g():
 def mock_aws_secret(secrets_name, secret_name, secret_value):
     hms_config_with_aws_secrets_class_name = "hms_utils.config.config_with_aws_macros.ConfigWithAwsMacros"
     hms_config_with_aws_secrets_get_secrets_function_name = (
-        f"{hms_config_with_aws_secrets_class_name}._aws_read_secret_value")
+        f"{hms_config_with_aws_secrets_class_name}._aws_read_secret")
     def mock_aws_get_secret(config, secrets_name, secret_name, aws_profile=None):  # noqa
         nonlocal secret_value
         return secret_value, "123456789"
