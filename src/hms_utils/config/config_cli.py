@@ -86,7 +86,7 @@ def handle_lookup_command(config: Config, args: object) -> int:
         return 0
     status = 0 ; n = 0  # noqa
     for lookup_path in args.lookup_paths:
-        if (value := config.lookup(lookup_path, show=args.show)) is None:
+        if (value := config.lookup(lookup_path, show=args.show if not args.dump else None)) is None:
             status = 1
             if not args.verbose:
                 continue
@@ -95,7 +95,8 @@ def handle_lookup_command(config: Config, args: object) -> int:
             status = 1
         if isinstance(value, JSON):
             if args.dump:
-                value._dump_for_testing(root=lookup_path)
+                config._dump_for_testing(root=lookup_path, data=value, sorted=not args.raw, verbose=args.verbose,
+                                         check=args.check, show=args.show, nocolor=args.nocolor)
                 continue
             if args.json and args.formatted:
                 value = json.dumps(value.sorted(), indent=4)

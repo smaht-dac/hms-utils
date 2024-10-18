@@ -426,7 +426,8 @@ class ConfigBasic:
     # TODO: Move this to config_output; otherwise the calls to _secrets_plaintext and
     # _secrets_obfuscated would more rightly be hooked on isinstance ConfigWithSecrets.
     # TODO: Does not yet work for hms-config / -dump -show # i.e. with a path.
-    def _dump_for_testing(self, sorted: bool = False, verbose: bool = False,
+    def _dump_for_testing(self, data: Optional[JSON] = None, root: Optional[str] = None,
+                          sorted: bool = False, verbose: bool = False,
                           check: bool = False, show: Optional[bool] = False, nocolor: bool = False) -> None:
         def display_secret_value(value: Any) -> str:
             nonlocal nocolor
@@ -439,5 +440,8 @@ class ConfigBasic:
                 return self._secrets_obfuscated(value, obfuscated_value=display_secret_value)
             else:
                 return value
-        self.data(show=None, sorted=sorted)._dump_for_testing(verbose=verbose, check=check,
-                                                              value_modifier=value_modifier)
+        if not isinstance(data, JSON):
+            import pdb ; pdb.set_trace()  # noqa
+            pass
+            data = self.data(show=None, sorted=sorted)
+        data._dump_for_testing(root=root, verbose=verbose, check=check, value_modifier=value_modifier)
