@@ -19,15 +19,16 @@ class Argv:
                 nonlocal self
                 if isinstance(value, str) and (value := value.strip()):
                     if (self == value) or (self._argv._fuzzy and value.startswith("--") and (self == value[1:])):
-                        return value[2:] if value.startswith("--") else value[1:]
-                return None
+                        return True
+                return False
             for value in values:
                 if isinstance(value, (list, tuple)):
                     for element in value:
                         if self.anyof(element):
-                            return True
-                elif name := match(value):
-                    return name
+                            import pdb ; pdb.set_trace()  # noqa
+                            return self._find_property_name(*values)
+                elif match(value):
+                    return self._find_property_name(*values)
             return None
 
         def set_boolean(self, *values) -> bool:
