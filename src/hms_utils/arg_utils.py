@@ -42,6 +42,14 @@ class Argv:
                         return True
             return False
 
+        def set_string(self, *values) -> bool:
+            if self.anyof(values):
+                if (value := self._argv.peek) is not None:
+                    if self._set_property(*values, property_value=value) is not None:
+                        self._argv.next
+                        return True
+            return False
+
         def _set_property(self, *values, property_value: Any = None) -> Optional[object]:
             def find_target_object(*values) -> Optional[object]:
                 for value in values:
