@@ -14,19 +14,21 @@ class Argv:
             value._argv = args
             return value
 
-        def anyof(self, *values) -> bool:
+        def anyof(self, *values) -> Optional[str]:
             def match(value: Any) -> bool:
                 nonlocal self
-                return (isinstance(value, str) and
-                        ((self == value) or (self._argv._fuzzy and value.startswith("--") and (self == value[1:]))))
+                if isinstance(value, str) and (value := value.strip()):
+                    if (self == value) or (self._argv._fuzzy and value.startswith("--") and (self == value[1:])):
+                        return value[2:] if value.startswith("--") else value[1:]
+                return None
             for value in values:
                 if isinstance(value, (list, tuple)):
                     for element in value:
                         if self.anyof(element):
                             return True
-                elif match(value):
-                    return True
-            return False
+                elif name := match(value):
+                    return name
+            return None
 
         def set_boolean(self, *values) -> bool:
             if self.anyof(values):
@@ -50,28 +52,43 @@ class Argv:
                         return True
             return False
 
+        def set_string_multiple(self, *values) -> bool:
+            if self.anyof(values):
+                if ((target_object := self._find_target_object(*values)) and
+                    (property_name := self._find_property_name(*values))):  # noqa
+                    property_values = []
+                    setattr(target_object, property_name, property_values)
+                    while True:
+                        if not ((self._argv.peek is not None) and (not self._argv.peek.option)):
+                            break
+                        property_values.append(self._argv.next)
+                    return True
+            return False
+
         def _set_property(self, *values, property_value: Any = None) -> Optional[object]:
-            def find_target_object(*values) -> Optional[object]:
-                for value in values:
-                    if (not isinstance(value, str)) and hasattr(value, "__dict__"):
-                        return value
-                return None
-            def find_property_name(*value) -> Optional[str]:  # noqa
-                for value in values:
-                    if isinstance(value, (list, tuple)):
-                        for element in value:
-                            if property_name := find_property_name(element):
-                                return property_name
-                    elif isinstance(value, str):
-                        if value.startswith("--") and (value := value[2:].strip()):
-                            return value
-                        elif self._argv._fuzzy and value.startswith("-") and (value := value[2:].strip()):
-                            return value
-            if (target_object := find_target_object(*values)) is not None:
-                if property_name := find_property_name(*values):
+            if (target_object := self._find_target_object(*values)) is not None:
+                if property_name := self._find_property_name(*values):
                     setattr(target_object, property_name, property_value)
                     return target_object
             return None
+
+        def _find_target_object(self, *values) -> Optional[object]:
+            for value in values:
+                if (not isinstance(value, str)) and hasattr(value, "__dict__"):
+                    return value
+            return None
+
+        def _find_property_name(self, *values) -> Optional[str]:  # noqa
+            for value in values:
+                if isinstance(value, (list, tuple)):
+                    for element in value:
+                        if property_name := self._find_property_name(element):
+                            return property_name
+                elif isinstance(value, str):
+                    if value.startswith("--") and (value := value[2:].strip()):
+                        return value
+                    elif self._argv._fuzzy and value.startswith("-") and (value := value[2:].strip()):
+                        return value
 
         @property
         def option(self):
