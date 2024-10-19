@@ -1,5 +1,4 @@
 from __future__ import annotations
-from copy import deepcopy
 import os
 import re
 import sys
@@ -65,33 +64,6 @@ class ConfigBasic:
     @property
     def decrypted(self) -> bool:
         return self._decrypted
-
-    def evaluate(self, data: Optional[Union[ConfigBasic, JSON, dict]] = None, show: Optional[bool] = True) -> JSON:
-        def traverse(data: Optional[Any]) -> None:  # Not currently used.
-            if not isinstance(data, JSON):
-                return data
-            for key in data:
-                value = data[key]
-                if isinstance(value, JSON):
-                    traverse(value)
-                elif isinstance(value, list):
-                    for element in value:
-                        traverse(element)
-                else:
-                    path = self.path(data, path_suffix=key)
-                    value = self.lookup(path, context=data, show=show)
-                    data[key] = value
-        if not isinstance(data, JSON):
-            if isinstance(data, dict):
-                data = JSON(data)
-            elif isinstance(data, ConfigBasic):
-                data = data.json
-            else:
-                data = self.json
-        if show not in [True, False, None]:
-            show = False
-        traverse(data := deepcopy(data))
-        return data
 
     @property
     def json(self) -> JSON:

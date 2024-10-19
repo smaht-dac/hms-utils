@@ -195,16 +195,6 @@ class ConfigWithAwsMacros(ConfigBasic):
         if not macro_value.startswith(ConfigWithAwsMacros._AWS_SECRET_MACRO_NAME_PREFIX):
             super()._note_macro_not_found(macro_value, context, context_path=context_path)
 
-    def _get_current_aws_account_number(self) -> Optional[str]:
-        try:
-            aws_profile = os.environ.get(ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME)
-            if (aws_account_number := ConfigWithAwsMacros._AWS_CACHED_ACCOUNT_NUMBERS.get(aws_profile)) is None:
-                aws_account_number = self._boto_client("sts").get_caller_identity()["Account"]
-                ConfigWithAwsMacros._AWS_CACHED_ACCOUNT_NUMBERS[aws_profile] = aws_account_number
-            return aws_account_number
-        except Exception:
-            return None
-
     @staticmethod
     def _boto_client(service: str) -> object:
         # This boto3.DEFAULT_SESSION works around an oddity discovered way back (circa 2022-06-19) with the

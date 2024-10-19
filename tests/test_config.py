@@ -352,7 +352,7 @@ def test_hms_config_rewrite_secrets_c():
         }
     }, secrets=True)
     with mock_aws_secret("C4AppConfigSmahtWolf", "ENCODED_AUTH0_CLIENT", "some_secret_value_0123456789"):
-        assert config.evaluate(show=None) == {
+        assert config.lookup("/", show=None) == {
             "bbb": {
                 "AWS_PROFILE": (f"{ConfigWithSecrets._SECRET_VALUE_START}{ConfigWithSecrets._TYPE_NAME_STR}:"
                                 f"smaht-wolf{ConfigWithSecrets._SECRET_VALUE_END}"),
@@ -363,14 +363,14 @@ def test_hms_config_rewrite_secrets_c():
                            f"{ConfigWithSecrets._SECRET_VALUE_END}")
             }
         }
-        assert config.evaluate(show=True) == {
+        assert config.lookup("/", show=True) == {
             "bbb": {
                 "AWS_PROFILE": "smaht-wolf",
                 "foo": "smaht-wolf",
                 "secret": "some_secret_value_0123456789"
             }
         }
-        assert config.evaluate(show=False) == {
+        assert config.lookup("/", show=False) == {
             "bbb": {
                 "AWS_PROFILE": ConfigWithSecrets._SECRET_OBFUSCATED_VALUE,
                 "foo": ConfigWithSecrets._SECRET_OBFUSCATED_VALUE,
