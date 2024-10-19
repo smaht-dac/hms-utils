@@ -12,9 +12,9 @@ from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
 from hms_utils.config.config_with_aws_macros import ConfigWithAwsMacros
 from hms_utils.crypt_utils import read_encrypted_file
-from hms_utils.version_utils import get_version
 from hms_utils.dictionary_parented import JSON
 from hms_utils.path_utils import is_current_or_parent_relative_path
+from hms_utils.version_utils import get_version
 
 DEFAULT_CONFIG_DIR = "~/.config/hms"
 DEFAULT_CONFIG_FILE_NAME = "config.json"
@@ -275,6 +275,8 @@ def parse_args(argv: List[str]) -> object:
                 argi_config = argi - 1
                 if not ((argi < argn) and (config_file := argv[argi])):
                     _usage()
+                if not is_current_or_parent_relative_path(config_file):
+                    config_file = os.path.join(".", config_file)
                 configs.append(verify_config(config_file, config_dir, secrets=secrets))
                 argi += 1
                 while argi < argn:
@@ -283,6 +285,8 @@ def parse_args(argv: List[str]) -> object:
                                                      config_file.endswith(".yaml") or config_file.endswith(".yml")))):  # noqa
                         del argv[argi_config:argi] ; argi = 0 ; argn = len(argv)  # noqa
                         break
+                    if not is_current_or_parent_relative_path(config_file):
+                        config_file = os.path.join(".", config_file)
                     configs.append(verify_config(config_file, config_dir, secrets=secrets))
                     argi += 1
                 if argi > 0:
