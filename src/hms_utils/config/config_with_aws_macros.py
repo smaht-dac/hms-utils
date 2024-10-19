@@ -142,15 +142,20 @@ class ConfigWithAwsMacros(ConfigBasic):
             self._warning(msg)
             return None, None
 
-    def _aws_read_secret_message(self, message: str, aws_profile: Optional[str], e: Optional[Exception] = None) -> str:
-        if aws_profile:
-            message += f" {chars.dot} profile: {aws_profile}"
-        if aws_account_number := self._aws_current_account_number(aws_profile):
-            message += f" {chars.dot} account: {aws_account_number}"
-        elif not aws_profile:
-            message += f" {chars.dot} profile: unspecified"
-        if e and ("token" in (e := str(e))) and ("expired" in e):
-            message += f" {chars.dot} expired"
+    def _aws_read_secret_message(self, message: str, aws_profile: Optional[str],
+                                 exception: Optional[Exception] = None, _noprofile: bool = False) -> str:
+        if _noprofile is not True:
+            if aws_profile:
+                message += f" {chars.dot} profile: {aws_profile}"
+            if aws_account_number := self._aws_current_account_number(aws_profile):
+                message += f" {chars.dot} account: {aws_account_number}"
+            elif not aws_profile:
+                message += f" {chars.dot} profile: unspecified"
+        if exception := str(exception):
+            if ("token" in exception) and ("expired" in exception):
+                message += f" {chars.dot} expired"
+            elif ("not" in exception) and ("found" in exception):
+                message += f" {chars.dot} unknown"
         return message
 
     @lru_cache
@@ -160,8 +165,11 @@ class ConfigWithAwsMacros(ConfigBasic):
             aws_account_number = self._boto_client("sts").get_caller_identity()["Account"]
             self._debug(f"Read AWS account number OK{f': {aws_profile}' if aws_profile else ''}")
             return aws_account_number
-        except Exception:
-            self._debug(f"Cannot read AWS account number{f': {aws_profile}' if aws_profile else ''}")
+        except Exception as e:
+            msg = self._aws_read_secret_message(
+                f"Cannot read AWS account number{f': {aws_profile}' if aws_profile else ''}",
+                aws_profile, e, _noprofile=True)
+            self._debug(msg)
             return None
 
     def _contains_aws_secret_values(self, value: Any) -> bool:
