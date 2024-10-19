@@ -113,7 +113,7 @@ class ConfigWithAwsMacros(ConfigBasic):
         except Exception as e:
             if self._raise_exception is True:
                 raise e
-            msg = self._aws_read_secret_message(f"Cannot read AWS secret {secrets_name}/{secret_name}", aws_profile, e)
+            msg = self._aws_error_message(f"Cannot read AWS secret {secrets_name}/{secret_name}", aws_profile, e)
             self._debug(msg)
             self._warning(msg)
             return None, None
@@ -132,18 +132,18 @@ class ConfigWithAwsMacros(ConfigBasic):
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             account_number = extract_aws_account_number(secrets)
             secrets = json.loads(secrets.get("SecretString"))
-            self._debug(lambda: self._aws_read_secret_message(f"Read AWS secrets OK: {secrets_name}", aws_profile))
+            self._debug(lambda: self._aws_error_message(f"Read AWS secrets OK: {secrets_name}", aws_profile))
             return secrets, account_number
         except Exception as e:
             if self._raise_exception is True:
                 raise e
-            msg = self._aws_read_secret_message(f"Cannot read AWS secrets {secrets_name}", aws_profile, e)
+            msg = self._aws_error_message(f"Cannot read AWS secrets {secrets_name}", aws_profile, e)
             self._debug(msg)
             self._warning(msg)
             return None, None
 
-    def _aws_read_secret_message(self, message: str, aws_profile: Optional[str],
-                                 exception: Optional[Exception] = None, _noprofile: bool = False) -> str:
+    def _aws_error_message(self, message: str, aws_profile: Optional[str],
+                           exception: Optional[Exception] = None, _noprofile: bool = False) -> str:
         if _noprofile is not True:
             if aws_profile:
                 message += f" {chars.dot} profile: {aws_profile}"
@@ -166,7 +166,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             self._debug(f"Read AWS account number OK{f': {aws_profile}' if aws_profile else ''}")
             return aws_account_number
         except Exception as e:
-            msg = self._aws_read_secret_message(
+            msg = self._aws_error_message(
                 f"Cannot read AWS account number{f': {aws_profile}' if aws_profile else ''}",
                 aws_profile, e, _noprofile=True)
             self._debug(msg)
