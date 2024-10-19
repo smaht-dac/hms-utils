@@ -44,7 +44,7 @@ class Argv:
 
         def set_string(self, *values) -> bool:
             if self.anyof(values):
-                if (value := self._argv.peek) is not None:
+                if ((value := self._argv.peek) is not None) and (not value.option):
                     if self._set_property(*values, property_value=value) is not None:
                         self._argv.next
                         return True
