@@ -397,6 +397,9 @@ class ConfigBasic:
         if message not in self._warnings:
             self._warnings.append(message)
 
-    def _debug(self, message: str) -> None:
+    def _debug(self, message: Union[str, Callable]) -> None:
         if ("--debug" in sys.argv) or ("-debug" in sys.argv) or (os.environ.get("HMS_DEBUG", "").lower() == "true"):
-            print("DEBUG: " + message, file=sys.stderr, flush=True)
+            if callable(message):
+                message = message()
+            if isinstance(message, str):
+                print("DEBUG: " + message, file=sys.stderr, flush=True)

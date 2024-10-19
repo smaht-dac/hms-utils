@@ -107,7 +107,7 @@ class ConfigWithAwsMacros(ConfigBasic):
                 self._warning(f"Cannot find AWS secret {secrets_name}/{secret_name}"
                               f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
                 return None, None
-            self._debug(f"Read AWS secret {secrets_name}/{secret_name} OK"
+            self._debug(f"Read AWS secret OK: {secrets_name}/{secret_name}"
                         f"{f' {chars.dot} profile: {aws_profile}' if aws_profile else ''}")
             return value, account_number
         except Exception as e:
@@ -132,7 +132,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             secrets = boto_secrets.get_secret_value(SecretId=secrets_name)
             account_number = extract_aws_account_number(secrets)
             secrets = json.loads(secrets.get("SecretString"))
-            self._debug(self._aws_read_secret_message(f"Read AWS secrets {secrets_name} OK", aws_profile))
+            self._debug(lambda: self._aws_read_secret_message(f"Read AWS secrets OK: {secrets_name}", aws_profile))
             return secrets, account_number
         except Exception as e:
             if self._raise_exception is True:
@@ -161,7 +161,7 @@ class ConfigWithAwsMacros(ConfigBasic):
             self._debug(f"Read AWS account number OK{f': {aws_profile}' if aws_profile else ''}")
             return aws_account_number
         except Exception:
-            self._debug(f"Cannot read AWS account number{f' :{aws_profile}' if aws_profile else ''}")
+            self._debug(f"Cannot read AWS account number{f': {aws_profile}' if aws_profile else ''}")
             return None
 
     def _contains_aws_secret_values(self, value: Any) -> bool:

@@ -156,6 +156,7 @@ def parse_args(argv: List[str]) -> object:
         raw = False
         check = False
         show = None
+        profile = None
         noaws = False
         nocolor = False
         formatted = False
@@ -389,10 +390,11 @@ def parse_args(argv: List[str]) -> object:
             elif arg in ["--version", "-version"]:
                 print(get_version())
                 exit(0)
-            elif arg in ["--aws", "-aws", "--aws", "-aws", "--aws-profile", "-aws-profile", "--profile", "-profile"]:
+            elif arg in ["--aws", "-aws", "--aws", "-aws",
+                         "--aws-profile", "-aws-profile", "--profile", "-profile", "--env", "-env"]:
                 if (argi >= argn) or not (arg := argv[argi].strip()) or (not arg):
                     _usage()
-                os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = arg ; argi += 1  # noqa
+                args.profile = arg ; argi += 1
             elif arg in ["--json", "-json"]:
                 args.json = True
             elif arg in ["--jsonf", "-jsonf"]:
@@ -442,6 +444,11 @@ def parse_args(argv: List[str]) -> object:
         args.show = False
     if args.show is False:
         args.noaws = True
+
+    if args.profile:
+        os.environ[ConfigWithAwsMacros._AWS_PROFILE_ENV_NAME] = args.profile
+        if not (aws_account_number := args.config._aws_current_account_number(args.profile)):
+            _error(f"Specified AWS profile does not work: {args.profile}")
 
     return args
 
