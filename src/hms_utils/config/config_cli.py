@@ -49,10 +49,6 @@ def main(argv: Optional[List] = None):
 
     if not args.lookup_paths:
         if args.json:
-            # data = config.lookup("/", show=args.show).sorted()
-            # print(json.dumps(data, indent=4 if args.formatted else None))
-            # print(json.dumps(config.data(show=args.show), indent=4 if args.formatted else None))
-            # data = config.evaluate(show=args.show)
             if args.show is True:
                 data = config.lookup("/", show=args.show).sorted()
             elif args.show is False:
