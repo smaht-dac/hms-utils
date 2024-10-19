@@ -56,9 +56,9 @@ def main(argv: Optional[List] = None):
             if args.show is True:
                 data = config.lookup("/", show=args.show).sorted()
             elif args.show is False:
-                pass
+                data = config.data(show=False)
             else:
-                data = config.json.sorted()
+                data = config.data(show=None)
             print(json.dumps(data, indent=4 if args.formatted else None))
         elif args.tree or args.dump:
             ConfigOutput.print_tree(config, show=args.show, nocolor=args.nocolor, root=True, debug=args.dump)
