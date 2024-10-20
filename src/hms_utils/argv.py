@@ -170,7 +170,7 @@ class Argv:
                                         else Argv._UNPARSED_PROPERTY_NAME)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
         self._argi = 0
-        self._values = Argv._Values(self._unparsed_property_name)
+        self._values = Argv._Values(unparsed_property_name=self._unparsed_property_name)
         self._fuzzy = fuzzy is not False
         self._strip = strip is not False
         self._escape = escape is not False
@@ -186,7 +186,7 @@ class Argv:
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._definitions:
                 return
-            argv = auxiliary_argv = Argv(self._unparsed_property_name)
+            argv = auxiliary_argv = Argv(unparsed_property_name=self._unparsed_property_name)
             argv._argv = args[0]
             argv._argi = 0
             argv._fuzzy = self._fuzzy
@@ -209,7 +209,7 @@ class Argv:
                     if definition["action"](arg, definition["options"]):
                         parsed = True
                 if not parsed:
-                    argv._values.unparsed.append(arg)
+                    getattr(argv._values, argv._unparsed_property_name).append(arg)
         if auxiliary_argv:
             self._values = auxiliary_argv.values
 
