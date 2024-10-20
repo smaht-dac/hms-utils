@@ -143,7 +143,7 @@ class Argv:
     def process(self, *args) -> Optional[str]:
         def flatten(*args):
             flattened_args = []
-            def flatten(*args):
+            def flatten(*args):  # noqa
                 nonlocal flattened_args
                 for arg in args:
                     if isinstance(arg, (list, tuple)):
@@ -155,7 +155,6 @@ class Argv:
             return flattened_args
         args = flatten(args)
         actions = [] ; options = []  # noqa
-        import pdb ; pdb.set_trace()  # noqa
         for arg in args:
             if id(arg) == Argv._ID_STRING:
                 if options:
