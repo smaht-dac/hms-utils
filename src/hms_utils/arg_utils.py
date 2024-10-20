@@ -157,8 +157,8 @@ class Argv:
             setattr(self, unparsed_property_name, [])
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
-                 strip: bool = True, skip: bool = True, escape: bool = True,
-                 unparsed_property_name: Optional[str] = None, delete: bool = False) -> None:
+                 strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
+                 unparsed_property_name: Optional[str] = None) -> None:
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
