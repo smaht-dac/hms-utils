@@ -8,7 +8,9 @@ class Argv:
 
     BOOLEAN = 1
     FLOAT = 2
+    FLOATS = 2
     INTEGER = 3
+    INTEGERS = 3
     STRING = 4
     STRINGS = 5
 
@@ -53,13 +55,16 @@ class Argv:
                     return True
             return False
 
-        def set_float(self, *values) -> bool:
+        def set_string(self, *values) -> bool:
             if self.anyof(values):
-                if (value := to_float(self._argv.peek)) is not None:  # TODO
-                    if self._set_property(*values, property_value=value):
+                if self._argv.peek and (not self._argv.peek.option):
+                    if self._set_property(*values, property_value=self._argv.peek):
                         self._argv.next
                         return True
             return False
+
+        def set_strings(self, *values, is_type: Optional[Callable] = None) -> bool:
+            return self._set_property_multiple(*values)
 
         def set_integer(self, *values) -> bool:
             if self.anyof(values):
@@ -72,16 +77,16 @@ class Argv:
         def set_integers(self, *values) -> bool:
             return self._set_property_multiple(*values, to_type=to_integer)
 
-        def set_string(self, *values) -> bool:
+        def set_float(self, *values) -> bool:
             if self.anyof(values):
-                if self._argv.peek and (not self._argv.peek.option):
-                    if self._set_property(*values, property_value=self._argv.peek):
+                if (value := to_float(self._argv.peek)) is not None:  # TODO
+                    if self._set_property(*values, property_value=value):
                         self._argv.next
                         return True
             return False
 
-        def set_strings(self, *values, is_type: Optional[Callable] = None) -> bool:
-            return self._set_property_multiple(*values)
+        def set_floats(self, *values) -> bool:
+            return self._set_property_multiple(*values, to_type=to_float)
 
         def _set_property_multiple(self, *values, to_type: Optional[Callable] = None) -> bool:
             if not callable(to_type):
@@ -253,11 +258,13 @@ class Argv:
             if arg in Argv._TYPES:
                 if action and options:
                     definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
-                if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
-                elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
-                elif arg == Argv.INTEGER: action = Argv._Arg.set_integer  # noqa
-                elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
+                if arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
                 elif arg == Argv.STRINGS: action = Argv._Arg.set_strings  # noqa
+                elif arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
+                elif arg == Argv.INTEGER: action = Argv._Arg.set_integer  # noqa
+                elif arg == Argv.INTEGERS: action = Argv._Arg.set_integers  # noqa
+                elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
+                elif arg == Argv.FLOATS: action = Argv._Arg.set_floats  # noqa
                 else:
                     action = None
                 if action and options:
