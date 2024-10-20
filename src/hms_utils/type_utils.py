@@ -8,18 +8,26 @@ def is_primitive_type(value: Any) -> bool:
 
 
 def is_integer(value: str) -> bool:
-    if isinstance(value, str) and (value := value.strip()):
-        try:
-            int(value)
-        except Exception:
-            pass
-    return False
+    return to_integer(value) is not None
 
 
 def to_integer(value: str) -> Optional[int]:
     if isinstance(value, str) and (value := value.strip()):
         try:
             return int(value)
+        except Exception:
+            pass
+    return None
+
+
+def is_float(value: str) -> bool:
+    return to_float(value) is not None
+
+
+def to_float(value: str) -> Optional[int]:
+    if isinstance(value, str) and (value := value.strip()):
+        try:
+            return float(value)
         except Exception:
             pass
     return None

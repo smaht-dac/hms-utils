@@ -23,7 +23,7 @@ def test_argv_b():
             continue
         if arg.set_boolean("--verbose"):
             continue
-        if arg.set_string_multiple("--configs"):
+        if arg.set_strings("--configs"):
             continue
     assert argv.values.config == "file.json"
     assert argv.values.verbose is True

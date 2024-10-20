@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sys
-from typing import Any, List, Optional
-from hms_utils.type_utils import to_integer
+from typing import Any, Callable, List, Optional
+from hms_utils.type_utils import to_float, to_integer
 
 
 class Argv:
@@ -27,7 +27,7 @@ class Argv:
             value._argv = argv
             return value
 
-        def anyof(self, *values) -> Optional[str]:
+        def anyof(self, *values) -> bool:
             def match(value: Any) -> bool:
                 nonlocal self
                 if self._argv._escaping:
@@ -45,7 +45,7 @@ class Argv:
                             return self._find_property_name(*values)
                 elif match(value):
                     return self._find_property_name(*values)
-            return None
+            return False
 
         def set_boolean(self, *values) -> bool:
             if self.anyof(values):
@@ -55,7 +55,7 @@ class Argv:
 
         def set_float(self, *values) -> bool:
             if self.anyof(values):
-                if (value := to_integer(self._argv.peek)) is not None:  # TODO
+                if (value := to_float(self._argv.peek)) is not None:  # TODO
                     if self._set_property(*values, property_value=value):
                         self._argv.next
                         return True
@@ -69,6 +69,9 @@ class Argv:
                         return True
             return False
 
+        def set_integers(self, *values) -> bool:
+            return self._set_property_multiple(*values, to_type=to_integer)
+
         def set_string(self, *values) -> bool:
             if self.anyof(values):
                 if self._argv.peek and (not self._argv.peek.option):
@@ -77,22 +80,28 @@ class Argv:
                         return True
             return False
 
-        def set_strings(self, *values) -> bool:
-            return self.set_string_multiple(*values)
+        def set_strings(self, *values, is_type: Optional[Callable] = None) -> bool:
+            return self._set_property_multiple(*values)
 
-        def set_string_multiple(self, *values) -> bool:
+        def _set_property_multiple(self, *values, to_type: Optional[Callable] = None) -> bool:
+            if not callable(to_type):
+                to_type = lambda value: value if isinstance(value, str) else None  # noqa
             if self.anyof(values):
                 if property_name := self._find_property_name(*values):
                     property_values = []
                     if (hasattr(self._argv._values, property_name) and
                         (existing_property_value := getattr(self._argv._values, property_name))):  # noqa
-                        if isinstance(existing_property_value, list) or isinstance(existing_property_value, str):
+                        if isinstance(existing_property_value, list):
                             property_values[:0] = existing_property_value
+                        elif (existing_property_value := to_type(existing_property_value)) is not None:
+                            property_values.append(existing_property_value)
                     setattr(self._argv._values, property_name, property_values)
                     while True:
-                        if not (self._argv.peek and (not self._argv.peek.option)):
+                        if not ((peek := self._argv.peek) and
+                                (not peek.option) and ((peek := to_type(peek)) is not None)):
                             break
-                        property_values.append(self._argv.next)
+                        property_values.append(peek)
+                        self._argv.next
                     return True
             return False
 
