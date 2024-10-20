@@ -8,15 +8,17 @@ class Argv:
 
     class Arg(str):
 
-        def __new__(cls, value: str, args: Argv) -> None:
-            value = (value.strip() if args._strip else value) if isinstance(value, str) else ""
+        def __new__(cls, value: str, argv: Argv) -> None:
+            value = (value.strip() if argv._strip else value) if isinstance(value, str) else ""
             value = super().__new__(cls, value)
-            value._argv = args
+            value._argv = argv
             return value
 
         def anyof(self, *values) -> Optional[str]:
             def match(value: Any) -> bool:
                 nonlocal self
+                if self._argv._escaping:
+                    return False
                 if isinstance(value, str) and (value := value.strip()):
                     if (self == value) or (self._argv._fuzzy and value.startswith("--") and (self == value[1:])):
                         return True
@@ -25,7 +27,6 @@ class Argv:
                 if isinstance(value, (list, tuple)):
                     for element in value:
                         if self.anyof(element):
-                            import pdb ; pdb.set_trace()  # noqa
                             return self._find_property_name(*values)
                 elif match(value):
                     return self._find_property_name(*values)
@@ -59,6 +60,7 @@ class Argv:
                     (property_name := self._find_property_name(*values))):  # noqa
                     property_values = []
                     setattr(target_object, property_name, property_values)
+                    setattr(self._argv._values, property_name, property_values)
                     while True:
                         if not ((self._argv.peek is not None) and (not self._argv.peek.option)):
                             break
@@ -70,6 +72,7 @@ class Argv:
             if (target_object := self._find_target_object(*values)) is not None:
                 if property_name := self._find_property_name(*values):
                     setattr(target_object, property_name, property_value)
+                    setattr(self._argv._values, property_name, property_value)
                     return target_object
             return None
 
@@ -85,7 +88,7 @@ class Argv:
                     for element in value:
                         if property_name := self._find_property_name(element):
                             return property_name
-                elif isinstance(value, str):
+                elif isinstance(value, str) and (not self._argv._escaping):
                     if value.startswith("--") and (value := value[2:].strip()):
                         return value
                     elif self._argv._fuzzy and value.startswith("-") and (value := value[2:].strip()):
@@ -93,7 +96,7 @@ class Argv:
 
         @property
         def option(self):
-            return self.startswith("-") if self._argv._fuzzy else self.startswith("--")
+            return (not self._argv._escaping) and self.startswith("-") if self._argv._fuzzy else self.startswith("--")
 
         @property
         def empty(self):
@@ -103,12 +106,18 @@ class Argv:
         def null(self):
             return self.empty
 
-    def __init__(self, args: Optional[List[str]] = None, fuzzy: bool = True,
-                 strip: bool = True, skip: bool = True, delete: bool = False) -> None:
-        self._argv = args if isinstance(args, list) and args else (sys.argv[1:] if skip is not False else sys.argv)
+    class Values:
+        unparsed = []
+
+    def __init__(self, argv: Optional[List[str]] = None, fuzzy: bool = True,
+                 strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
+        self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
         self._argi = 0
+        self._values = Argv.Values()
         self._fuzzy = fuzzy is not False
         self._strip = strip is not False
+        self._escape = escape is not False
+        self._escaping = False
         self._delete = delete is True
 
     @property
@@ -136,8 +145,15 @@ class Argv:
             del self._argv[0]
         else:
             self._argi += 1
+        if (arg == "--") and self._escape and (not self._escaping):
+            self._escaping = True
+            return self.__next__()
         return Argv.Arg(arg, self)
 
     @property
-    def value(self):
+    def list(self) -> List[str]:
         return self._argv
+
+    @property
+    def values(self) -> Values:
+        return self._values
