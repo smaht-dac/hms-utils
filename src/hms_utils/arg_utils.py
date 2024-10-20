@@ -6,21 +6,18 @@ from hms_utils.type_utils import to_integer
 
 class Argv:
 
-    BOOLEAN = "__boolean__"
-    STRING = "__string__"
-    STRINGS = "__strings__"
-    INTEGER = "__integer__"
+    BOOLEAN = 1
+    FLOAT = 2
+    INTEGER = 3
+    STRING = 4
+    STRINGS = 5
 
-    _ID_BOOLEAN = id(BOOLEAN)
-    _ID_STRING = id(STRING)
-    _ID_STRINGS = id(STRINGS)
-    _ID_INTEGER = id(INTEGER)
-
-    _OPTION_PREFIX = "--"
-    _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
+    _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
     _FUZZY_OPTION_PREFIX_LENGTH = len(_FUZZY_OPTION_PREFIX)
-    _ESCAPE_VALUE = "--"
+    _OPTION_PREFIX = "--"
+    _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
+    _TYPES = [BOOLEAN, FLOAT, INTEGER, STRING, STRINGS]
 
     class _Arg(str):
 
@@ -54,6 +51,14 @@ class Argv:
             if self.anyof(values):
                 if self._set_property(*values, property_value=True):
                     return True
+            return False
+
+        def set_float(self, *values) -> bool:
+            if self.anyof(values):
+                if (value := to_integer(self._argv.peek)) is not None:  # TODO
+                    if self._set_property(*values, property_value=value):
+                        self._argv.next
+                        return True
             return False
 
         def set_integer(self, *values) -> bool:
@@ -133,8 +138,16 @@ class Argv:
     class _Values:
         unparsed = []
 
-    def __init__(self, argv: Optional[List[str]] = None, fuzzy: bool = True,
+    def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
+        if (len(args) == 1) and isinstance(args[0], list):
+            # Here, the given args are the actual command-line arguments to process/parse.
+            if not (isinstance(argv, list) and argv):
+                argv = args[0]
+            self._definitions = []
+        else:
+            # Here, the given args should be the definitions for processing/parsing command-line args.
+            self._definitions = self._process_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
         self._argi = 0
         self._values = Argv._Values()
@@ -144,45 +157,34 @@ class Argv:
         self._escaping = False
         self._delete = delete is True
 
-    def process(self, *args) -> Optional[str]:
-        def flatten(*args):
-            flattened_args = []
-            def flatten(*args):  # noqa
-                nonlocal flattened_args
-                for arg in args:
-                    if isinstance(arg, (list, tuple)):
-                        for item in arg:
-                            flatten(item)
-                    else:
-                        flattened_args.append(arg)
-            flatten(args)
-            return flattened_args
-        args = flatten(args)
-        actions = [] ; options = []  # noqa
-        for arg in args:
-            if id(arg) == Argv._ID_STRING:
-                if options:
-                    actions.append({"function": Argv._Arg.set_string, "options": options})
-                    options = []
-            elif id(arg) == Argv._ID_STRINGS:
-                if options:
-                    actions.append({"function": Argv._Arg.set_strings, "options": options})
-                    options = []
-            elif id(arg) == Argv._ID_INTEGER:
-                if options:
-                    actions.append({"function": Argv._Arg.set_integer, "options": options})
-                    options = []
-            elif id(arg) == Argv._ID_BOOLEAN:
-                if options:
-                    actions.append({"function": Argv._Arg.set_boolean, "options": options})
-                    options = []
-            elif isinstance(arg, str) and (arg := arg.strip()):
-                options.append(arg)
-            elif isinstance(arg, list) and arg:
-                options.append(arg)
-        for arg in self:
-            for action in actions:
-                action["function"](arg, action["options"])
+    def process(self, *args) -> None:
+        if (len(args) == 1) and isinstance(args[0], list):
+            # Here, the given args are the actual command-line arguments to process/parse;
+            # and this Argv object already should have the definitions for processing/parsing these.
+            if not self._definitions:
+                return
+            argv = auxiliary_argv = Argv()
+            argv._argv = args[0]
+            argv._argi = 0
+            argv._fuzzy = self._fuzzy
+            argv._strip = self._strip
+            argv._escape = self._escape
+            argv._delete = self._delete
+            definitions = self._definitions
+        else:
+            # Here, the given args are the definitions for processing/parsing command-line args;
+            # and this Argv object already as the actual command-line arguments to process/parse.
+            if not self._argv:
+                return
+            auxiliary_argv = None
+            argv = self
+            definitions = self._process_definitions(*args)
+        if definitions:
+            for arg in argv:
+                for definition in definitions:
+                    definition["action"](arg, definition["options"])
+        if auxiliary_argv:
+            self._values = auxiliary_argv.values
 
     @property
     def peek(self) -> Optional[str]:
@@ -221,3 +223,38 @@ class Argv:
     @property
     def values(self) -> Argv._Values:
         return self._values
+
+    @staticmethod
+    def _process_definitions(*args) -> Optional[list]:
+        def flatten(*args):
+            flattened_args = []
+            def flatten(*args):  # noqa
+                nonlocal flattened_args
+                for arg in args:
+                    if isinstance(arg, (list, tuple)):
+                        for item in arg:
+                            flatten(item)
+                    else:
+                        flattened_args.append(arg)
+            flatten(args)
+            return flattened_args
+        args = flatten(args)
+        definitions = [] ; action = None ; options = []  # noqa
+        for arg in args:
+            if arg in Argv._TYPES:
+                if action and options:
+                    definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+                if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
+                elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
+                elif arg == Argv.INTEGER: action = Argv._Arg.set_integer  # noqa
+                elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
+                elif arg == Argv.STRINGS: action = Argv._Arg.set_strings  # noqa
+                else:
+                    action = None
+                if action and options:
+                    definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+            elif isinstance(arg, str) and (arg := arg.strip()):
+                options.append(arg)
+        if action and options:
+            definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+        return definitions

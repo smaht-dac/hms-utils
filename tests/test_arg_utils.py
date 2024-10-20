@@ -2,6 +2,18 @@ from hms_utils.arg_utils import Argv
 
 
 def test_argv_a():
+
+    expected = [{"action": Argv._Arg.set_string, "options": ["--abc", "-def"]},
+                {"action": Argv._Arg.set_boolean, "options": ["--ghi"]}]
+
+    definitions = [Argv.STRING, "--abc", "-def", Argv.BOOLEAN, "--ghi"]
+    assert Argv._process_definitions(definitions) == expected
+
+    definitions = ["--abc", "-def", Argv.STRING, "--ghi", Argv.BOOLEAN]
+    assert Argv._process_definitions(definitions) == expected
+
+
+def test_argv_b():
     argv = Argv(["dummyt.py", "abc", "def", "--config", "file.json",
                  "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"])
     for arg in argv:
@@ -19,9 +31,9 @@ def test_argv_a():
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-def test_argv_b():
-    args = ["dummyt.py", "abc", "def", "--config", "file.json",
-            "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+def test_argv_c():
+    args = ["abc", "def", "--config", "file.json", "--verbose",
+            "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
     argv.process(
         "--config", "-file", Argv.STRING,
@@ -34,18 +46,15 @@ def test_argv_b():
     assert argv.values.config == "file.json"
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
-    return
-    args = ["dummyt.py", "abc", "def", "--config", "file.json",
-            "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
-    argv = Argv(args)
-    argv.process(
+    args = ["abc", "def", "--config", "file.json", "--verbose",
+            "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+    argv = Argv(
         Argv.STRING, "--config", "-file",
         Argv.STRINGS, "--configs",
         Argv.BOOLEAN, "--verbose",
         Argv.BOOLEAN, "--debug"
     )
-    import pdb ; pdb.set_trace()  # noqa
-    pass
+    argv.process(args)
     assert argv.values.verbose is True
     assert argv.values.debug is True
     assert argv.values.config == "file.json"
