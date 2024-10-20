@@ -8,18 +8,19 @@ class Argv:
 
     BOOLEAN = 1
     FLOAT = 2
-    FLOATS = 2
-    INTEGER = 3
-    INTEGERS = 3
-    STRING = 4
-    STRINGS = 5
+    FLOATS = 3
+    INTEGER = 4
+    INTEGERS = 5
+    STRING = 6
+    STRINGS = 7
 
     _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
     _FUZZY_OPTION_PREFIX_LENGTH = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
-    _TYPES = [BOOLEAN, FLOAT, INTEGER, STRING, STRINGS]
+    _TYPES = [BOOLEAN, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
+    _UNPARSED_PROPERTY_NAME = "unparsed"
 
     class _Arg(str):
 
@@ -150,10 +151,14 @@ class Argv:
             return self.empty
 
     class _Values:
-        unparsed = []
+        def __init__(self, unparsed_property_name: Optional[str] = None):
+            if not (isinstance(unparsed_property_name, str) and unparsed_property_name):
+                unparsed_property_name = Argv._UNPARSED_PROPERTY_NAME
+            setattr(self, unparsed_property_name, [])
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
-                 strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
+                 strip: bool = True, skip: bool = True, escape: bool = True,
+                 unparsed_property_name: Optional[str] = None, delete: bool = False) -> None:
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
@@ -164,12 +169,15 @@ class Argv:
             self._definitions = self._process_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
         self._argi = 0
-        self._values = Argv._Values()
+        self._values = Argv._Values(unparsed_property_name)
         self._fuzzy = fuzzy is not False
         self._strip = strip is not False
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
+
+    def parse(self, *args) -> None:
+        return self.process(*args)
 
     def process(self, *args) -> None:
         if (len(args) == 1) and isinstance(args[0], list):
@@ -195,10 +203,22 @@ class Argv:
             definitions = self._process_definitions(*args)
         if definitions:
             for arg in argv:
+                parsed = False
                 for definition in definitions:
-                    definition["action"](arg, definition["options"])
+                    if definition["action"](arg, definition["options"]):
+                        parsed = True
+                if not parsed:
+                    argv._values.unparsed.append(arg)
         if auxiliary_argv:
             self._values = auxiliary_argv.values
+
+    @property
+    def list(self) -> List[str]:
+        return self._argv
+
+    @property
+    def values(self) -> Argv._Values:
+        return self._values
 
     @property
     def peek(self) -> Optional[str]:
@@ -229,14 +249,6 @@ class Argv:
             self._escaping = True
             return self.__next__()
         return Argv._Arg(arg, self)
-
-    @property
-    def list(self) -> List[str]:
-        return self._argv
-
-    @property
-    def values(self) -> Argv._Values:
-        return self._values
 
     @staticmethod
     def _process_definitions(*args) -> Optional[list]:
