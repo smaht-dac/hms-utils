@@ -58,8 +58,8 @@ class Argv:
 
         def set_string(self, *values) -> bool:
             if self.anyof(values):
-                if self._argv.peek and (not self._argv.peek.option):
-                    if self._set_property(*values, property_value=self._argv.peek):
+                if (peek := self._argv.peek) and (not peek.option):
+                    if self._set_property(*values, property_value=peek):
                         self._argv.next
                         return True
             return False
@@ -69,8 +69,8 @@ class Argv:
 
         def set_integer(self, *values) -> bool:
             if self.anyof(values):
-                if (value := to_integer(self._argv.peek)) is not None:
-                    if self._set_property(*values, property_value=value):
+                if (peek := to_integer(self._argv.peek)) is not None:
+                    if self._set_property(*values, property_value=peek):
                         self._argv.next
                         return True
             return False
@@ -80,8 +80,8 @@ class Argv:
 
         def set_float(self, *values) -> bool:
             if self.anyof(values):
-                if (value := to_float(self._argv.peek)) is not None:  # TODO
-                    if self._set_property(*values, property_value=value):
+                if (peek := to_float(self._argv.peek)) is not None:
+                    if self._set_property(*values, property_value=peek):
                         self._argv.next
                         return True
             return False
