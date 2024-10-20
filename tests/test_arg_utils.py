@@ -32,3 +32,14 @@ def test_argv_b():
     assert argv.values.debug is True
     assert argv.values.config == "file.json"
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
+
+    argv.process(
+        Argv.STRING, "--config", "-file",
+        Argv.STRINGS, "--configs",
+        Argv.BOOLEAN, "--verbose",
+        Argv.BOOLEAN, "--debug"
+    )
+    assert argv.values.verbose is True
+    assert argv.values.debug is True
+    assert argv.values.config == "file.json"
+    assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]

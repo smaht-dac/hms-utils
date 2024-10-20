@@ -155,19 +155,24 @@ class Argv:
             return flattened_args
         args = flatten(args)
         actions = [] ; options = []  # noqa
+        import pdb ; pdb.set_trace()  # noqa
         for arg in args:
-            if id(arg) == Argv._ID_STRING and options:
-                actions.append({"function": Argv._Arg.set_string, "options": options})
-                options = []
-            elif id(arg) == Argv._ID_STRINGS and options:
-                actions.append({"function": Argv._Arg.set_strings, "options": options})
-                options = []
-            elif id(arg) == Argv._ID_INTEGER and options:
-                actions.append({"function": Argv._Arg.set_integer, "options": options})
-                options = []
-            elif id(arg) == Argv._ID_BOOLEAN and options:
-                actions.append({"function": Argv._Arg.set_boolean, "options": options})
-                options = []
+            if id(arg) == Argv._ID_STRING:
+                if options:
+                    actions.append({"function": Argv._Arg.set_string, "options": options})
+                    options = []
+            elif id(arg) == Argv._ID_STRINGS:
+                if options:
+                    actions.append({"function": Argv._Arg.set_strings, "options": options})
+                    options = []
+            elif id(arg) == Argv._ID_INTEGER:
+                if options:
+                    actions.append({"function": Argv._Arg.set_integer, "options": options})
+                    options = []
+            elif id(arg) == Argv._ID_BOOLEAN:
+                if options:
+                    actions.append({"function": Argv._Arg.set_boolean, "options": options})
+                    options = []
             elif isinstance(arg, str) and (arg := arg.strip()):
                 options.append(arg)
             elif isinstance(arg, list) and arg:
