@@ -68,7 +68,7 @@ class Argv:
                     property_values = []
                     setattr(self._argv._values, property_name, property_values)
                     while True:
-                        if not ((self._argv.peek is not None) and (not self._argv.peek.option)):
+                        if not (self._argv.peek and (not self._argv.peek.option)):
                             break
                         property_values.append(self._argv.next)
                     return True
@@ -92,7 +92,7 @@ class Argv:
             return None
 
         @property
-        def option(self):
+        def option(self) -> bool:
             return self._option_to_name(self) is not None
 
         def _option_to_name(self, value: str) -> Optional[str]:
