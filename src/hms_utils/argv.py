@@ -192,6 +192,7 @@ class Argv:
                 parsed = False
                 for definition in definitions:
                     if definition["action"](arg, definition["options"]):
+                        # TODO: Collect property names to set and setattr to None.
                         # xyzzy = argv._find_property_name(definition["options"])
                         parsed = True
                 if not parsed:
