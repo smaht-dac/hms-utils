@@ -6,6 +6,16 @@ from hms_utils.type_utils import to_integer
 
 class Argv:
 
+    BOOLEAN = "boolean"
+    STRING = "string"
+    STRINGS = "strings"
+    INTEGER = "integer"
+
+    _ID_BOOLEAN = id(BOOLEAN)
+    _ID_STRING = id(STRING)
+    _ID_STRINGS = id(STRINGS)
+    _ID_INTEGER = id(INTEGER)
+
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
     _FUZZY_OPTION_PREFIX = "-"
@@ -61,6 +71,9 @@ class Argv:
                         self._argv.next
                         return True
             return False
+
+        def set_strings(self, *values) -> bool:
+            return self.set_string_multiple(*values)
 
         def set_string_multiple(self, *values) -> bool:
             if self.anyof(values):
@@ -126,6 +139,25 @@ class Argv:
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
+
+    def process(self, *args) -> Optional[str]:
+        functions = []
+        options = []
+        for arg in args:
+            if id(arg) == Argv._ID_STRING and options:
+                functions.append({"function": Argv._Arg.set_string, "options": options})
+                options = []
+            elif id(arg) == Argv._ID_STRINGS and options:
+                functions.append({"function": Argv._Arg.set_strings, "options": options})
+                options = []
+            elif id(arg) == Argv._ID_BOOLEAN and options:
+                functions.append({"function": Argv._Arg.set_boolean, "options": options})
+                options = []
+            elif isinstance(arg, str) and (arg := arg.strip()):
+                options.append(arg)
+        for arg in self:
+            for function in functions:
+                function["function"](arg, function["options"])
 
     @property
     def peek(self) -> Optional[str]:
