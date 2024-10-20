@@ -30,6 +30,10 @@ class Argv:
             value._argv = argv
             return value
 
+        @property
+        def option(self) -> bool:
+            return self._property_name_from_option(self) is not None
+
         def anyof(self, *values) -> bool:
             def match(value: Any) -> bool:
                 nonlocal self
@@ -118,29 +122,10 @@ class Argv:
             return False
 
         def _find_property_name(self, *values) -> Optional[str]:
-            for value in values:
-                if isinstance(value, (list, tuple)):
-                    for element in value:
-                        if property_name := self._find_property_name(element):
-                            return property_name
-                elif isinstance(value, str) and (not self._argv._escaping):
-                    if value := self._option_to_name(value):
-                        return value
-            return None
+            return self._argv._find_property_name(*values)
 
-        @property
-        def option(self) -> bool:
-            return self._option_to_name(self) is not None
-
-        def _option_to_name(self, value: str) -> Optional[str]:
-            if isinstance(value, str) and (value := value.strip()):
-                if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
-                    return value
-                elif (self._argv._fuzzy and
-                      value.startswith(Argv._FUZZY_OPTION_PREFIX) and
-                      (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
-                    return value
-            return None
+        def _property_name_from_option(self, value: str) -> Optional[str]:
+            return self._argv._property_name_from_option(value)
 
         @property
         def empty(self):
@@ -207,6 +192,7 @@ class Argv:
                 parsed = False
                 for definition in definitions:
                     if definition["action"](arg, definition["options"]):
+                        # xyzzy = argv._find_property_name(definition["options"])
                         parsed = True
                 if not parsed:
                     getattr(argv._values, argv._unparsed_property_name).append(arg)
@@ -287,3 +273,24 @@ class Argv:
         if action and options:
             definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
         return definitions
+
+    def _find_property_name(self, *values) -> Optional[str]:
+        for value in values:
+            if isinstance(value, (list, tuple)):
+                for element in value:
+                    if property_name := self._find_property_name(element):
+                        return property_name
+            elif isinstance(value, str) and (not self._escaping):
+                if value := self._property_name_from_option(value):
+                    return value
+        return None
+
+    def _property_name_from_option(self, value: str) -> Optional[str]:
+        if isinstance(value, str) and (value := value.strip()):
+            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
+                return value
+            elif (self._fuzzy and
+                  value.startswith(Argv._FUZZY_OPTION_PREFIX) and
+                  (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
+                return value
+        return None
