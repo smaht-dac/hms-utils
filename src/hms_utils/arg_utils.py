@@ -6,10 +6,10 @@ from hms_utils.type_utils import to_integer
 
 class Argv:
 
-    BOOLEAN = "boolean"
-    STRING = "string"
-    STRINGS = "strings"
-    INTEGER = "integer"
+    BOOLEAN = "__boolean__"
+    STRING = "__string__"
+    STRINGS = "__strings__"
+    INTEGER = "__integer__"
 
     _ID_BOOLEAN = id(BOOLEAN)
     _ID_STRING = id(STRING)
@@ -141,23 +141,40 @@ class Argv:
         self._delete = delete is True
 
     def process(self, *args) -> Optional[str]:
-        functions = []
-        options = []
+        def flatten(*args):
+            flattened_args = []
+            def flatten(*args):
+                nonlocal flattened_args
+                for arg in args:
+                    if isinstance(arg, (list, tuple)):
+                        for item in arg:
+                            flatten(item)
+                    else:
+                        flattened_args.append(arg)
+            flatten(args)
+            return flattened_args
+        args = flatten(args)
+        actions = [] ; options = []  # noqa
         for arg in args:
             if id(arg) == Argv._ID_STRING and options:
-                functions.append({"function": Argv._Arg.set_string, "options": options})
+                actions.append({"function": Argv._Arg.set_string, "options": options})
                 options = []
             elif id(arg) == Argv._ID_STRINGS and options:
-                functions.append({"function": Argv._Arg.set_strings, "options": options})
+                actions.append({"function": Argv._Arg.set_strings, "options": options})
+                options = []
+            elif id(arg) == Argv._ID_INTEGER and options:
+                actions.append({"function": Argv._Arg.set_integer, "options": options})
                 options = []
             elif id(arg) == Argv._ID_BOOLEAN and options:
-                functions.append({"function": Argv._Arg.set_boolean, "options": options})
+                actions.append({"function": Argv._Arg.set_boolean, "options": options})
                 options = []
             elif isinstance(arg, str) and (arg := arg.strip()):
                 options.append(arg)
+            elif isinstance(arg, list) and arg:
+                options.append(arg)
         for arg in self:
-            for function in functions:
-                function["function"](arg, function["options"])
+            for action in actions:
+                action["function"](arg, action["options"])
 
     @property
     def peek(self) -> Optional[str]:
