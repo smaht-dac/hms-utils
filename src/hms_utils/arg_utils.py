@@ -79,6 +79,10 @@ class Argv:
             if self.anyof(values):
                 if property_name := self._find_property_name(*values):
                     property_values = []
+                    if (hasattr(self._argv._values, property_name) and
+                        (existing_property_value := getattr(self._argv._values, property_name))):
+                        if isinstance(existing_property_value, list) or isinstance(existing_property_value, str):
+                            property_values[:0] = existing_property_value
                     setattr(self._argv._values, property_name, property_values)
                     while True:
                         if not (self._argv.peek and (not self._argv.peek.option)):
