@@ -152,8 +152,6 @@ class Argv:
 
     class _Values:
         def __init__(self, unparsed_property_name: Optional[str] = None):
-            if not (isinstance(unparsed_property_name, str) and unparsed_property_name):
-                unparsed_property_name = Argv._UNPARSED_PROPERTY_NAME
             setattr(self, unparsed_property_name, [])
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
@@ -167,9 +165,12 @@ class Argv:
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
             self._definitions = self._process_definitions(*args)
+        self._unparsed_property_name = (unparsed_property_name if (isinstance(unparsed_property_name, str) and
+                                                                   unparsed_property_name)
+                                        else Argv._UNPARSED_PROPERTY_NAME)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
         self._argi = 0
-        self._values = Argv._Values(unparsed_property_name)
+        self._values = Argv._Values(self._unparsed_property_name)
         self._fuzzy = fuzzy is not False
         self._strip = strip is not False
         self._escape = escape is not False
@@ -185,7 +186,7 @@ class Argv:
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._definitions:
                 return
-            argv = auxiliary_argv = Argv()
+            argv = auxiliary_argv = Argv(self._unparsed_property_name)
             argv._argv = args[0]
             argv._argi = 0
             argv._fuzzy = self._fuzzy
@@ -270,9 +271,9 @@ class Argv:
             if arg in Argv._TYPES:
                 if action and options:
                     definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
-                if arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
+                if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
+                elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
                 elif arg == Argv.STRINGS: action = Argv._Arg.set_strings  # noqa
-                elif arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
                 elif arg == Argv.INTEGER: action = Argv._Arg.set_integer  # noqa
                 elif arg == Argv.INTEGERS: action = Argv._Arg.set_integers  # noqa
                 elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
