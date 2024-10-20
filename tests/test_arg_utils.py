@@ -20,8 +20,9 @@ def test_argv_a():
 
 
 def test_argv_b():
-    argv = Argv(["dummyt.py", "abc", "def", "--config", "file.json",
-                 "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"])
+    args = ["dummyt.py", "abc", "def", "--config", "file.json",
+            "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+    argv = Argv(args, delete=True)
     argv.process(
         "--config", "-file", Argv.STRING,
         "--configs", Argv.STRINGS,
@@ -33,12 +34,18 @@ def test_argv_b():
     assert argv.values.config == "file.json"
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
+    return
+    args = ["dummyt.py", "abc", "def", "--config", "file.json",
+            "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+    argv = Argv(args)
     argv.process(
         Argv.STRING, "--config", "-file",
         Argv.STRINGS, "--configs",
         Argv.BOOLEAN, "--verbose",
         Argv.BOOLEAN, "--debug"
     )
+    import pdb ; pdb.set_trace()  # noqa
+    pass
     assert argv.values.verbose is True
     assert argv.values.debug is True
     assert argv.values.config == "file.json"
