@@ -1,4 +1,4 @@
-from hms_utils.arg_utils import Argv
+from hms_utils.argv import Argv
 
 
 def test_argv_a():
