@@ -6,6 +6,12 @@ from hms_utils.type_utils import to_integer
 
 class Argv:
 
+    _OPTION_PREFIX = "--"
+    _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
+    _FUZZY_OPTION_PREFIX = "-"
+    _FUZZY_OPTION_PREFIX_LENGTH = len(_FUZZY_OPTION_PREFIX)
+    _ESCAPE_VALUE = "--"
+
     class Arg(str):
 
         def __new__(cls, value: str, argv: Argv) -> None:
@@ -20,7 +26,9 @@ class Argv:
                 if self._argv._escaping:
                     return False
                 if isinstance(value, str) and (value := value.strip()):
-                    if (self == value) or (self._argv._fuzzy and value.startswith("--") and (self == value[1:])):
+                    if ((self == value) or
+                        (self._argv._fuzzy and value.startswith(Argv._OPTION_PREFIX) and
+                         (self == Argv._FUZZY_OPTION_PREFIX + value[Argv._OPTION_PREFIX_LENGTH:]))):
                         return True
                 return False
             for value in values:
@@ -89,9 +97,11 @@ class Argv:
                         if property_name := self._find_property_name(element):
                             return property_name
                 elif isinstance(value, str) and (not self._argv._escaping):
-                    if value.startswith("--") and (value := value[2:].strip()):
+                    if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
                         return value
-                    elif self._argv._fuzzy and value.startswith("-") and (value := value[2:].strip()):
+                    elif (self._argv._fuzzy and
+                          value.startswith(Argv._FUZZY_OPTION_PREFIX) and
+                          (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
                         return value
 
         @property
@@ -145,7 +155,7 @@ class Argv:
             del self._argv[0]
         else:
             self._argi += 1
-        if (arg == "--") and self._escape and (not self._escaping):
+        if (arg == Argv._ESCAPE_VALUE) and self._escape and (not self._escaping):
             self._escaping = True
             return self.__next__()
         return Argv.Arg(arg, self)
