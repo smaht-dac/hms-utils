@@ -211,9 +211,11 @@ class Argv:
                     if not arg.option:
                         if default_property_names:
                             for default_property_name in default_property_names:
-                                # import pdb ; pdb.set_trace()  # noqa
-                                pass
-                        if defaults_property_name:
+                                if not hasattr(argv._values, default_property_name):
+                                    setattr(argv._values, default_property_name, arg)
+                                    parsed = True
+                                    break
+                        if (not parsed) and defaults_property_name:
                             if not hasattr(argv._values, defaults_property_name):
                                 setattr(argv._values, defaults_property_name, [arg])
                             else:
