@@ -149,8 +149,9 @@ class Argv:
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
-        self._unparsed_property_name = (unparsed_property_name if (isinstance(unparsed_property_name, str) and
-                                                                   unparsed_property_name)
+        self._unparsed_property_name = (unparsed_property_name.replace("-", "_")
+                                        if (isinstance(unparsed_property_name, str) and
+                                            unparsed_property_name)
                                         else Argv._UNPARSED_PROPERTY_NAME)
         self._values = Argv._Values(unparsed_property_name=self._unparsed_property_name)
         if (len(args) == 1) and isinstance(args[0], list):
@@ -195,8 +196,6 @@ class Argv:
                 parsed = False
                 for definition in definitions:
                     if definition["action"](arg, definition["options"]):
-                        # TODO: Collect property names to set and setattr to None.
-                        # xyzzy = argv._find_property_name(definition["options"])
                         parsed = True
                 if not parsed:
                     getattr(argv._values, argv._unparsed_property_name).append(arg)
@@ -303,9 +302,9 @@ class Argv:
     def _property_name_from_option(self, value: str) -> Optional[str]:
         if isinstance(value, str) and (value := value.strip()):
             if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
-                return value
+                return value.replace("-", "_")
             elif (self._fuzzy and
                   value.startswith(Argv._FUZZY_OPTION_PREFIX) and
                   (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
-                return value
+                return value.replace("-", "_")
         return None
