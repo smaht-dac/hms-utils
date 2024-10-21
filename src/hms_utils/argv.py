@@ -33,7 +33,7 @@ class Argv:
 
         @property
         def option(self) -> bool:
-            return self._property_name_from_option(self) is not None
+            return self._argv._is_option(self)
 
         def anyof(self, *values) -> bool:
             def match(value: Any) -> bool:
@@ -149,7 +149,7 @@ class Argv:
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
-        self._unparsed_property_name = (self._property_name_ize(unparsed_property_name)
+        self._unparsed_property_name = (unparsed_property_name
                                         if (isinstance(unparsed_property_name, str) and
                                             unparsed_property_name)
                                         else Argv._UNPARSED_PROPERTY_NAME)
@@ -310,13 +310,21 @@ class Argv:
     def _property_name_from_option(self, value: str) -> Optional[str]:
         if isinstance(value, str) and (value := value.strip()):
             if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
-                return self._property_name_ize(value)
+                return value.replace("-", "_")
             elif (self._fuzzy and
                   value.startswith(Argv._FUZZY_OPTION_PREFIX) and
                   (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
-                return self._property_name_ize(value)
+                return value.replace("-", "_")
+            else:
+                return value.replace("-", "_")
         return None
 
-    @staticmethod
-    def _property_name_ize(value: str) -> Optional[str]:
-        return value.replace("-", "_") if isinstance(value, str) else None
+    def _is_option(self, value: str) -> bool:
+        if isinstance(value, str) and (value := value.strip()):
+            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
+                return True
+            elif (self._fuzzy and
+                  value.startswith(Argv._FUZZY_OPTION_PREFIX) and
+                  (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
+                return True
+        return False
