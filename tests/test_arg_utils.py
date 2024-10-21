@@ -3,8 +3,8 @@ from hms_utils.argv import Argv
 
 def test_argv_a():
 
-    expected = [{"action": Argv._Arg.set_string, "options": ["--abc", "-def"]},
-                {"action": Argv._Arg.set_boolean, "options": ["--ghi"]}]
+    expected = [{"action": Argv._Arg.set_string, "options": ["--abc", "-def"], "name": "abc"},
+                {"action": Argv._Arg.set_boolean, "options": ["--ghi"], "name": "ghi"}]
 
     definitions = [Argv.STRING, "--abc", "-def", Argv.BOOLEAN, "--ghi"]
     definitions, property_names = Argv()._process_definitions(definitions)

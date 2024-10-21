@@ -69,7 +69,6 @@ def main(argv: Optional[List] = None):
             status = handle_lookup_command(config, args)
 
     if config._warnings:
-        # if ((not args.nowarnings) and args.lookup_paths) or args.warnings:
         if args.warnings:
             print(f"{chars.rarrow} WARNINGS ({len(config._warnings)}):", file=sys.stderr)
             for warning in config._warnings:
@@ -162,7 +161,6 @@ def parse_args(argv: List[str]) -> object:
         formatted = False
         verbose = False
         password = False
-        nowarnings = False
         warnings = False
         debug = False
 
@@ -376,8 +374,6 @@ def parse_args(argv: List[str]) -> object:
                 args.nocolor = True
             elif arg in ["--noaws", "-noaws"]:
                 args.noaws = True
-            elif arg in ["--nowarnings", "-nowarnings", "--nowarning", "-nowarning"]:
-                args.nowarnings = True
             elif arg in ["--warnings", "-warnings", "--warning", "-warning"]:
                 args.warnings = True
             elif arg in ["--format", "-format", "--formatted", "-formatted"]:

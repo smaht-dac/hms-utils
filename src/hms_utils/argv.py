@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import sys
 from typing import Any, Callable, List, Optional
 from uuid import uuid4 as uuid
@@ -261,7 +262,9 @@ class Argv:
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
-                    definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+                    definitions.append({"action": action, "options": options,
+                                        "name": self._property_name_from_option(options[0])})
+                    action = None ; options = []  # noqa
                 if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
                 elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
                 elif arg == Argv.STRINGS: action = Argv._Arg.set_strings  # noqa
@@ -272,7 +275,9 @@ class Argv:
                 else:
                     action = None
                 if action and options:
-                    definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+                    definitions.append({"action": action, "options": options,
+                                        "name": self._property_name_from_option(options[0])})
+                    action = None ; options = []  # noqa
             elif isinstance(arg, str) and (arg := arg.strip()):
                 if not options:
                     if arg.startswith(Argv._OPTION_PREFIX):
@@ -287,7 +292,9 @@ class Argv:
         if options:
             if not action:
                 action = Argv._Arg.set_boolean
-            definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
+            definitions.append({"action": action, "options": options,
+                                "name": self._property_name_from_option(options[0])})
+            action = None ; options = []  # noqa
         return definitions, property_names
 
     def _find_property_name(self, *values) -> Optional[str]:
