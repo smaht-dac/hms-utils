@@ -154,7 +154,7 @@ class Argv:
             return self._options
 
         @options.setter
-        def options(value: Union[List[Argv._Option], Argv._Option]) -> None:
+        def options(self, value: Union[List[Argv._Option], Argv._Option]) -> None:
             value = value if isinstance(value, list) else value
             self._options = [item for item in value if isinstance(item, Argv._Option)]
 
@@ -163,7 +163,7 @@ class Argv:
             return self._default_property_names
 
         @default_property_names.setter
-        def default_property_names(value: Union[List[Argv._Option], Argv._Option]) -> None:
+        def default_property_names(self, value: Union[List[Argv._Option], Argv._Option]) -> None:
             value = value if isinstance(value, list) else value
             self._default_property_names = [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
@@ -172,7 +172,7 @@ class Argv:
             return self._defaults_property_name
 
         @defaults_property_name.setter
-        def defaults_property_name(value: str) -> None:
+        def defaults_property_name(self, value: str) -> None:
             self._defaults_property_name = value if isinstance(value, str) and (value := value.strip()) else ""
 
     class _Option:  # TODO: IN PROGRESS
@@ -185,7 +185,7 @@ class Argv:
             return self._options
 
         @options.setter
-        def options(options: Union[List[str], str]) -> None:
+        def options(self, options: Union[List[str], str]) -> None:
             options = (options if isinstance(options, list)
                        else ([options] if isinstance(options, str) and (options := options.strip()) else []))
             self._options = [item for item in options if isinstance(item, str)]
@@ -195,7 +195,7 @@ class Argv:
             return self._action
 
         @action.setter
-        def action(action: Callable) -> None:
+        def action(self, action: Callable) -> None:
             self._action = action if callable(action) else lambda: None
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
@@ -343,12 +343,13 @@ class Argv:
         args = flatten(args)
         definitions = [] ; property_names = [] ; default_property_names = [] ; defaults_property_name = None  # noqa
         action = None ; options = []  # noqa
-        # option_definitions = Argv._OptionDefinitions()  # TODO: IN PROGRESS
+        option_definitions = Argv._OptionDefinitions()  # TODO: IN PROGRESS
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
                     if action == Argv.DEFAULT:
                         default_property_names.extend(options)
+                        option_definitions.default_property_names = options
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
