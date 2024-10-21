@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 from uuid import uuid4 as uuid
 from hms_utils.type_utils import to_float, to_integer
 
@@ -8,6 +8,8 @@ from hms_utils.type_utils import to_float, to_integer
 class Argv:
 
     BOOLEAN = uuid()
+    DEFAULT = uuid()
+    DEFAULTS = uuid()
     FLOAT = uuid()
     FLOATS = uuid()
     INTEGER = uuid()
@@ -20,7 +22,7 @@ class Argv:
     _FUZZY_OPTION_PREFIX_LENGTH = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
-    _TYPES = [BOOLEAN, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
+    _TYPES = [BOOLEAN, DEFAULT, DEFAULTS, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
     _UNPARSED_PROPERTY_NAME = "unparsed"
 
     class _Arg(str):
@@ -94,6 +96,12 @@ class Argv:
         def set_floats(self, *values) -> bool:
             return self._set_property_multiple(*values, to_type=to_float)
 
+        def _set_property(self, *values, property_value: Any = None) -> bool:
+            if property_name := self._find_property_name(*values):
+                setattr(self._argv._values, property_name, property_value)
+                return True
+            return False
+
         def _set_property_multiple(self, *values, to_type: Optional[Callable] = None) -> bool:
             if not callable(to_type):
                 to_type = lambda value: value if isinstance(value, str) else None  # noqa
@@ -116,12 +124,6 @@ class Argv:
                     return True
             return False
 
-        def _set_property(self, *values, property_value: Any = None) -> bool:
-            if property_name := self._find_property_name(*values):
-                setattr(self._argv._values, property_name, property_value)
-                return True
-            return False
-
         def _find_property_name(self, *values) -> Optional[str]:
             return self._argv._find_property_name(*values)
 
@@ -140,9 +142,6 @@ class Argv:
         def __init__(self, unparsed_property_name: Optional[str] = None):
             self._unparsed_property_name = unparsed_property_name
             setattr(self, unparsed_property_name, [])
-        @property  # noqa
-        def _unparsed(self) -> List[str]:
-            return getattr(self, self._unparsed_property_name)
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
@@ -164,9 +163,10 @@ class Argv:
                 argv = args[0]
             self._definitions = []
             self._property_names = []
+            self._default_property_name = None
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._definitions, self._property_names = self._process_definitions(*args)
+            self._definitions, self._property_names, self._default_property_name = self._process_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
@@ -187,6 +187,7 @@ class Argv:
             argv._delete = self._delete
             definitions = self._definitions
             property_names = self._property_names
+            default_property_name = self._default_property_name
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
@@ -194,7 +195,7 @@ class Argv:
                 return
             auxiliary_argv = None
             argv = self
-            definitions, property_names = self._process_definitions(*args)
+            definitions, property_names, default_property_name = self._process_definitions(*args)
         if definitions:
             for arg in argv:
                 parsed = False
@@ -202,6 +203,9 @@ class Argv:
                     if definition["action"](arg, definition["options"]):
                         parsed = True
                 if not parsed:
+                    if not arg.option:
+                        # TODO
+                        pass
                     getattr(argv._values, argv._unparsed_property_name).append(arg)
         for property_name in property_names:
             if not hasattr(argv._values, property_name):
@@ -211,7 +215,7 @@ class Argv:
         if report is not False:
             if not callable(printf):
                 printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-            for unparsed_arg in self._values._unparsed:
+            for unparsed_arg in getattr(self._values, self. _unparsed_property_name):
                 printf(f"Unparsed argument: {unparsed_arg}")
 
     @property
@@ -252,7 +256,7 @@ class Argv:
             return self.__next__()
         return Argv._Arg(arg, self)
 
-    def _process_definitions(self, *args) -> Optional[list]:
+    def _process_definitions(self, *args) -> Tuple[List[dict], List[str], Optional[str]]:
         def flatten(*args):
             flattened_args = []
             def flatten(*args):  # noqa
@@ -266,7 +270,8 @@ class Argv:
             flatten(args)
             return flattened_args
         args = flatten(args)
-        definitions = [] ; property_names = [] ; action = None ; options = []  # noqa
+        definitions = [] ; property_names = [] ; default_property_name = None  # noqa
+        action = None ; options = []  # noqa
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
@@ -280,6 +285,7 @@ class Argv:
                 elif arg == Argv.INTEGERS: action = Argv._Arg.set_integers  # noqa
                 elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
                 elif arg == Argv.FLOATS: action = Argv._Arg.set_floats  # noqa
+                elif arg in [Argv.DEFAULT, Argv.DEFAULTS]: action = arg  # noqa
                 else:
                     action = None
                 if action and options:
@@ -303,7 +309,7 @@ class Argv:
             definitions.append({"action": action, "options": options,
                                 "name": self._property_name_from_option(options[0])})
             action = None ; options = []  # noqa
-        return definitions, property_names
+        return definitions, property_names, default_property_name
 
     def _find_property_name(self, *values) -> Optional[str]:
         for value in values:
