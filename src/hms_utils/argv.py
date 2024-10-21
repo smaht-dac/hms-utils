@@ -206,19 +206,21 @@ class Argv:
                 for definition in definitions:
                     if definition["action"](arg, definition["options"]):
                         parsed = True
+                        break
                 if not parsed:
-                    if default_property_names and (not arg.option):
-                        if not hasattr(argv._values, default_property_names):
-                            setattr(argv._values, default_property_names, arg)
-                        elif (existing_default_property_value := getattr(argv._values, default_property_names)) is None:
-                            setattr(argv._values, default_property_names, arg)
-                        elif isinstance(existing_default_property_value, list):
-                            existing_default_property_value.append(arg)
-                        else:
-                            setattr(argv._values, default_property_names, [existing_default_property_value, arg])
-                    elif defaults_property_name and (not arg.option):
-                        pass
-                    getattr(argv._values, argv._unparsed_property_name).append(arg)
+                    if not arg.option:
+                        if default_property_names:
+                            for default_property_name in default_property_names:
+                                # import pdb ; pdb.set_trace()  # noqa
+                                pass
+                        if defaults_property_name:
+                            if not hasattr(argv._values, defaults_property_name):
+                                setattr(argv._values, defaults_property_name, [arg])
+                            else:
+                                getattr(argv._values, defaults_property_name).append(arg)
+                            parsed = True
+                    if not parsed:
+                        getattr(argv._values, argv._unparsed_property_name).append(arg)
         for property_name in property_names:
             if not hasattr(argv._values, property_name):
                 setattr(argv._values, property_name, None)
