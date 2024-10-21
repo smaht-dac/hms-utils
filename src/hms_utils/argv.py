@@ -142,6 +142,16 @@ class Argv:
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
                  unparsed_property_name: Optional[str] = None) -> None:
+        self._argi = 0
+        self._fuzzy = fuzzy is not False
+        self._strip = strip is not False
+        self._escape = escape is not False
+        self._escaping = False
+        self._delete = delete is True
+        self._unparsed_property_name = (unparsed_property_name if (isinstance(unparsed_property_name, str) and
+                                                                   unparsed_property_name)
+                                        else Argv._UNPARSED_PROPERTY_NAME)
+        self._values = Argv._Values(unparsed_property_name=self._unparsed_property_name)
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
@@ -151,17 +161,7 @@ class Argv:
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
             self._definitions, self._property_names = self._process_definitions(*args)
-        self._unparsed_property_name = (unparsed_property_name if (isinstance(unparsed_property_name, str) and
-                                                                   unparsed_property_name)
-                                        else Argv._UNPARSED_PROPERTY_NAME)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
-        self._argi = 0
-        self._values = Argv._Values(unparsed_property_name=self._unparsed_property_name)
-        self._fuzzy = fuzzy is not False
-        self._strip = strip is not False
-        self._escape = escape is not False
-        self._escaping = False
-        self._delete = delete is True
 
     def parse(self, *args) -> None:
         return self.process(*args)
@@ -199,6 +199,9 @@ class Argv:
                         parsed = True
                 if not parsed:
                     getattr(argv._values, argv._unparsed_property_name).append(arg)
+        for property_name in property_names:
+            if not hasattr(argv._values, property_name):
+                setattr(argv._values, property_name, None)
         if auxiliary_argv:
             self._values = auxiliary_argv.values
 
@@ -240,8 +243,7 @@ class Argv:
             return self.__next__()
         return Argv._Arg(arg, self)
 
-    @staticmethod
-    def _process_definitions(*args) -> Optional[list]:
+    def _process_definitions(self, *args) -> Optional[list]:
         def flatten(*args):
             flattened_args = []
             def flatten(*args):  # noqa
@@ -275,7 +277,7 @@ class Argv:
                 if not options:
                     if arg.startswith(Argv._OPTION_PREFIX):
                         property_name = arg[Argv._OPTION_PREFIX_LENGTH:]
-                    elif args._fuzzy and arg.startswith(Argv._FUZZY_OPTION_PREFIX):
+                    elif self._fuzzy and arg.startswith(Argv._FUZZY_OPTION_PREFIX):
                         property_name = arg[Argv._FUZZY_OPTION_PREFIX_LENGTH:]
                     else:
                         property_name = arg
