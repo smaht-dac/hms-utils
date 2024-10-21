@@ -1,18 +1,19 @@
 from __future__ import annotations
 import sys
 from typing import Any, Callable, List, Optional
+from uuid import uuid4 as uuid
 from hms_utils.type_utils import to_float, to_integer
 
 
 class Argv:
 
-    BOOLEAN = 1
-    FLOAT = 2
-    FLOATS = 3
-    INTEGER = 4
-    INTEGERS = 5
-    STRING = 6
-    STRINGS = 7
+    BOOLEAN = uuid()
+    FLOAT = uuid()
+    FLOATS = uuid()
+    INTEGER = uuid()
+    INTEGERS = uuid()
+    STRING = uuid()
+    STRINGS = uuid()
 
     _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
