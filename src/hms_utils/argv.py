@@ -158,6 +158,10 @@ class Argv:
             value = value if isinstance(value, list) else value
             self._options = [item for item in value if isinstance(item, Argv._Option)]
 
+        def define_option(self, value: Argv._Option) -> None:
+            if isinstance(value, Argv._Option):
+                self._options.append(value)
+
         @property
         def default_property_names(self) -> List[str]:
             return self._default_property_names
@@ -352,9 +356,11 @@ class Argv:
                         option_definitions.default_property_names = options
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
+                        option_definitions.defaults_property_name = options[0]
                     else:
                         definitions.append({"action": action, "options": options,
                                             "name": self._property_name_from_option(options[0])})
+                        option_definitions.define_option(Argv._Option(options=options, action=action))
                     action = None ; options = []  # noqa
                 if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
                 elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
