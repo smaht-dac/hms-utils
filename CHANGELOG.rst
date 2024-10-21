@@ -2,6 +2,11 @@
 hms-utils : CHANGE LOG
 ======================
 
+1.4.0
+=====
+* 2024-10-21/dmichaels
+  Added argv.py
+
 1.3.0
 =====
 * 2024-10-18/dmichaels

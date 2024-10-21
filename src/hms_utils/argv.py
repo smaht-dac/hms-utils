@@ -284,7 +284,9 @@ class Argv:
                     if property_name not in property_names:
                         property_names.append(property_name)
                 options.append(arg)
-        if action and options:
+        if options:
+            if not action:
+                action = Argv._Arg.set_boolean
             definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
         return definitions, property_names
 
