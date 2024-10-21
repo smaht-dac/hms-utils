@@ -311,5 +311,6 @@ class Argv:
                 return self._property_name_ize(value)
         return None
 
-    def _property_name_ize(self, value: str) -> Optional[str]:
+    @staticmethod
+    def _property_name_ize(value: str) -> Optional[str]:
         return value.replace("-", "_") if isinstance(value, str) else None
