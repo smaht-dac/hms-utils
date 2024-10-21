@@ -292,7 +292,7 @@ class Argv:
             if arg in Argv._TYPES:
                 if action and options:
                     if action == Argv.DEFAULT:
-                        default_property_names = options
+                        default_property_names.extend(options)
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
@@ -311,7 +311,7 @@ class Argv:
                     action = None
                 if action and options:
                     if action == Argv.DEFAULT:
-                        default_property_names = options
+                        default_property_names.extend(options)
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
@@ -333,7 +333,7 @@ class Argv:
             if not action:
                 action = Argv._Arg.set_boolean
             if action == Argv.DEFAULT:
-                default_property_names = options
+                default_property_names.extend(options)
             elif action == Argv.DEFAULTS:
                 defaults_property_name = options[0]
             else:
