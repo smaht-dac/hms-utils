@@ -163,11 +163,11 @@ class Argv:
                 argv = args[0]
             self._definitions = []
             self._property_names = []
-            self._default_property_name = None
+            self._default_property_names = []
             self._defaults_property_name = None
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._definitions, self._property_names, self._default_property_name, self._defaults_property_name = \
+            self._definitions, self._property_names, self._default_property_names, self._defaults_property_name = \
                 self._process_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
@@ -189,7 +189,7 @@ class Argv:
             argv._delete = self._delete
             definitions = self._definitions
             property_names = self._property_names
-            default_property_name = self._default_property_name
+            default_property_names = self._default_property_names
             defaults_property_name = self._defaults_property_name
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
@@ -198,7 +198,7 @@ class Argv:
                 return
             auxiliary_argv = None
             argv = self
-            definitions, property_names, default_property_name, defaults_property_name = \
+            definitions, property_names, default_property_names, defaults_property_name = \
                 self._process_definitions(*args)
         if definitions:
             for arg in argv:
@@ -207,17 +207,16 @@ class Argv:
                     if definition["action"](arg, definition["options"]):
                         parsed = True
                 if not parsed:
-                    if default_property_name and (not arg.option):
-                        if not hasattr(argv._values, default_property_name):
-                            setattr(argv._values, default_property_name, arg)
-                        elif (existing_default_property_value := getattr(argv._values, default_property_name)) is None:
-                            setattr(argv._values, default_property_name, arg)
+                    if default_property_names and (not arg.option):
+                        if not hasattr(argv._values, default_property_names):
+                            setattr(argv._values, default_property_names, arg)
+                        elif (existing_default_property_value := getattr(argv._values, default_property_names)) is None:
+                            setattr(argv._values, default_property_names, arg)
                         elif isinstance(existing_default_property_value, list):
                             existing_default_property_value.append(arg)
                         else:
-                            setattr(argv._values, default_property_name, [existing_default_property_value, arg])
-                        # TODO
-                        # import pdb ; pdb.set_trace()  # noqa
+                            setattr(argv._values, default_property_names, [existing_default_property_value, arg])
+                    elif defaults_property_name and (not arg.option):
                         pass
                     getattr(argv._values, argv._unparsed_property_name).append(arg)
         for property_name in property_names:
@@ -283,13 +282,13 @@ class Argv:
             flatten(args)
             return flattened_args
         args = flatten(args)
-        definitions = [] ; property_names = [] ; default_property_name = None ; defaults_property_name = None  # noqa
+        definitions = [] ; property_names = [] ; default_property_names = [] ; defaults_property_name = None  # noqa
         action = None ; options = []  # noqa
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
                     if action == Argv.DEFAULT:
-                        default_property_name = options[0]
+                        default_property_names = options
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
@@ -308,7 +307,7 @@ class Argv:
                     action = None
                 if action and options:
                     if action == Argv.DEFAULT:
-                        default_property_name = options[0]
+                        default_property_names = options
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
@@ -330,14 +329,14 @@ class Argv:
             if not action:
                 action = Argv._Arg.set_boolean
             if action == Argv.DEFAULT:
-                default_property_name = options[0]
+                default_property_names = options
             elif action == Argv.DEFAULTS:
                 defaults_property_name = options[0]
             else:
                 definitions.append({"action": action, "options": options,
                                     "name": self._property_name_from_option(options[0])})
             action = None ; options = []  # noqa
-        return definitions, property_names, default_property_name, defaults_property_name
+        return definitions, property_names, default_property_names, defaults_property_name
 
     def _find_property_name(self, *values) -> Optional[str]:
         for value in values:

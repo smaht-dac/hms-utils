@@ -7,12 +7,12 @@ def test_argv_a():
                 {"action": Argv._Arg.set_boolean, "options": ["--ghi"], "name": "ghi"}]
 
     definitions = [Argv.STRING, "--abc", "-def", Argv.BOOLEAN, "--ghi"]
-    definitions, property_names, default_property_name, defaults_property_name = \
+    definitions, property_names, default_property_names, defaults_property_name = \
         Argv()._process_definitions(definitions)
     assert definitions == expected
 
     definitions = ["--abc", "-def", Argv.STRING, "--ghi", Argv.BOOLEAN]
-    definitions, property_names, default_property_name, defaults_property_name = \
+    definitions, property_names, default_property_names, defaults_property_name = \
         Argv()._process_definitions(definitions)
     assert definitions == expected
 
