@@ -147,9 +147,10 @@ class Argv:
             if not (isinstance(argv, list) and argv):
                 argv = args[0]
             self._definitions = []
+            self._property_names = []
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._definitions = self._process_definitions(*args)
+            self._definitions, self._property_names = self._process_definitions(*args)
         self._unparsed_property_name = (unparsed_property_name if (isinstance(unparsed_property_name, str) and
                                                                    unparsed_property_name)
                                         else Argv._UNPARSED_PROPERTY_NAME)
@@ -179,6 +180,7 @@ class Argv:
             argv._escape = self._escape
             argv._delete = self._delete
             definitions = self._definitions
+            property_names = self._property_names
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
@@ -186,7 +188,7 @@ class Argv:
                 return
             auxiliary_argv = None
             argv = self
-            definitions = self._process_definitions(*args)
+            definitions, property_names = self._process_definitions(*args)
         if definitions:
             for arg in argv:
                 parsed = False
@@ -253,7 +255,7 @@ class Argv:
             flatten(args)
             return flattened_args
         args = flatten(args)
-        definitions = [] ; action = None ; options = []  # noqa
+        definitions = [] ; property_names = [] ; action = None ; options = []  # noqa
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
@@ -270,10 +272,19 @@ class Argv:
                 if action and options:
                     definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
             elif isinstance(arg, str) and (arg := arg.strip()):
+                if not options:
+                    if arg.startswith(Argv._OPTION_PREFIX):
+                        property_name = arg[Argv._OPTION_PREFIX_LENGTH:]
+                    elif args._fuzzy and arg.startswith(Argv._FUZZY_OPTION_PREFIX):
+                        property_name = arg[Argv._FUZZY_OPTION_PREFIX_LENGTH:]
+                    else:
+                        property_name = arg
+                    if property_name not in property_names:
+                        property_names.append(property_name)
                 options.append(arg)
         if action and options:
             definitions.append({"action": action, "options": options}) ; action = None ; options = [] # noqa
-        return definitions
+        return definitions, property_names
 
     def _find_property_name(self, *values) -> Optional[str]:
         for value in values:

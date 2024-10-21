@@ -7,10 +7,12 @@ def test_argv_a():
                 {"action": Argv._Arg.set_boolean, "options": ["--ghi"]}]
 
     definitions = [Argv.STRING, "--abc", "-def", Argv.BOOLEAN, "--ghi"]
-    assert Argv._process_definitions(definitions) == expected
+    definitions, property_names = Argv._process_definitions(definitions)
+    assert definitions == expected
 
     definitions = ["--abc", "-def", Argv.STRING, "--ghi", Argv.BOOLEAN]
-    assert Argv._process_definitions(definitions) == expected
+    definitions, property_names = Argv._process_definitions(definitions)
+    assert definitions == expected
 
 
 def test_argv_b():
