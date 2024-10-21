@@ -8,12 +8,12 @@ def test_argv_a():
 
     definitions = [Argv.STRING, "--abc", "-def", Argv.BOOLEAN, "--ghi"]
     definitions, property_names, default_property_names, defaults_property_name = \
-        Argv()._process_definitions(definitions)
+        Argv()._process_option_definitions(definitions)
     assert definitions == expected
 
     definitions = ["--abc", "-def", Argv.STRING, "--ghi", Argv.BOOLEAN]
     definitions, property_names, default_property_names, defaults_property_name = \
-        Argv()._process_definitions(definitions)
+        Argv()._process_option_definitions(definitions)
     assert definitions == expected
 
 
