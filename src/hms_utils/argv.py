@@ -138,7 +138,11 @@ class Argv:
 
     class _Values:
         def __init__(self, unparsed_property_name: Optional[str] = None):
+            self._unparsed_property_name = unparsed_property_name
             setattr(self, unparsed_property_name, [])
+        @property  # noqa
+        def _unparsed(self) -> List[str]:
+            return getattr(self, self._unparsed_property_name)
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
@@ -165,10 +169,10 @@ class Argv:
             self._definitions, self._property_names = self._process_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
-    def parse(self, *args) -> None:
-        return self.process(*args)
+    def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
+        return self.process(*args, report=report, printf=printf)
 
-    def process(self, *args) -> None:
+    def process(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse;
             # and this Argv object already should have the definitions for processing/parsing these.
@@ -204,6 +208,11 @@ class Argv:
                 setattr(argv._values, property_name, None)
         if auxiliary_argv:
             self._values = auxiliary_argv.values
+        if report is not False:
+            if not callable(printf):
+                printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
+            for unparsed_arg in self._values._unparsed:
+                printf(f"Unparsed argument: {unparsed_arg}")
 
     @property
     def list(self) -> List[str]:
