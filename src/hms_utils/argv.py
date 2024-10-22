@@ -1,21 +1,26 @@
 from __future__ import annotations
 import sys
 from typing import Any, Callable, List, Optional, Union
-from uuid import uuid4 as uuid
 from hms_utils.type_utils import to_float, to_integer
 
 
 class Argv:
 
-    BOOLEAN = uuid()
-    DEFAULT = uuid()
-    DEFAULTS = uuid()
-    FLOAT = uuid()
-    FLOATS = uuid()
-    INTEGER = uuid()
-    INTEGERS = uuid()
-    STRING = uuid()
-    STRINGS = uuid()
+    class _TYPE:
+        def __init__(self, action: Union[str, Callable], required: bool = False) -> None:
+            self._action = action if isinstance(action, (str, Callable)) else None
+            self._required = required is True
+
+    BOOLEAN = 0x0001
+    DEFAULT = 0x0002
+    DEFAULTS = 0x0004
+    FLOAT = 0x0008
+    FLOATS = 0x0010
+    INTEGER = 0x0020
+    INTEGERS = 0x0040
+    STRING = 0x0080
+    STRINGS = 0x0100
+    REQUIRED = 0x1000
 
     _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
@@ -340,11 +345,28 @@ class Argv:
             flattened_args = []
             def flatten(*args):  # noqa
                 nonlocal flattened_args
-                for arg in args:
+                # for arg in args:
+                for argi in range(len(args)):
+                    arg = args[argi]
                     if isinstance(arg, (list, tuple)):
-                        for item in arg:
+                        # for item in arg:
+                        for iitem in range(len(arg)):
+                            item = arg[iitem]
+                            if isinstance(item, int):
+                                # import pdb ; pdb.set_trace()  # noqa
+                                if (iitem + 1) < len(arg):
+                                    next_item = arg[iitem + 1]
+                                    if isinstance(next_item, tuple):
+                                        # item |= Argv.REQUIRED
+                                        # required = True
+                                        pass
                             flatten(item)
                     else:
+                        if isinstance(arg, int):
+                            print(args)
+                            print(arg)
+                            # import pdb ; pdb.set_trace()  # noqa
+                            pass
                         flattened_args.append(arg)
             flatten(args)
             return flattened_args
