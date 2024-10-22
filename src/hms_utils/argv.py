@@ -144,7 +144,7 @@ class Argv:
             self._unparsed_property_name = unparsed_property_name
             setattr(self, unparsed_property_name, [])
 
-    class _OptionDefinitions:  # TODO: IN PROGRESS
+    class _OptionDefinitions:
         def __init__(self) -> None:
             self._options = []
             self._option_property_names = []
@@ -185,7 +185,7 @@ class Argv:
         def defaults_property_name(self, value: str) -> None:
             self._defaults_property_name = value if isinstance(value, str) and (value := value.strip()) else ""
 
-    class _OptionDefinition:  # TODO: IN PROGRESS
+    class _OptionDefinition:
         def __init__(self, options: Union[List[str], str], action: Callable) -> None:
             self._options = options
             self._action = action
@@ -334,6 +334,7 @@ class Argv:
         return Argv._Arg(arg, self)
 
     def _process_option_definitions(self, *args) -> None:
+
         def flatten(*args):
             flattened_args = []
             def flatten(*args):  # noqa
@@ -346,12 +347,22 @@ class Argv:
                         flattened_args.append(arg)
             flatten(args)
             return flattened_args
+
+        def add_option_definition(options: List[str], action: str) -> None:
+            nonlocal self
+            if action == Argv.DEFAULT:
+                self._option_definitions.add_default_property_names(options)
+            elif action == Argv.DEFAULTS:
+                self._option_definitions.defaults_property_name = options[0]
+            else:
+                self._option_definitions.add_option(Argv._OptionDefinition(options=options, action=action))
+
         args = flatten(args)
         action = None ; options = []  # noqa
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
-                    self._add_option_definition(options, action)
+                    add_option_definition(options, action)
                     action = None ; options = []  # noqa
                 if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
                 elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
@@ -364,7 +375,7 @@ class Argv:
                 else:
                     action = None
                 if action and options:
-                    self._add_option_definition(options, action)
+                    add_option_definition(options, action)
                     action = None ; options = []  # noqa
             elif isinstance(arg, str) and (arg := arg.strip()):
                 if not options:
@@ -379,16 +390,8 @@ class Argv:
         if options:
             if not action:
                 action = Argv._Arg.set_boolean
-            self._add_option_definition(options, action)
+            add_option_definition(options, action)
             action = None ; options = []  # noqa
-
-    def _add_option_definition(self, options: List[str], action: str) -> None:
-        if action == Argv.DEFAULT:
-            self._option_definitions.add_default_property_names(options)
-        elif action == Argv.DEFAULTS:
-            self._option_definitions.defaults_property_name = options[0]
-        else:
-            self._option_definitions.add_option(Argv._OptionDefinition(options=options, action=action))
 
     def _find_property_name(self, *values) -> Optional[str]:
         for value in values:
