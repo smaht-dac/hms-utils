@@ -186,9 +186,10 @@ class Argv:
             self._defaults_property_name = value if isinstance(value, str) and (value := value.strip()) else ""
 
     class _OptionDefinition:
-        def __init__(self, options: Union[List[str], str], action: Callable) -> None:
+        def __init__(self, options: Union[List[str], str], action: Callable, required: bool = False) -> None:
             self._options = options
             self._action = action
+            self._required = required is True
 
         @property
         def options(self) -> List[str]:
@@ -348,13 +349,13 @@ class Argv:
             flatten(args)
             return flattened_args
 
-        def add_option_definition(options: List[str], action: str) -> None:
+        def add_option_definition(options: List[str], action: Union[str, Callable]) -> None:
             nonlocal self
             if action == Argv.DEFAULT:
                 self._option_definitions.add_default_property_names(options)
             elif action == Argv.DEFAULTS:
                 self._option_definitions.defaults_property_name = options[0]
-            else:
+            elif callable(action):
                 self._option_definitions.add_option(Argv._OptionDefinition(options=options, action=action))
 
         args = flatten(args)
