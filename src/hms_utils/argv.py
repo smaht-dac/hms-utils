@@ -71,7 +71,8 @@ class Argv:
                         return True
             return False
 
-        def set_strings(self, *values, is_type: Optional[Callable] = None) -> bool:
+        # def set_strings(self, *values, is_type: Optional[Callable] = None) -> bool:
+        def set_strings(self, *values) -> bool:
             return self._set_property_multiple(*values)
 
         def set_integer(self, *values) -> bool:
@@ -146,6 +147,7 @@ class Argv:
     class _OptionDefinitions:  # TODO: IN PROGRESS
         def __init__(self) -> None:
             self._options = []
+            self._option_property_names = []
             self._default_property_names = []
             self._defaults_property_name = ""
 
@@ -156,6 +158,15 @@ class Argv:
         def add_option(self, value: Argv._OptionDefinition) -> None:
             if isinstance(value, Argv._OptionDefinition):
                 self._options.append(value)
+
+        @property
+        def option_property_names(self) -> List[str]:
+            return self._option_property_names
+
+        def add_option_property_name(self, property_name: str) -> None:
+            if isinstance(property_name, str) and (property_name := property_name.strip()):
+                if (property_name := property_name.replace("-", "_")) not in self._option_property_names:
+                    self._option_property_names.append(property_name)
 
         @property
         def default_property_names(self) -> List[str]:
@@ -197,6 +208,9 @@ class Argv:
         def action(self, action: Callable) -> None:
             self._action = action if callable(action) else lambda: None
 
+        def call_action(self, arg: Argv._Arg) -> bool:
+            return self._action(arg, self._options)
+
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
                  unparsed_property_name: Optional[str] = None) -> None:
@@ -216,24 +230,19 @@ class Argv:
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
                 argv = args[0]
-            self._definitions = []
-            self._property_names = []
-            self._default_property_names = []
-            self._defaults_property_name = None
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._definitions, self._property_names, self._default_property_names, self._defaults_property_name = \
-                self._process_option_definitions(*args)
+            self._process_option_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
-        return self.process(*args, report=report, printf=printf)
+        return self._process(*args, report=report, printf=printf)
 
-    def process(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
+    def _process(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse;
             # and this Argv object already should have the definitions for processing/parsing these.
-            if not self._definitions:
+            if not self._option_definitions:
                 return
             argv = auxiliary_argv = Argv(unparsed_property_name=self._unparsed_property_name)
             argv._argv = args[0]
@@ -242,10 +251,7 @@ class Argv:
             argv._strip = self._strip
             argv._escape = self._escape
             argv._delete = self._delete
-            definitions = self._definitions
-            property_names = self._property_names
-            default_property_names = self._default_property_names
-            defaults_property_name = self._defaults_property_name
+            option_definitions = self._option_definitions
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
@@ -253,32 +259,32 @@ class Argv:
                 return
             auxiliary_argv = None
             argv = self
-            definitions, property_names, default_property_names, defaults_property_name = \
-                self._process_option_definitions(*args)
-        if definitions:
+            self._process_option_definitions(*args)
+            option_definitions = self._option_definitions
+        if option_definitions:
             for arg in argv:
                 parsed = False
-                for definition in definitions:
-                    if definition["action"](arg, definition["options"]):
+                for option in option_definitions._options:
+                    if option.call_action(arg):
                         parsed = True
                         break
                 if not parsed:
                     if not arg.option:
-                        if default_property_names:
-                            for default_property_name in default_property_names:
+                        if option_definitions.default_property_names:
+                            for default_property_name in option_definitions.default_property_names:
                                 if not hasattr(argv._values, default_property_name):
                                     setattr(argv._values, default_property_name, arg)
                                     parsed = True
                                     break
-                        if (not parsed) and defaults_property_name:
-                            if not hasattr(argv._values, defaults_property_name):
-                                setattr(argv._values, defaults_property_name, [arg])
+                        if (not parsed) and option_definitions.defaults_property_name:
+                            if not hasattr(argv._values, option_definitions.defaults_property_name):
+                                setattr(argv._values, option_definitions.defaults_property_name, [arg])
                             else:
-                                getattr(argv._values, defaults_property_name).append(arg)
+                                getattr(argv._values, option_definitions.defaults_property_name).append(arg)
                             parsed = True
                     if not parsed:
                         getattr(argv._values, argv._unparsed_property_name).append(arg)
-        for property_name in property_names:
+        for property_name in option_definitions.option_property_names:
             if not hasattr(argv._values, property_name):
                 setattr(argv._values, property_name, None)
         if auxiliary_argv:
@@ -346,14 +352,15 @@ class Argv:
         for arg in args:
             if arg in Argv._TYPES:
                 if action and options:
+                    # import pdb ; pdb.set_trace()  # noqa
+                    pass
                     self._add_option_definition(options, action)
                     if action == Argv.DEFAULT:
                         default_property_names.extend(options)
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
-                        definitions.append({"action": action, "options": options,
-                                            "name": self._property_name_from_option(options[0])})
+                        definitions.append({"action": action, "options": options})
                     action = None ; options = []  # noqa
                 if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
                 elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
@@ -372,8 +379,7 @@ class Argv:
                     elif action == Argv.DEFAULTS:
                         defaults_property_name = options[0]
                     else:
-                        definitions.append({"action": action, "options": options,
-                                            "name": self._property_name_from_option(options[0])})
+                        definitions.append({"action": action, "options": options})
                     action = None ; options = []  # noqa
             elif isinstance(arg, str) and (arg := arg.strip()):
                 if not options:
@@ -383,6 +389,7 @@ class Argv:
                         property_name = arg[Argv._FUZZY_OPTION_PREFIX_LENGTH:]
                     else:
                         property_name = arg
+                    self._option_definitions.add_option_property_name(property_name)
                     if property_name not in property_names:
                         property_names.append(property_name)
                 options.append(arg)
@@ -395,12 +402,11 @@ class Argv:
             elif action == Argv.DEFAULTS:
                 defaults_property_name = options[0]
             else:
-                definitions.append({"action": action, "options": options,
-                                    "name": self._property_name_from_option(options[0])})
+                definitions.append({"action": action, "options": options})
             action = None ; options = []  # noqa
         return definitions, property_names, default_property_names, defaults_property_name
 
-    def _add_option_definition(self, options: List[str], action: str) -> None:  # noqa
+    def _add_option_definition(self, options: List[str], action: str) -> None:
         if action == Argv.DEFAULT:
             self._option_definitions.add_default_property_names(options)
         elif action == Argv.DEFAULTS:
@@ -440,3 +446,79 @@ class Argv:
                   (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
                 return True
         return False
+
+
+if False:
+    # args = Argv(
+    #     [Argv.STRINGS, "--config", "--conf"],
+    #     [Argv.STRING, "--config", "--conf"],
+    #     [Argv.INTEGERS, "--count"],
+    #     [Argv.FLOATS, "--kay"]
+    # )
+    args = Argv(
+        Argv.STRINGS, "--config", "--conf",
+        Argv.STRING, "--config", "--conf",
+        Argv.INTEGERS, "--count",
+        Argv.FLOATS, "--kay",
+        Argv.STRING, "--foo",
+        Argv.STRING, "goo",
+        Argv.STRING, "--import-file",
+        # Argv.DEFAULT, "defaultt",
+        unparsed_property_name="foobar"
+    )
+    args.parse(["--config", "abc", "ghi", "-xyz", "--config", "foo", "--import-file", "secrets.json",
+                "-count", "123", "456", "-kay", "321", "2342.234", "-123", "somefile.json", "asdfasfd"])
+
+    print(args.values.config)
+    print(args.values.count)
+    print(args.values.kay)
+    print('--')
+    print(args.values.foo)
+    print(args.values.goo)
+    print(args.values.import_file)
+    print(args.values.foobar)
+
+    print('-------------------------------------------------------------------------')
+
+if True:
+    argv = Argv(
+        # Argv.DEFAULT, "files",
+        Argv.STRINGS, ["--config", "--conf"],
+        Argv.STRINGS, ["--secrets", "--secret"],
+        Argv.STRINGS, ["--merge"],
+        Argv.STRINGS, ["--includes", "--include", "--imports", "--import",
+                       "--import-config", "--import-configs", "--import-conf"],
+        Argv.STRINGS, ["--include-secrets", "--include-secret", "--import-secrets", "--import-secret"],
+        Argv.BOOLEAN, ["--list"],
+        Argv.BOOLEAN, ["--tree"],
+        Argv.BOOLEAN, ["--dump"],
+        Argv.BOOLEAN, ["--json"],
+        Argv.BOOLEAN, ["--formatted", "--format"],
+        Argv.BOOLEAN, ["--jsonf"],
+        Argv.BOOLEAN, ["--raw"],
+        Argv.BOOLEAN, ["--verbose"],
+        Argv.BOOLEAN, ["--debug"],
+        Argv.STRINGS, ["--shell", "-shell", "--script", "-script", "--scripts", "-scripts", "--command", "-command",
+                       "--commands", "-commands", "--function", "-function", "--functions", "-functions"],
+        Argv.STRING, ["--password", "--passwd"],
+        Argv.STRING, ["--exports", "--export"],
+        Argv.STRING, ["--exports-file", "--export-file"],
+        Argv.DEFAULT, "thedefault",
+        Argv.DEFAULTS, "thedefaults",
+        Argv.DEFAULT, "thedefaultb",
+        Argv.DEFAULTS, "thedefaultfoo",
+        #    Argv.DEFAULTS, "thedefaults"
+    )
+    import json
+    # print(json.dumps(argv._definitions, indent=4, default=str))
+    argv.parse(["foo", "bara", "barb", "-xyz", "goo"])
+    print('unparsed:')
+    print(argv.values.unparsed)
+    print('thedefault:')
+    print(argv.values.thedefault)
+    print('thedefaultb:')
+    print(argv.values.thedefaultb)
+    print('thedefaults:')
+    print(argv.values.thedefaults)
+    print('thedefaultfoo:')
+    print(argv.values.thedefaultfoo)
