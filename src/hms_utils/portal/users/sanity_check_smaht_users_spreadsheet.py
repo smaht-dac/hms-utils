@@ -57,11 +57,7 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
 
     for user in users:
         try:
-            try:
-                user_metadata = portal.get_metadata(f"/users/{user[PROPERTY.EMAIL]}")
-            except Exception:
-                # Try lower case.
-                user_metadata = portal.get_metadata(f"/users/{user[PROPERTY.EMAIL].lower()}")
+            user_metadata = portal.get_metadata(f"/users/{user[PROPERTY.EMAIL]}")
             user_portal = get_user_from_portal_metadata(user_metadata)
             if debug is True:
                 _debug(f"Read user from portal OK: {user[PROPERTY.EMAIL]}")
@@ -111,6 +107,7 @@ def parse_spreadsheet_row(row: object) -> List[dict]:
                 user[user_column_name] = normalize_string(spreadsheet_column_value)
             else:
                 user[user_column_name] = ""
+    user[PROPERTY.EMAIL] = user[PROPERTY.EMAIL].lower()
     user[PROPERTY.SUBMISSION_CENTERS] = map_spreadsheet_submission_centers(user[PROPERTY.SUBMISSION_CENTER])
     del user[PROPERTY.SUBMISSION_CENTER]
     if user[PROPERTY.SUBMITS_FOR].lower() in ["yes", "y", "true"]:
@@ -126,7 +123,7 @@ def parse_spreadsheet_row(row: object) -> List[dict]:
             user[PROPERTY.EMAIL] = user_emails[0]
             for user_email in user_emails[1:]:
                 user = deepcopy(user)
-                user[PROPERTY.EMAIL] = user_email
+                user[PROPERTY.EMAIL] = user_email.lower()
                 users.append(user)
     return users
 
@@ -228,10 +225,10 @@ def _error(message: str, plain: bool = False) -> None:
 users_spreadsheet = "smaht_users_spreadsheet_20241023.tsv"
 
 portal_env = "smaht-data"
-dump = True
+dump = False
 process = True
-verbose = False
-debug = True
+verbose = True
+debug = False
 
 users = read_users_from_spreadsheet(users_spreadsheet)
 
