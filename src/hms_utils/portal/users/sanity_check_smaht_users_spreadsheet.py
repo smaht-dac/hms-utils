@@ -17,6 +17,7 @@ class PROPERTY:
     SUBMISSION_CENTERS = "submission_centers"
     SUBMITS_FOR = "submits_for"
     REVOKED = "revoked"
+    STATUS = "status"
 
 
 USER_SPREADSHEET_COLUMN_MAP = {
@@ -55,6 +56,8 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
     elif not isinstance(users := file_or_users, list):
         return
 
+    users_to_add = []
+    users_to_update = []
     for user in users:
         try:
             user_metadata = portal.get_metadata(f"/users/{user[PROPERTY.EMAIL]}")
@@ -65,6 +68,7 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
                 if verbose is True:
                     _info(f"User from spreadsheet and portal are the SAME: {user[PROPERTY.EMAIL]}")
             else:
+                users_to_update.append(user)
                 _error(f"User from spreadsheet and portal are DIFFERENT:"
                        f" {user[PROPERTY.EMAIL]} {chars.dot} {user_portal['uuid']}")
                 diffs = compile_diffs(user, user_portal)
@@ -78,11 +82,13 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
         except Exception as e:
             if ("not" in str(e).lower()) and ("found" in str(e).lower()):
                 _error(f"User from spreadsheet is MISSING in portal: {user[PROPERTY.EMAIL]}")
+                users_to_add.append(user)
             else:
                 _error(f"Cannot read user from portal: {user[PROPERTY.EMAIL]}")
                 _error(str(e))
 
     print_diffs_by_kind(diffs_by_kind)
+    return users_to_add, users_to_update
 
 
 def read_users_from_spreadsheet(file: str):
@@ -91,13 +97,13 @@ def read_users_from_spreadsheet(file: str):
     data = next(iter(data.values()))
     users = []
     for item in data:
-        users_from_spreadsheet_row = parse_spreadsheet_row(item)
+        users_from_spreadsheet_row = get_user_from_spreadsheet_row(item)
         for user_from_spreadsheet_row in users_from_spreadsheet_row:
             users.append(user_from_spreadsheet_row)
     return users
 
 
-def parse_spreadsheet_row(row: object) -> List[dict]:
+def get_user_from_spreadsheet_row(row: object) -> List[dict]:
     # Returns zero or more user dictionaries for the given spreadsheet row.
     # Can return more than one if there are more than one email in the email field.
     user = {}
@@ -114,7 +120,8 @@ def parse_spreadsheet_row(row: object) -> List[dict]:
         user[PROPERTY.SUBMITS_FOR] = user[PROPERTY.SUBMISSION_CENTERS]
     else:
         user[PROPERTY.SUBMITS_FOR] = []
-    user[PROPERTY.REVOKED] = user[PROPERTY.REVOKED].lower() in ["yes", "y", "true"]
+    user[PROPERTY.STATUS] = "deleted" if (user[PROPERTY.REVOKED].lower() in ["yes", "y", "true"]) else "current"
+    del user[PROPERTY.REVOKED]
     users = [user := sort_dictionary(user)]
     if "," in user[PROPERTY.EMAIL]:
         # Handle multiple (comma-separated) emails within a single field;
@@ -125,6 +132,10 @@ def parse_spreadsheet_row(row: object) -> List[dict]:
                 user = deepcopy(user)
                 user[PROPERTY.EMAIL] = user_email.lower()
                 users.append(user)
+    if not user[PROPERTY.SUBMISSION_CENTERS]:
+        del user[PROPERTY.SUBMISSION_CENTERS]
+    if not user[PROPERTY.SUBMITS_FOR]:
+        del user[PROPERTY.SUBMITS_FOR]
     return users
 
 
@@ -150,7 +161,8 @@ def get_user_from_portal_metadata(user_metadata: dict) -> Optional[dict]:
         user[PROPERTY.EMAIL] = normalize_string(user_metadata.get("email", ""))
         user[PROPERTY.FIRST_NAME] = normalize_string(user_metadata.get("first_name", ""))
         user[PROPERTY.LAST_NAME] = normalize_string(user_metadata.get("last_name", ""))
-        user[PROPERTY.REVOKED] = user_metadata.get("status", "").lower() in ["deleted", "revoked"]
+        # user[PROPERTY.REVOKED] = user_metadata.get("status", "").lower() in ["deleted", "revoked"]
+        user[PROPERTY.STATUS] = user_metadata.get("status", "")
         user["uuid"] = user_metadata.get("uuid", "")
         if isinstance(submission_centers := user_metadata.get("submission_centers", []), list):
             user[PROPERTY.SUBMISSION_CENTERS] = \
@@ -158,6 +170,10 @@ def get_user_from_portal_metadata(user_metadata: dict) -> Optional[dict]:
         if isinstance(submits_for := user_metadata.get("submits_for", []), list):
             user[PROPERTY.SUBMITS_FOR] = \
                 sorted(list(set([item["identifier"] for item in submits_for if item.get("identifier")])))
+        if not user[PROPERTY.SUBMISSION_CENTERS]:
+            del user[PROPERTY.SUBMISSION_CENTERS]
+        if not user[PROPERTY.SUBMITS_FOR]:
+            del user[PROPERTY.SUBMITS_FOR]
         return sort_dictionary(user)
     return None
 
@@ -237,4 +253,13 @@ if dump:
 
 if process:
     portal = Portal(portal_env)
-    sanity_check_users_from_spreadsheet_with_portal(users, portal, verbose=verbose, debug=debug)
+    users_to_add, users_to_update = \
+        sanity_check_users_from_spreadsheet_with_portal(users, portal, verbose=verbose, debug=debug)
+
+if users_to_add:
+    print("USERS TO ADD")
+    print(json.dumps(users_to_add, indent=4))
+
+if users_to_update:
+    print("USERS TO UPDATE")
+    print(json.dumps(users_to_update, indent=4))
