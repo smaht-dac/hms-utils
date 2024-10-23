@@ -341,7 +341,7 @@ class Argv:
 
     def _process_option_definitions(self, *args) -> None:
 
-        def flatten(*args):
+        def old_flatten(*args):
             flattened_args = []
             def flatten(*args):  # noqa
                 nonlocal flattened_args
@@ -367,6 +367,19 @@ class Argv:
                             print(arg)
                             # import pdb ; pdb.set_trace()  # noqa
                             pass
+                        flattened_args.append(arg)
+            flatten(args)
+            return flattened_args
+
+        def flatten(*args):
+            flattened_args = []
+            def flatten(*args):  # noqa
+                nonlocal flattened_args
+                for arg in args:
+                    if isinstance(arg, (list, tuple)):
+                        for item in arg:
+                            flatten(item)
+                    else:
                         flattened_args.append(arg)
             flatten(args)
             return flattened_args
