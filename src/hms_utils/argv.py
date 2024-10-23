@@ -448,3 +448,81 @@ class Argv:
                   (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
                 return True
         return False
+
+# args = Argv({"foo": "bar"})
+
+
+if False:
+    # args = Argv(
+    #     [Argv.STRINGS, "--config", "--conf"],
+    #     [Argv.STRING, "--config", "--conf"],
+    #     [Argv.INTEGERS, "--count"],
+    #     [Argv.FLOATS, "--kay"]
+    # )
+    args = Argv(
+        Argv.STRINGS, "--config", "--conf",
+        Argv.STRING, "--config", "--conf",
+        Argv.INTEGERS, "--count",
+        Argv.FLOATS, "--kay",
+        Argv.STRING, "--foo",
+        Argv.STRING, "goo",
+        Argv.STRING, "--import-file",
+        # Argv.DEFAULT, "defaultt",
+        unparsed_property_name="foobar"
+    )
+    args.parse(["--config", "abc", "ghi", "-xyz", "--config", "foo", "--import-file", "secrets.json",
+                "-count", "123", "456", "-kay", "321", "2342.234", "-123", "somefile.json", "asdfasfd"])
+
+    print(args.values.config)
+    print(args.values.count)
+    print(args.values.kay)
+    print('--')
+    print(args.values.foo)
+    print(args.values.goo)
+    print(args.values.import_file)
+    print(args.values.foobar)
+
+    print('-------------------------------------------------------------------------')
+
+if True:
+    argv = Argv(
+        # Argv.DEFAULT, "files",
+        Argv.STRINGS, ("--config", "--conf"),
+        Argv.STRINGS, ("--secrets", "--secret"),
+        Argv.STRINGS, ["--merge"],
+        Argv.STRINGS, ["--includes", "--include", "--imports", "--import",
+                       "--import-config", "--import-configs", "--import-conf"],
+        Argv.STRINGS, ["--include-secrets", "--include-secret", "--import-secrets", "--import-secret"],
+        Argv.BOOLEAN, ["--list"],
+        Argv.BOOLEAN, ["--tree"],
+        Argv.BOOLEAN, ["--dump"],
+        Argv.BOOLEAN, ["--json"],
+        Argv.BOOLEAN, ["--formatted", "--format"],
+        Argv.BOOLEAN, ["--jsonf"],
+        Argv.BOOLEAN, ["--raw"],
+        Argv.BOOLEAN, ["--verbose"],
+        Argv.BOOLEAN, ["--debug"],
+        Argv.STRINGS, ["--shell", "-shell", "--script", "-script", "--scripts", "-scripts", "--command", "-command",
+                       "--commands", "-commands", "--function", "-function", "--functions", "-functions"],
+        Argv.STRING, ["--password", "--passwd"],
+        Argv.STRING, ["--exports", "--export"],
+        Argv.STRING, ["--exports-file", "--export-file"],
+        Argv.DEFAULT, "thedefault",
+        Argv.DEFAULTS, "thedefaults",
+        Argv.DEFAULT, "thedefaultb",
+        Argv.DEFAULTS, "thedefaultfoo",
+        #    Argv.DEFAULTS, "thedefaults"
+    )
+    # import json
+    # print(json.dumps(argv._definitions, indent=4, default=str))
+    argv.parse(["foo", "bara", "barb", "-xyz", "goo"])
+    print('unparsed:')
+    print(argv.values.unparsed)
+    print('thedefault:')
+    print(argv.values.thedefault)
+    print('thedefaultb:')
+    print(argv.values.thedefaultb)
+    print('thedefaults:')
+    print(argv.values.thedefaults)
+    print('thedefaultfoo:')
+    print(argv.values.thedefaultfoo)
