@@ -105,8 +105,8 @@ class Argv:
             return self._set_value_property_multiple(option, to_type=to_float)
 
         def set_string_for_default(self, default: str) -> bool:
-            if isinstance(default, str) and default and (not hasattr(self._argv._values, default)):
-                if self and (not self.option):
+            if self and (not self.option):
+                if isinstance(default, str) and default and (not hasattr(self._argv._values, default)):
                     setattr(self._argv._values, default, self)
                     # self._argv.next
                     return True
@@ -181,8 +181,6 @@ class Argv:
             self._definitions = []
             self._default_property_names = []
             self._defaults_property_names = ""
-            self._default_property_required = False
-            self._defaults_property_required = False
             self._fuzzy = fuzzy is True
 
         def define_option(self, option_type: int, options: List[str]) -> None:
