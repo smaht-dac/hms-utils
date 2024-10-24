@@ -24,7 +24,6 @@ class Argv:
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
     _TYPES = [BOOLEAN, DEFAULT, DEFAULTS, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
-    _UNPARSED_PROPERTY_NAME = "unparsed"
 
     class _Arg(str):
 
@@ -61,9 +60,9 @@ class Argv:
         def set_value_string(self, option: Argv._Option) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
             if self.is_any_of(option.options):
-                if (peek := self._argv.peek) and (not peek.is_option):
+                if (peek := self._argv._peek) and (not peek.is_option):
                     if self._set_value_property(option, property_value=peek):
-                        self._argv.next
+                        self._argv._next
                         return True
             return False
 
@@ -72,9 +71,9 @@ class Argv:
 
         def set_value_integer(self, option: Argv._Option) -> bool:
             if self.is_any_of(option.options):
-                if (peek := to_integer(self._argv.peek)) is not None:
+                if (peek := to_integer(self._argv._peek)) is not None:
                     if self._set_value_property(option, property_value=peek):
-                        self._argv.next
+                        self._argv._next
                         return True
             return False
 
@@ -83,9 +82,9 @@ class Argv:
 
         def set_value_float(self, option: Argv._Option) -> bool:
             if self.is_any_of(option.options):
-                if (peek := to_float(self._argv.peek)) is not None:
+                if (peek := to_float(self._argv._peek)) is not None:
                     if self._set_value_property(option, property_value=peek):
-                        self._argv.next
+                        self._argv._next
                         return True
             return False
 
@@ -114,8 +113,8 @@ class Argv:
                             option_values = []
                             setattr(self._argv._values, option, option_values)
                         option_values.append(peek)
-                        self._argv.next
-                        peek = self._argv.peek
+                        self._argv._next
+                        peek = self._argv._peek
                         parsed = True
                     else:
                         break
@@ -143,11 +142,11 @@ class Argv:
                             property_values.append(existing_property_value)
                     setattr(self._argv._values, property_name, property_values)
                     while True:
-                        if not ((peek := self._argv.peek) and
+                        if not ((peek := self._argv._peek) and
                                 (not peek.is_option) and ((peek := to_type(peek)) is not None)):
                             break
                         property_values.append(peek)
-                        self._argv.next
+                        self._argv._next
                     return True
             return False
 
@@ -160,9 +159,8 @@ class Argv:
             return self.empty
 
     class _Values:
-        def __init__(self, unparsed_property_name: Optional[str] = None):
-            self._unparsed_property_name = unparsed_property_name
-            setattr(self, unparsed_property_name, [])
+        def __init__(self) -> None:
+            pass
 
     class _OptionDefinitions:
         def __init__(self, fuzzy: bool = False) -> None:
@@ -222,19 +220,14 @@ class Argv:
             return ""
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
-                 strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
-                 unparsed_property_name: Optional[str] = None) -> None:
+                 strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
         self._argi = 0
         self._fuzzy = fuzzy is not False
         self._strip = strip is not False
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
-        self._unparsed_property_name = (unparsed_property_name
-                                        if (isinstance(unparsed_property_name, str) and
-                                            unparsed_property_name)
-                                        else Argv._UNPARSED_PROPERTY_NAME)
-        self._values = Argv._Values(unparsed_property_name=self._unparsed_property_name)
+        self._values = Argv._Values()
         self._option_definitions = Argv._OptionDefinitions(self._fuzzy)
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
@@ -252,7 +245,7 @@ class Argv:
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._option_definitions:
                 return
-            argv = auxiliary_argv = Argv(unparsed_property_name=self._unparsed_property_name)
+            argv = auxiliary_argv = Argv()
             argv._argv = args[0]
             argv._argi = 0
             argv._fuzzy = self._fuzzy
@@ -282,7 +275,6 @@ class Argv:
                         break
                 if not parsed:
                     unparsed_options.append(arg)
-                    getattr(argv._values, argv._unparsed_property_name).append(arg)
 
         for option in option_definitions.definitions:
             if not hasattr(argv._values, property_name := option.property_name):
@@ -296,7 +288,7 @@ class Argv:
         if report is not False:
             if not callable(printf):
                 printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-            for unparsed_arg in getattr(self._values, self. _unparsed_property_name):
+            for unparsed_arg in unparsed_options:
                 printf(f"Unparsed argument: {unparsed_arg}")
 
         return missing_options, unparsed_options
@@ -310,12 +302,12 @@ class Argv:
         return self._values
 
     @property
-    def peek(self) -> Optional[str]:
+    def _peek(self) -> Optional[str]:
         return Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
 
     @property
-    def next(self) -> Optional[str]:
-        if (value := self.peek) is not None:
+    def _next(self) -> Optional[str]:
+        if (value := self._peek) is not None:
             if self._delete:
                 del self._argv[0]
             else:
@@ -456,7 +448,6 @@ if True:
         Argv.STRING, "goo",
         Argv.STRING, "--import-file",
         # Argv.DEFAULT, "defaultt",
-        unparsed_property_name="foobar"
     )
     missing, unparsed = args.parse(["--config", "abc", "ghi", "-xyz",
                                     "--config", "foo", "--import-file", "secrets.json",
@@ -470,7 +461,7 @@ if True:
     print(args.values.foo)
     print(args.values.goo)
     print(args.values.import_file)
-    print(args.values.foobar)
+    print(args.foobar)
 
     print('-------------------------------------------------------------------------')
 
@@ -512,7 +503,8 @@ if True:
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
                                     "-passwd", "--shell", "hoo", "-config", "configfile"])
     print('unparsed:')
-    print(argv.values.unparsed)
+    print(unparsed)
+    # print(argv.values.unparsed)
     print('thedefault:')
     print(argv.values.thedefault)
     print('thedefault2:')
