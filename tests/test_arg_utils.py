@@ -23,13 +23,13 @@ def test_argv_b():
     argv = Argv(["dummyt.py", "abc", "def", "--config", "file.json",
                  "--verbose", "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"])
     for arg in argv:
-        if arg.set_string("--config"):
+        if arg.set_value_string("--config"):
             continue
-        if arg.set_boolean("--debug"):
+        if arg.set_value_boolean("--debug"):
             continue
-        if arg.set_boolean("--verbose"):
+        if arg.set_value_boolean("--verbose"):
             continue
-        if arg.set_strings("--configs"):
+        if arg.set_value_strings("--configs"):
             continue
     assert argv.values.config == "file.json"
     assert argv.values.verbose is True
