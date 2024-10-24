@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple, Union
 
 primitive_type = (int, float, str, bool)
 
@@ -48,3 +48,13 @@ def at_most_one_of_bool(*booleans) -> bool:
                 return False
             ntrue += 1
     return True
+
+def to_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
+    strings = []
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if isinstance(item, str) and ((strip is False) or (item := item.strip())):
+                strings.append(item)
+    elif isinstance(value, str) and ((strip is False) or (value := value.strip())):
+        strings = [value]
+    return strings

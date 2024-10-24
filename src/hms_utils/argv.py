@@ -1,15 +1,10 @@
 from __future__ import annotations
 import sys
 from typing import Any, Callable, List, Optional, Union
-from hms_utils.type_utils import to_float, to_integer
+from hms_utils.type_utils import to_float, to_integer, to_string_list
 
 
 class Argv:
-
-    class _TYPE:
-        def __init__(self, action: Union[str, Callable], required: bool = False) -> None:
-            self._action = action if isinstance(action, (str, Callable)) else None
-            self._required = required is True
 
     BOOLEAN = 0x0001
     DEFAULT = 0x0002
@@ -215,63 +210,22 @@ class Argv:
                      required: bool = False,
                      action: Optional[Callable] = None,
                      fuzzy: bool = True) -> None:
-            if isinstance(default, str) and (default := default.strip()):
-                self._default = default.replace("-", "_")
-                self._defaults = None
-                self._options = []
-                self._required = required is True
-                self._fuzzy = False
-                self._action = Argv._Arg.set_default_value_string
-            elif isinstance(defaults, str) and (defaults := defaults.strip()):
-                self._default = default
-                self._defaults = defaults.replace("-", "_")
-                self._options = []
-                self._required = required is True
-                self._fuzzy = False
-                self._action = Argv._Arg.set_default_value_strings
-            else:
-                self._default = None
-                self._defaults = None
-                self._options = (options if isinstance(options, list)
-                                 else ([options] if isinstance(options, str) else []))
-                self._required = required is True
-                self._fuzzy = fuzzy is not True
-                self._action = action if callable(action) else lambda: None
+            self._options = to_string_list(options)
+            self._required = required is True
+            self._fuzzy = fuzzy is not True
+            self._action = action if callable(action) else lambda: None
 
         @property
         def options(self) -> List[str]:
             return self._options
 
         @property
-        def default(self) -> Optional[str]:
-            return self._default
-
-        @property
-        def defaults(self) -> Optional[str]:
-            return self._defaults
-
-        @property
         def option_name(self) -> str:
-            if self._default:
-                return self._default
-            elif self._defaults:
-                return self._defaults
-            elif self._options:
-                return self._options[0]
-            return ""
+            return self._options[0] if self._options else ""
 
         @property
         def property_name(self) -> str:
-            if self._default:
-                return self._default
-            elif self._defaults:
-                return self._defaults
-            elif self._options:
-                return self._property_namify(self._options[0]) if self._options else ""
-            return ""
-
-        def _property_namify(self, option: str) -> str:
-            if isinstance(option, str) and (option := option.strip()):
+            if self._options and (option := self._options[0]):
                 if option.startswith(Argv._OPTION_PREFIX):
                     option = option[Argv._OPTION_PREFIX_LENGTH:]
                 elif self._fuzzy and option.startswith(Argv._FUZZY_OPTION_PREFIX):
@@ -282,12 +236,6 @@ class Argv:
         @property
         def required(self) -> bool:
             return self._required
-
-        @options.setter
-        def options(self, options: Union[List[str], str]) -> None:
-            options = (options if isinstance(options, list)
-                       else ([options] if isinstance(options, str) and (options := options.strip()) else []))
-            self._options = [item for item in options if isinstance(item, str)]
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
