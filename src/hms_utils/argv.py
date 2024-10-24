@@ -40,7 +40,7 @@ class Argv:
             return value
 
         @property
-        def option(self) -> bool:
+        def is_option(self) -> bool:
             return self._argv._is_option(self)
 
         def anyof(self, *values) -> bool:
@@ -73,7 +73,7 @@ class Argv:
         def set_value_string(self, option: Argv._OptionDefinition) -> bool:
             if isinstance(option, str): option = Argv._OptionDefinition(option)  # noqa xyzzy
             if self.anyof(option.options):
-                if (peek := self._argv.peek) and (not peek.option):
+                if (peek := self._argv.peek) and (not peek.is_option):
                     if self._set_value_property(option, property_value=peek):
                         self._argv.next
                         return True
@@ -105,8 +105,8 @@ class Argv:
             return self._set_value_property_multiple(option, to_type=to_float)
 
         def set_default_value_string(self, default: str) -> bool:
-            pass
-            if self and (not self.option):
+            # import pdb ; pdb.set_trace()  # noqa
+            if self and (not self.is_option):
                 if isinstance(default, str) and default and (not hasattr(self._argv._values, default)):
                     setattr(self._argv._values, default, self)
                     # self._argv.next
@@ -122,7 +122,7 @@ class Argv:
                 else:
                     defaults_values = None
                 while True:
-                    if peek and (not peek.option):
+                    if peek and (not peek.is_option):
                         if defaults_values is None:
                             defaults_values = []
                             setattr(self._argv._values, default, defaults_values)
@@ -157,7 +157,7 @@ class Argv:
                     setattr(self._argv._values, property_name, property_values)
                     while True:
                         if not ((peek := self._argv.peek) and
-                                (not peek.option) and ((peek := to_type(peek)) is not None)):
+                                (not peek.is_option) and ((peek := to_type(peek)) is not None)):
                             break
                         property_values.append(peek)
                         self._argv.next
@@ -197,8 +197,8 @@ class Argv:
             elif option_type == Argv.INTEGERS: action = Argv._Arg.set_value_integers  # noqa
             elif option_type == Argv.FLOAT: action = Argv._Arg.set_value_float  # noqa
             elif option_type == Argv.FLOATS: action = Argv._Arg.set_value_floats  # noqa
-            #elif option_type == Argv.DEFAULT: action = Argv._Arg.set_default_value_string  # noqa
-            #elif option_type == Argv.DEFAULTS: action = Argv._Arg.set_default_value_strings  # noqa
+            # elif option_type == Argv.DEFAULT: action = Argv._Arg.set_default_value_string  # noqa
+            # elif option_type == Argv.DEFAULTS: action = Argv._Arg.set_default_value_strings  # noqa
             elif option_type == Argv.DEFAULT:
                 for default_property_name in options:
                     self._definitions.append(Argv._OptionDefinition(
@@ -387,7 +387,7 @@ class Argv:
                         parsed = True
                         break
                 if not parsed:
-                    if not arg.option:
+                    if not arg.is_option:
                         if option_definitions.default_property_names:
                             for default_property_name in option_definitions.default_property_names:
                                 if not hasattr(argv._values, default_property_name):
