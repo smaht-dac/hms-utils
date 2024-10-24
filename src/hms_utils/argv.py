@@ -356,7 +356,7 @@ class Argv:
         args = flatten(args)
         option_type = None ; options = [] ; parsing_options = None  # noqa
         for arg in args:
-            if self._is_option_type(arg):
+            if Argv._is_option_type(arg):
                 if (parsing_options is True) and option_type and options:
                     self._option_definitions.define_option(option_type, options)
                     option_type = None
