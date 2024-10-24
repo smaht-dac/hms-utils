@@ -200,23 +200,19 @@ class Argv:
             elif option_type == Argv.FLOATS: action = Argv._Arg.set_value_floats  # noqa
             elif option_type == Argv.DEFAULT:
                 for default_property_name in options:
-                    self.add_option(
-                        Argv._OptionDefinition(default=default_property_name, required=option_required))
+                    self._definitions.append(Argv._OptionDefinition(
+                        default=default_property_name, required=option_required))
             elif option_type == Argv.DEFAULTS:
                 for defaults_property_name in options:
-                    self.add_option(
-                        Argv._OptionDefinition(defaults=defaults_property_name, required=option_required))
+                    self._definitions.append(Argv._OptionDefinition(
+                        defaults=defaults_property_name, required=option_required))
             if action:
-                self.add_option(Argv._OptionDefinition(options=options, required=option_required,
-                                                       action=action, fuzzy=self._fuzzy))
+                self._definitions.append(Argv._OptionDefinition(
+                    options=options, required=option_required, action=action, fuzzy=self._fuzzy))
 
         @property
         def definitions(self) -> List[Argv._OptionDefinition]:
             return self._definitions
-
-        def add_option(self, value: Argv._OptionDefinition) -> None:
-            if isinstance(value, Argv._OptionDefinition):
-                self._definitions.append(value)
 
         @property
         def default_property_names(self) -> List[str]:
