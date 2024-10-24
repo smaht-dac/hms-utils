@@ -52,14 +52,14 @@ class Argv:
 
         def set_value_boolean(self, option: Argv._Option) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
-            if self.is_any_of(option.options):
+            if self.is_any_of(option._options):
                 if self._set_value_property(option, property_value=True):
                     return True
             return False
 
         def set_value_string(self, option: Argv._Option) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
-            if self.is_any_of(option.options):
+            if self.is_any_of(option._options):
                 if (peek := self._argv._peek) and (not peek.is_option):
                     if self._set_value_property(option, property_value=peek):
                         self._argv._next
@@ -70,7 +70,7 @@ class Argv:
             return self._set_value_property_multiple(option)
 
         def set_value_integer(self, option: Argv._Option) -> bool:
-            if self.is_any_of(option.options):
+            if self.is_any_of(option._options):
                 if (peek := to_integer(self._argv._peek)) is not None:
                     if self._set_value_property(option, property_value=peek):
                         self._argv._next
@@ -81,7 +81,7 @@ class Argv:
             return self._set_value_property_multiple(option, to_type=to_integer)
 
         def set_value_float(self, option: Argv._Option) -> bool:
-            if self.is_any_of(option.options):
+            if self.is_any_of(option._options):
                 if (peek := to_float(self._argv._peek)) is not None:
                     if self._set_value_property(option, property_value=peek):
                         self._argv._next
@@ -93,7 +93,7 @@ class Argv:
 
         def set_default_value_string(self, option: Argv._Option) -> bool:
             if self and (not self.is_option):
-                for option in option.options:
+                for option in option._options:
                     if not hasattr(self._argv._values, option):
                         setattr(self._argv._values, option, self)
                         return True
@@ -102,7 +102,7 @@ class Argv:
         def set_default_value_strings(self, option: Argv._Option) -> bool:
             parsed = False
             peek = self
-            for option in option.options:
+            for option in option._options:
                 if hasattr(self._argv._values, option):
                     option_values = getattr(self._argv._values, option)
                 else:
@@ -121,7 +121,7 @@ class Argv:
             return parsed
 
         def _set_value_property(self, option: Argv._Option, property_value: Any = None) -> bool:
-            if property_name := option.property_name:
+            if property_name := option._property_name:
                 setattr(self._argv._values, property_name, property_value)
                 return True
             return False
@@ -131,8 +131,8 @@ class Argv:
             if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
             if not callable(to_type):
                 to_type = lambda value: value if isinstance(value, str) else None  # noqa
-            if self.is_any_of(option.options):
-                if property_name := option.property_name:
+            if self.is_any_of(option._options):
+                if property_name := option._property_name:
                     property_values = []
                     if (hasattr(self._argv._values, property_name) and
                         (existing_property_value := getattr(self._argv._values, property_name))):  # noqa
@@ -150,14 +150,6 @@ class Argv:
                     return True
             return False
 
-        @property
-        def empty(self):
-            return not self
-
-        @property
-        def null(self):
-            return self.empty
-
     class _Values:
         def __init__(self) -> None:
             pass
@@ -166,29 +158,25 @@ class Argv:
         def __init__(self, fuzzy: bool = False) -> None:
             self._definitions = []
             self._fuzzy = fuzzy is True
+            self._option_type_action_map = {
+                Argv.BOOLEAN: Argv._Arg.set_value_boolean,
+                Argv.STRING: Argv._Arg.set_value_string,
+                Argv.STRINGS: Argv._Arg.set_value_strings,
+                Argv.INTEGER: Argv._Arg.set_value_integer,
+                Argv.INTEGERS: Argv._Arg.set_value_integers,
+                Argv.FLOAT: Argv._Arg.set_value_float,
+                Argv.FLOATS: Argv._Arg.set_value_floats,
+                Argv.DEFAULT: Argv._Arg.set_default_value_string,
+                Argv.DEFAULTS: Argv._Arg.set_default_value_strings
+            }
 
         def define_option(self, option_type: int, options: List[str]) -> None:
-            if not (isinstance(option_type, int) and isinstance(options, list)):
-                return
-            option_required = (option_type & Argv.REQUIRED) == Argv.REQUIRED
-            option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL)
-            action = None
-            if option_type == Argv.BOOLEAN: action = Argv._Arg.set_value_boolean  # noqa
-            elif option_type == Argv.STRING: action = Argv._Arg.set_value_string  # noqa
-            elif option_type == Argv.STRINGS: action = Argv._Arg.set_value_strings  # noqa
-            elif option_type == Argv.INTEGER: action = Argv._Arg.set_value_integer  # noqa
-            elif option_type == Argv.INTEGERS: action = Argv._Arg.set_value_integers  # noqa
-            elif option_type == Argv.FLOAT: action = Argv._Arg.set_value_float  # noqa
-            elif option_type == Argv.FLOATS: action = Argv._Arg.set_value_floats  # noqa
-            elif option_type == Argv.DEFAULT: action = Argv._Arg.set_default_value_string  # noqa
-            elif option_type == Argv.DEFAULTS: action = Argv._Arg.set_default_value_strings  # noqa
-            if action:
-                self._definitions.append(Argv._Option(
-                    options=options, required=option_required, action=action, fuzzy=self._fuzzy))
-
-        @property
-        def definitions(self) -> List[Argv._Option]:
-            return self._definitions
+            if isinstance(option_type, int) and isinstance(options, list):
+                option_required = (option_type & Argv.REQUIRED) == Argv.REQUIRED
+                option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL)
+                if action := self._option_type_action_map.get(option_type):
+                    self._definitions.append(Argv._Option(
+                        options=options, required=option_required, action=action, fuzzy=self._fuzzy))
 
     class _Option:
         def __init__(self,
@@ -202,15 +190,11 @@ class Argv:
             self._action = action if callable(action) else lambda: None
 
         @property
-        def options(self) -> List[str]:
-            return self._options
-
-        @property
-        def option_name(self) -> str:
+        def _option_name(self) -> str:
             return self._options[0] if self._options else ""
 
         @property
-        def property_name(self) -> str:
+        def _property_name(self) -> str:
             if self._options and (option := self._options[0]):
                 if option.startswith(Argv._OPTION_PREFIX):
                     option = option[Argv._OPTION_PREFIX_LENGTH:]
@@ -265,10 +249,10 @@ class Argv:
                 if not parsed:
                     unparsed_options.append(arg)
 
-        for option in self._option_definitions.definitions:
-            if not hasattr(self._values, property_name := option.property_name):
+        for option in self._option_definitions._definitions:
+            if not hasattr(self._values, property_name := option._property_name):
                 if option._required:
-                    missing_options.append(option.option_name)
+                    missing_options.append(option._option_name)
                 setattr(self._values, property_name, None)
 
         if report is not False:
@@ -403,12 +387,12 @@ if True:
         Argv.BOOLEAN, "--verbose",
         Argv.BOOLEAN, "--debug"
     )
-    print(argv._option_definitions.definitions[0].options)
-    print(argv._option_definitions.definitions[0]._action)
-    print(argv._option_definitions.definitions[1].options)
-    print(argv._option_definitions.definitions[1]._action)
-    print(argv._option_definitions.definitions[2].options)
-    print(argv._option_definitions.definitions[2]._action)
+    print(argv._option_definitions._definitions[0]._options)
+    print(argv._option_definitions._definitions[0]._action)
+    print(argv._option_definitions._definitions[1]._options)
+    print(argv._option_definitions._definitions[1]._action)
+    print(argv._option_definitions._definitions[2]._options)
+    print(argv._option_definitions._definitions[2]._action)
     assert argv.values.verbose is True
     assert argv.values.debug is True
     assert argv.values.config == "file.json"
@@ -477,10 +461,10 @@ if True:
         Argv.DEFAULTS | Argv.OPTIONAL, "thedefaultfoo",
         #    Argv.DEFAULTS, "thedefaults"
     )
-    print(argv._option_definitions.definitions)
-    print(argv._option_definitions.definitions[1])
-    print(argv._option_definitions.definitions[1].options)
-    print(argv._option_definitions.definitions[1]._action)
+    print(argv._option_definitions._definitions)
+    print(argv._option_definitions._definitions[1])
+    print(argv._option_definitions._definitions[1]._options)
+    print(argv._option_definitions._definitions[1]._action)
     # import json
     # print(json.dumps(argv._definitions, indent=4, default=str))
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
