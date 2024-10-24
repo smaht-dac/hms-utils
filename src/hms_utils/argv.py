@@ -222,6 +222,14 @@ class Argv:
             self._option_definitions = self._process_option_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
+    @property
+    def list(self) -> List[str]:
+        return self._argv
+
+    @property
+    def values(self) -> Argv._Values:
+        return self._values
+
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
 
         if (len(args) == 1) and isinstance(args[0], list):
@@ -262,44 +270,6 @@ class Argv:
                 printf(f"Unparsed argument: {unparsed_arg}")
 
         return missing_options, unparsed_options
-
-    @property
-    def list(self) -> List[str]:
-        return self._argv
-
-    @property
-    def values(self) -> Argv._Values:
-        return self._values
-
-    @property
-    def _peek(self) -> Optional[str]:
-        return Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
-
-    @property
-    def _next(self) -> Optional[str]:
-        if (value := self._peek) is not None:
-            if self._delete:
-                del self._argv[0]
-            else:
-                self._argi += 1
-            return value
-        return None
-
-    def __iter__(self) -> Argv:
-        return self
-
-    def __next__(self) -> Optional[str]:
-        if self._argi >= len(self._argv):
-            raise StopIteration
-        arg = self._argv[self._argi]
-        if self._delete:
-            del self._argv[0]
-        else:
-            self._argi += 1
-        if (arg == Argv._ESCAPE_VALUE) and self._escape and (not self._escaping):
-            self._escaping = True
-            return self.__next__()
-        return Argv._Arg(arg, self)
 
     def _process_option_definitions(self, *args) -> None:
 
@@ -342,6 +312,36 @@ class Argv:
             if options:
                 option_definitions.define_option(option_type or Argv.BOOLEAN, options)
         return option_definitions
+
+    @property
+    def _peek(self) -> Optional[str]:
+        return Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
+
+    @property
+    def _next(self) -> Optional[str]:
+        if (value := self._peek) is not None:
+            if self._delete:
+                del self._argv[0]
+            else:
+                self._argi += 1
+            return value
+        return None
+
+    def __iter__(self) -> Argv:
+        return self
+
+    def __next__(self) -> Optional[str]:
+        if self._argi >= len(self._argv):
+            raise StopIteration
+        arg = self._argv[self._argi]
+        if self._delete:
+            del self._argv[0]
+        else:
+            self._argi += 1
+        if (arg == Argv._ESCAPE_VALUE) and self._escape and (not self._escaping):
+            self._escaping = True
+            return self.__next__()
+        return Argv._Arg(arg, self)
 
     @staticmethod
     def _is_option_type(option_type: int) -> bool:
