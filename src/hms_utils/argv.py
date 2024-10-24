@@ -104,7 +104,8 @@ class Argv:
         def set_value_floats(self, option: Argv._OptionDefinition) -> bool:
             return self._set_value_property_multiple(option, to_type=to_float)
 
-        def set_string_for_default(self, default: str) -> bool:
+        def set_default_value_string(self, default: str) -> bool:
+            pass
             if self and (not self.option):
                 if isinstance(default, str) and default and (not hasattr(self._argv._values, default)):
                     setattr(self._argv._values, default, self)
@@ -112,7 +113,7 @@ class Argv:
                     return True
             return False
 
-        def set_strings_for_defaults(self, default: str) -> bool:
+        def set_default_value_strings(self, default: str) -> bool:
             parsed = False
             if isinstance(default, str) and default:
                 peek = self
@@ -196,6 +197,8 @@ class Argv:
             elif option_type == Argv.INTEGERS: action = Argv._Arg.set_value_integers  # noqa
             elif option_type == Argv.FLOAT: action = Argv._Arg.set_value_float  # noqa
             elif option_type == Argv.FLOATS: action = Argv._Arg.set_value_floats  # noqa
+            #elif option_type == Argv.DEFAULT: action = Argv._Arg.set_default_value_string  # noqa
+            #elif option_type == Argv.DEFAULTS: action = Argv._Arg.set_default_value_strings  # noqa
             elif option_type == Argv.DEFAULT:
                 for default_property_name in options:
                     self._definitions.append(Argv._OptionDefinition(
@@ -234,14 +237,14 @@ class Argv:
                 self._options = []
                 self._required = required is True
                 self._fuzzy = False
-                self._action = Argv._Arg.set_string_for_default
+                self._action = Argv._Arg.set_default_value_string
             elif isinstance(defaults, str) and (defaults := defaults.strip()):
                 self._default = default
                 self._defaults = defaults.replace("-", "_")
                 self._options = []
                 self._required = required is True
                 self._fuzzy = False
-                self._action = Argv._Arg.set_strings_for_defaults
+                self._action = Argv._Arg.set_default_value_strings
             else:
                 self._default = None
                 self._defaults = None
