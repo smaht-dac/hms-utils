@@ -167,8 +167,6 @@ class Argv:
     class _OptionDefinitions:
         def __init__(self, fuzzy: bool = False) -> None:
             self._definitions = []
-            self._default_property_names = []
-            self._defaults_property_names = ""
             self._fuzzy = fuzzy is True
 
         def define_option(self, option_type: int, options: List[str]) -> None:
@@ -194,19 +192,9 @@ class Argv:
         def definitions(self) -> List[Argv._Option]:
             return self._definitions
 
-        @property
-        def default_property_names(self) -> List[str]:
-            return self._default_property_names
-
-        @property
-        def defaults_property_names(self) -> str:
-            return self._defaults_property_names
-
     class _Option:
         def __init__(self,
                      options: Optional[List[str]] = None,
-                     default: Optional[str] = None,
-                     defaults: Optional[str] = None,
                      required: bool = False,
                      action: Optional[Callable] = None,
                      fuzzy: bool = True) -> None:
@@ -233,10 +221,6 @@ class Argv:
                 return option.replace("-", "_")
             return ""
 
-        @property
-        def required(self) -> bool:
-            return self._required
-
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False,
                  unparsed_property_name: Optional[str] = None) -> None:
@@ -262,9 +246,6 @@ class Argv:
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
-        return self._process(*args, report=report, printf=printf)
-
-    def _process(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
 
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse;
@@ -300,35 +281,15 @@ class Argv:
                         parsed = True
                         break
                 if not parsed:
-                    if not arg.is_option:
-                        if option_definitions.default_property_names:
-                            for default_property_name in option_definitions.default_property_names:
-                                if not hasattr(argv._values, default_property_name):
-                                    setattr(argv._values, default_property_name, arg)
-                                    parsed = True
-                                    break
-                        if (not parsed) and option_definitions.defaults_property_names:
-                            if not hasattr(argv._values, option_definitions.defaults_property_names):
-                                setattr(argv._values, option_definitions.defaults_property_names, [arg])
-                            else:
-                                getattr(argv._values, option_definitions.defaults_property_names).append(arg)
-                            parsed = True
-                    if not parsed:
-                        unparsed_options.append(arg)
-                        getattr(argv._values, argv._unparsed_property_name).append(arg)
+                    unparsed_options.append(arg)
+                    getattr(argv._values, argv._unparsed_property_name).append(arg)
 
-        # Check for required arguments.
         for option in option_definitions.definitions:
             if not hasattr(argv._values, property_name := option.property_name):
-                if option.required:
+                if option._required:
                     missing_options.append(option.option_name)
                 setattr(argv._values, property_name, None)
-        # End check for required arguments.
 
-        for property_name in option_definitions.default_property_names + [option_definitions.defaults_property_names]:
-            if not hasattr(argv._values, property_name):
-                pass
-                setattr(argv._values, property_name, None)
         if auxiliary_argv:
             self._values = auxiliary_argv.values
 
