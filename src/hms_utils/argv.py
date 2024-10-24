@@ -256,20 +256,18 @@ class Argv:
                         break
                 if not parsed:
                     unparsed_options.append(arg)
-
-        for option in self._option_definitions._definitions:
-            if not hasattr(self._values, property_name := option._property_name):
-                if option._required:
-                    missing_options.append(option._option_name)
-                setattr(self._values, property_name, None)
-
-        if report is not False:
-            if not callable(printf):
-                printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-            for unparsed_option in unparsed_options:
-                printf(f"Unparsed argument: {unparsed_option}")
-            for missing_option in missing_options:
-                printf(f"Missing argument: {missing_option}")
+            for option in self._option_definitions._definitions:
+                if not hasattr(self._values, property_name := option._property_name):
+                    if option._required:
+                        missing_options.append(option._option_name)
+                    setattr(self._values, property_name, None)
+            if report is not False:
+                if not callable(printf):
+                    printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
+                for unparsed_option in unparsed_options:
+                    printf(f"Unparsed argument: {unparsed_option}")
+                for missing_option in missing_options:
+                    printf(f"Missing argument: {missing_option}")
 
         return missing_options, unparsed_options
 
