@@ -467,7 +467,7 @@ if True:
     # import json
     # print(json.dumps(argv._definitions, indent=4, default=str))
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
-                                    "-passwd", "--shell", "hoo", "-config", "configfile"])
+                                    "-passwd", "pas", "--shell", "hoo", "-config", "configfile"])
     print('unparsed:')
     print(unparsed)
     # print(argv.values.unparsed)
@@ -481,6 +481,7 @@ if True:
     print(argv.values.thedefaultb)
     print('thedefaultfoo:')
     print(argv.values.thedefaultfoo)
+    assert argv.password == "pas"
 
     assert argv.values.thedefault == "foo"
     assert argv.values.thedefault2 == "bara"
