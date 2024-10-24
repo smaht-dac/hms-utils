@@ -49,6 +49,7 @@ def at_most_one_of_bool(*booleans) -> bool:
             ntrue += 1
     return True
 
+
 def to_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
     strings = []
     if isinstance(value, (list, tuple)):
