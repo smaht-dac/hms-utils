@@ -266,8 +266,10 @@ class Argv:
         if report is not False:
             if not callable(printf):
                 printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-            for unparsed_arg in unparsed_options:
-                printf(f"Unparsed argument: {unparsed_arg}")
+            for unparsed_option in unparsed_options:
+                printf(f"Unparsed argument: {unparsed_option}")
+            for missing_option in missing_options:
+                printf(f"Missing argument: {missing_option}")
 
         return missing_options, unparsed_options
 
