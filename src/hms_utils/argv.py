@@ -69,6 +69,14 @@ class Argv:
                     return True
             return False
 
+        def new_set_string(self, option: Argv._OptionDefinition) -> bool:
+            if self.anyof(option.options):
+                if (peek := self._argv.peek) and (not peek.option):
+                    if self._new_set_property(option, property_value=peek):
+                        self._argv.next
+                        return True
+            return False
+
         def set_string(self, *values) -> bool:
             if self.anyof(values):
                 if (peek := self._argv.peek) and (not peek.option):
@@ -130,6 +138,12 @@ class Argv:
                     else:
                         break
             return parsed
+
+        def _new_set_property(self, option: Argv._OptionDefinition, property_value: Any = None) -> bool:
+            if property_name := option.property_name:
+                setattr(self._argv._values, property_name, property_value)
+                return True
+            return False
 
         def _set_property(self, *values, property_value: Any = None) -> bool:
             if property_name := self._find_property_name(*values):
@@ -330,6 +344,8 @@ class Argv:
             elif self._defaults:
                 return self._action(arg, self._defaults)
             elif self._options:
+                # import pdb ; pdb.set_trace()  # noqa
+                # x = Argv._Arg.new_set_string(arg, self)
                 return self._action(arg, self._options)
 
     def __init__(self, *args, argv: Optional[List[str]] = None, fuzzy: bool = True,
