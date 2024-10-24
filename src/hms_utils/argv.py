@@ -353,8 +353,7 @@ class Argv:
                 argv = args[0]
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._new_process_option_definitions(*args)  # xyzzy
-            # self._process_option_definitions(*args)
+            self._process_option_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
@@ -382,8 +381,7 @@ class Argv:
                 return
             auxiliary_argv = None
             argv = self
-            self._new_process_option_definitions(*args)  # xyzzy
-            # self._process_option_definitions(*args)
+            self._process_option_definitions(*args)  # xyzzy
             option_definitions = self._option_definitions
 
         missing_options = []
@@ -479,7 +477,7 @@ class Argv:
             return self.__next__()
         return Argv._Arg(arg, self)
 
-    def _new_process_option_definitions(self, *args) -> None:
+    def _process_option_definitions(self, *args) -> None:
 
         def flatten(*args):
             flattened_args = []
@@ -552,106 +550,6 @@ class Argv:
             if not option_type:
                 option_type = Argv.BOOLEAN
             add_option_definition(option_type, options)
-
-    def _process_option_definitions(self, *args) -> None:
-
-        def flatten(*args):
-            flattened_args = []
-            def flatten(*args):  # noqa
-                nonlocal flattened_args
-                # for arg in args:
-                for argi in range(len(args)):
-                    arg = args[argi]
-                    if isinstance(arg, (list, tuple)):
-                        # for item in arg:
-                        for iitem in range(len(arg)):
-                            item = arg[iitem]
-                            if isinstance(item, int):
-                                if (iitem + 1) < len(arg):
-                                    next_item = arg[iitem + 1]
-                                    if isinstance(next_item, tuple) or isinstance(next_item, str):
-                                        if (item & Argv.OPTIONAL) != Argv.OPTIONAL:
-                                            item |= Argv.REQUIRED
-                            flatten(item)
-                    else:
-                        flattened_args.append(arg)
-            flatten(args)
-            return flattened_args
-
-        def _flatten(*args):
-            flattened_args = []
-            def flatten(*args):  # noqa
-                nonlocal flattened_args
-                for arg in args:
-                    if isinstance(arg, (list, tuple)):
-                        for item in arg:
-                            flatten(item)
-                    else:
-                        flattened_args.append(arg)
-            flatten(args)
-            return flattened_args
-
-        def add_option_definition(options: List[str], required: bool, action: Union[str, Callable]) -> None:
-            nonlocal self
-
-            if action == Argv.DEFAULT:
-                self._option_definitions.add_default_property_names(options, required)  # xyzzy
-                for default in options:  # xyzzy
-                    self._option_definitions.add_option(
-                        Argv._OptionDefinition(default=default, required=required))
-            elif action == Argv.DEFAULTS:
-                self._option_definitions.add_defaults_property_names(options[0], required)  # xyzzy
-                for default in options:  # xyzzy
-                    self._option_definitions.add_option(
-                        Argv._OptionDefinition(default=default, required=required))
-            else:
-                self._option_definitions.add_option(
-                    Argv._OptionDefinition(options=options, required=required, action=action, fuzzy=self._fuzzy))
-
-        args = flatten(args)
-        action = None ; options = [] ; required = False  # noqa
-        for arg in args:
-            if isinstance(arg, int):
-                arg_required = False
-                if (arg & Argv.REQUIRED):
-                    arg_required = True
-                arg &= ~(Argv.REQUIRED | Argv.OPTIONAL)
-                if action and options:
-                    add_option_definition(options, required, action)
-                    action = None ; options = [] ; required = False  # noqa
-                if arg == Argv.BOOLEAN: action = Argv._Arg.set_boolean  # noqa
-                elif arg == Argv.STRING: action = Argv._Arg.set_string  # noqa
-                elif arg == Argv.STRINGS: action = Argv._Arg.set_strings  # noqa
-                elif arg == Argv.INTEGER: action = Argv._Arg.set_integer  # noqa
-                elif arg == Argv.INTEGERS: action = Argv._Arg.set_integers  # noqa
-                elif arg == Argv.FLOAT: action = Argv._Arg.set_float  # noqa
-                elif arg == Argv.FLOATS: action = Argv._Arg.set_floats  # noqa
-                # elif arg == Argv.DEFAULT: action = Argv._Arg.set_string_for_default  # noqa
-                # elif arg == Argv.DEFAULTS: action = Argv._Arg.set_string_for_default  # noqa
-                # elif arg in [Argv.DEFAULT, Argv.DEFAULTS]: action = arg  # noqa
-                else:
-                    action = None
-                    required = False
-                if callable(action):  # xyzzy
-                    if arg_required:
-                        required = True
-                if action and options:
-                    add_option_definition(options, required, action)
-                    action = None ; options = [] ; required = False  # noqa
-            elif isinstance(arg, str) and (arg := arg.strip()):
-                if not options:
-                    if arg.startswith(Argv._OPTION_PREFIX):
-                        property_name = arg[Argv._OPTION_PREFIX_LENGTH:]
-                    elif self._fuzzy and arg.startswith(Argv._FUZZY_OPTION_PREFIX):
-                        property_name = arg[Argv._FUZZY_OPTION_PREFIX_LENGTH:]
-                    else:
-                        property_name = arg
-                    self._option_definitions.add_option_property_name(property_name)
-                options.append(arg)
-        if options:
-            if not action:
-                action = Argv._Arg.set_boolean
-            add_option_definition(options, required, action)
 
     def _find_property_name(self, *values) -> Optional[str]:
         for value in values:
