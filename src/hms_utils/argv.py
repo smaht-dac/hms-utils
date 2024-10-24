@@ -228,14 +228,14 @@ class Argv:
         self._escaping = False
         self._delete = delete is True
         self._values = Argv._Values()
-        self._option_definitions = Argv._OptionDefinitions(self._fuzzy)
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
                 argv = args[0]
+            self._option_definitions = self._process_option_definitions()
         else:
             # Here, the given args should be the definitions for processing/parsing command-line args.
-            self._process_option_definitions(*args)
+            self._option_definitions = self._process_option_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
 
     def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
@@ -245,45 +245,31 @@ class Argv:
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._option_definitions:
                 return
-            argv = auxiliary_argv = Argv()
-            argv._argv = args[0]
-            argv._argi = 0
-            argv._fuzzy = self._fuzzy
-            argv._strip = self._strip
-            argv._escape = self._escape
-            argv._delete = self._delete
-            option_definitions = self._option_definitions
+            self._argv = args[0]
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
             if not self._argv:
                 return
-            auxiliary_argv = None
-            argv = self
-            self._process_option_definitions(*args)  # xyzzy
-            option_definitions = self._option_definitions
+            self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
-        missing_options = []
-        unparsed_options = []
+        missing_options = unparsed_options = []
 
-        if option_definitions:
-            for arg in argv:
+        if self._option_definitions:
+            for arg in self:
                 parsed = False
-                for option in option_definitions._definitions:
+                for option in self._option_definitions._definitions:
                     if option._action(arg, option):
                         parsed = True
                         break
                 if not parsed:
                     unparsed_options.append(arg)
 
-        for option in option_definitions.definitions:
-            if not hasattr(argv._values, property_name := option.property_name):
+        for option in self._option_definitions.definitions:
+            if not hasattr(self._values, property_name := option.property_name):
                 if option._required:
                     missing_options.append(option.option_name)
-                setattr(argv._values, property_name, None)
-
-        if auxiliary_argv:
-            self._values = auxiliary_argv.values
+                setattr(self._values, property_name, None)
 
         if report is not False:
             if not callable(printf):
@@ -353,28 +339,25 @@ class Argv:
             flatten(args)
             return flattened_args
 
-        args = flatten(args)
-        option_type = None ; options = [] ; parsing_options = None  # noqa
-        for arg in args:
-            if Argv._is_option_type(arg):
-                if (parsing_options is True) and option_type and options:
-                    self._option_definitions.define_option(option_type, options)
-                    option_type = None
-                    options = []
-                parsing_options = False
-                option_type = arg
-            elif isinstance(arg, str) and (arg := arg.strip()):
-                if (parsing_options is False) and option_type and options:
-                    self._option_definitions.define_option(option_type, options)
-                    option_type = None
-                    options = []
-                parsing_options = True
-                options.append(arg)
-        if options:
-            if not option_type:
-                option_type = Argv.BOOLEAN
-            self._option_definitions.define_option(option_type, options)
-        return isinstance(option_type, int) and (option_type & ~(Argv.REQUIRED | Argv.OPTIONAL)) in Argv._TYPES
+        option_definitions = Argv._OptionDefinitions(fuzzy=self._fuzzy)
+        if args := flatten(args):
+            option_type = None ; options = [] ; parsing_options = None  # noqa
+            for arg in args:
+                if Argv._is_option_type(arg):
+                    if (parsing_options is True) and option_type and options:
+                        option_definitions.define_option(option_type, options)
+                        option_type = None ; options = []  # noqa
+                    parsing_options = False
+                    option_type = arg
+                elif isinstance(arg, str) and (arg := arg.strip()):
+                    if (parsing_options is False) and option_type and options:
+                        option_definitions.define_option(option_type, options)
+                        option_type = None ; options = []  # noqa
+                    parsing_options = True
+                    options.append(arg)
+            if options:
+                option_definitions.define_option(option_type or Argv.BOOLEAN, options)
+        return option_definitions
 
     @staticmethod
     def _is_option_type(option_type: int) -> bool:
