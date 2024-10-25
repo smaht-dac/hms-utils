@@ -141,7 +141,7 @@ class Argv:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
                     if ((peek is None) or peek.is_option or
-                        (callable(convert_type) and ((peek := convert_type(peek)) is None))):
+                        (callable(convert_type) and ((peek := convert_type(peek)) is None))):  # noqa
                         break
                     if option_values is None:
                         option_values = []
