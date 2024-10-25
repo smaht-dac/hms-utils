@@ -424,7 +424,9 @@ class Argv:
         return False
 
     def __getattr__(self, name: str):
-        return getattr(self._values, name) if hasattr(self._values, name) else None
+        if not hasattr(self._values, name):
+            raise AttributeError(f"Property for argument not found: {name}")
+        return getattr(self._values, name)
 
 
 # args = Argv({"foo": "bar"})
@@ -583,7 +585,7 @@ if True:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if True: # xxx
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -649,11 +651,11 @@ REQUIRED = ARGV.REQUIRED
 
 if True:
     argv = ARGV({
-        ARGV.OPTIONAL(str): ("--password"),
-        ARGV.OPTIONAL(str): ("--xpassword"),
-        ARGV.REQUIRED(bool): ["--req", "--reqx"],
-        ARGV.ARGUMENT([str]): "thedefaults",
-        ARGV.REQUIRED(float): "--maxn",
+        OPTIONAL(str): ("--password"),
+        OPTIONAL(str): ("--xpassword"),
+        REQUIRED(bool): ["--req", "--reqx"],
+        REQUIRED([str]): "thedefaults",
+        REQUIRED(float): "--maxn",
     })
     missing, unparsed = argv.parse(["foo", "bar", "-password", "pas", " argwithspace ", "", "", "-reqx", "xyz"])
     assert argv.password == "pas"
