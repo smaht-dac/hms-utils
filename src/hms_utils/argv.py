@@ -332,11 +332,13 @@ class Argv:
 
         option_definitions = Argv._OptionDefinitions(fuzzy=self._fuzzy)
 
-        if (len(args) == 1) and isinstance(args[0], dict):
-            # TODO
-            for key in args[0]:
-                pass
-            return option_definitions
+        if (len(args) == 1) and isinstance(options := args[0], dict):
+            args = []
+            for option_type in options:
+                if Argv._is_option_type(option_type):
+                    if isinstance(option_options := options[option_type], (list, tuple, str)):
+                        args.append(option_type)
+                        args.append(option_options)
 
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
@@ -555,11 +557,11 @@ if True:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults"
     })
     missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
     assert argv.password == "pas"
-    assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
