@@ -307,7 +307,7 @@ class Argv:
                 for unparsed_arg in unparsed_args:
                     printf(f"Unparsed argument: {unparsed_arg}")
                 for missing_option in missing_options:
-                    printf(f"Missing argument: {missing_option}")
+                    printf(f"Missing required option: {missing_option}")
 
         return missing_options, unparsed_args
 
@@ -335,10 +335,10 @@ class Argv:
         if (len(args) == 1) and isinstance(options := args[0], dict):
             args = []
             for option_type in options:
-                if Argv._is_option_type(option_type):
-                    if isinstance(option_options := options[option_type], (list, tuple, str)):
-                        args.append(option_type)
-                        args.append(option_options)
+                if (Argv._is_option_type(option_type) and
+                    isinstance(option_options := options[option_type], (list, tuple, str))):  # noqa
+                    args.append(option_type)
+                    args.append(option_options)
 
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
