@@ -584,52 +584,63 @@ if True:
     assert argv.req is True
 
 
-def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None, required: bool = False, multiple: bool = False):
-    if isinstance(type, list) and (len(type) == 1):
-        type = type[0]
-        multiple = True
-    if multiple is True:
-        if type == str: option_type = Argv.STRINGS  # noqa
-        elif type == int: option_type = Argv.INTEGERS  # noqa
-        elif type == float: option_type = Argv.FLOATS  # noqa
-        elif type == bool: option_type = Argv.BOOLEAN  # noqa
-        elif type is None: option_type = Argv.DEFAULTS  # noqa
-        else: return None  # noqa
-    else:
-        if type == str: option_type = Argv.STRING  # noqa
-        elif type == int: option_type = Argv.INTEGER  # noqa
-        elif type == float: option_type = Argv.FLOAT  # noqa
-        elif type == bool: option_type = Argv.BOOLEAN  # noqa
-        elif type is None: option_type = Argv.DEFAULT  # noqa
-        else: return None  # noqa
-    if required is True:
-        option_type |= Argv.REQUIRED
-    else:
-        option_type |= Argv.OPTIONAL
-    from uuid import uuid4 as uuid
-    return str(option_type) + "_" + str(uuid())
+class ARGV(Argv):
+
+    @staticmethod
+    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None,
+                 _required: bool = False, _default: bool = False) -> str:
+        if isinstance(type, list) and (len(type) == 1):
+            type = type[0]
+            if type == str: option_type = Argv.STRINGS  # noqa
+            elif type == int: option_type = Argv.INTEGERS  # noqa
+            elif type == float: option_type = Argv.FLOATS  # noqa
+            elif type == bool: option_type = Argv.BOOLEAN  # noqa
+            else:
+                import pdb ; pdb.set_trace()  # noqa
+                return None  # noqa
+            if _default is True: option_type |= Argv.DEFAULTS  # noqa
+        else:
+            if type == str: option_type = Argv.STRING  # noqa
+            elif type == int: option_type = Argv.INTEGER  # noqa
+            elif type == float: option_type = Argv.FLOAT  # noqa
+            elif type == bool: option_type = Argv.BOOLEAN  # noqa
+            else:
+                import pdb ; pdb.set_trace()  # noqa
+                return None  # noqa
+            if _default is True: option_type |= Argv.DEFAULT  # noqa
+        if _required is True:
+            option_type |= Argv.REQUIRED
+        else:
+            option_type |= Argv.OPTIONAL
+        from uuid import uuid4 as uuid
+        return str(option_type) + "_" + str(uuid())
+
+    @staticmethod
+    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
+        return OPTIONAL(type=type, _required=True)
+
+    @staticmethod
+    def ARGUMENT(type: Optional[Type[Union[str, int, float, bool]]] = str):
+        return OPTIONAL(type=type, _required=True, _default=True)
 
 
-def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None, multiple: bool = False):
-    return OPTIONAL(type=type, required=True, multiple=multiple)
-
-
-def ARGUMENT(type: Optional[Type[Union[str, int, float, bool]]] = None, multiple: bool = False):
-    return OPTIONAL(type=[None], required=True, multiple=multiple)
-
-
-def ARGUMENTS(type: Optional[Type[Union[str, int, float, bool]]] = None):
-    return OPTIONAL(type=None, required=True, multiple=True)
-
+ARGUMENT = ARGV.ARGUMENT
+OPTIONAL = ARGV.OPTIONAL
+REQUIRED = ARGV.REQUIRED
 
 if True:
-    argv = Argv({
-        OPTIONAL(str): ("--password"),
-        OPTIONAL(str): ("--xpassword"),
-        REQUIRED(bool): "--req",
-        ARGUMENT([str]): "thedefaults",
+    argv = ARGV({
+        ARGV.OPTIONAL(str): ("--password"),
+        ARGV.OPTIONAL(str): ("--xpassword"),
+        ARGV.REQUIRED(bool): ["--req", "--reqx"],
+        ARGV.ARGUMENT([str]): "thedefaults",
+        ARGV.REQUIRED(float): "--maxn",
     })
-    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
+    missing, unparsed = argv.parse(["foo", "bar", "-password", "pas", " argwithspace ", "", "", "-reqx", "xyz"])
     assert argv.password == "pas"
+    print(argv.thedefaults)
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
     assert argv.req is True
+    assert argv.values.xpassword is None
+    assert unparsed == []
+    assert missing == ["--maxn"]
