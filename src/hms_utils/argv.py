@@ -176,7 +176,8 @@ class Argv:
             self._definitions = []
             self._fuzzy = fuzzy is True
             self._option_type_action_map = {
-                0: Argv._Arg.set_value_string,
+                # 0: Argv._Arg.set_value_string,
+                0: Argv._Arg.set_value_boolean,
                 Argv.BOOLEAN: Argv._Arg.set_value_boolean,
                 Argv.STRING: Argv._Arg.set_value_string,
                 Argv.STRINGS: Argv._Arg.set_value_strings,
@@ -560,8 +561,19 @@ if True:
 if True:
     argv = Argv({
         Argv.STRING: ["--password"],
-        Argv.DEFAULTS: "thedefaults"
+        Argv.DEFAULTS: "thedefaults",
     })
     missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
+
+if True:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.REQUIRED: "--req",
+        Argv.DEFAULTS: "thedefaults",
+    })
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
