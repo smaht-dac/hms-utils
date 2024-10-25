@@ -344,19 +344,6 @@ class Argv:
                     args.append(option_type)
                     args.append(option_options)
 
-#               if isinstance(option_type, str) and ((index := option_type.find("_")) > 1):
-#                   if (actual_option_type := to_integer(option_type[0:index])) is not None:
-#                       if isinstance(option_options := options[option_type], (list, tuple, str)):
-#                           if (value := to_non_empty_string_list(option_options)) and (not Argv._Arg(value).is_option):
-#                               import pdb ; pdb.set_trace()  # noqa
-#                               pass
-#                           args.append(actual_option_type)
-#                           args.append(option_options)
-#               if Argv._is_option_type(option_type):
-#                   if isinstance(option_options := options[option_type], (list, tuple, str)):
-#                       args.append(option_type)
-#                       args.append(option_options)
-
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
             for arg in args:
@@ -406,14 +393,6 @@ class Argv:
             return self.__next__()
         return Argv._Arg(arg, self)
 
-    @staticmethod
-    def _is_option_type(option_type: Any) -> bool:
-        if isinstance(option_type, int):
-            return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
-                      Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
-                      Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
-        return False
-
     def _is_option(self, value: str) -> bool:
         if isinstance(value, str) and (value := value.strip()):
             if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
@@ -423,10 +402,57 @@ class Argv:
                     return True
         return False
 
+    @staticmethod
+    def _is_option_type(option_type: Any) -> bool:
+        if isinstance(option_type, int):
+            return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
+                      Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
+                      Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
+        return False
+
     def __getattr__(self, name: str):
         if not hasattr(self._values, name):
             raise AttributeError(f"Property for argument not found: {name}")
         return getattr(self._values, name)
+
+
+class ARGV(Argv):
+
+    @staticmethod
+    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None,
+                 _required: bool = False, _default: bool = False) -> str:
+        if isinstance(type, list) and (len(type) == 1):
+            type = type[0]
+            if type == str: option_type = Argv.STRINGS  # noqa
+            elif type == int: option_type = Argv.INTEGERS  # noqa
+            elif type == float: option_type = Argv.FLOATS  # noqa
+            elif type == bool: option_type = Argv.BOOLEAN  # noqa
+            else:
+                import pdb ; pdb.set_trace()  # noqa
+                return None  # noqa
+            if _default is True: option_type |= Argv.DEFAULTS  # noqa
+        else:
+            if type == str: option_type = Argv.STRING  # noqa
+            elif type == int: option_type = Argv.INTEGER  # noqa
+            elif type == float: option_type = Argv.FLOAT  # noqa
+            elif type == bool: option_type = Argv.BOOLEAN  # noqa
+            else:
+                import pdb ; pdb.set_trace()  # noqa
+                return None  # noqa
+            if _default is True: option_type |= Argv.DEFAULT  # noqa
+        if _required is True:
+            option_type |= Argv.REQUIRED
+        else:
+            option_type |= Argv.OPTIONAL
+        return str(option_type) + "_" + str(uuid())
+
+    @staticmethod
+    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
+        return OPTIONAL(type=type, _required=True)
+
+
+OPTIONAL = ARGV.OPTIONAL
+REQUIRED = ARGV.REQUIRED
 
 
 # args = Argv({"foo": "bar"})
@@ -605,49 +631,6 @@ if True:
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
     assert argv.req is True
 
-
-class ARGV(Argv):
-
-    @staticmethod
-    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None,
-                 _required: bool = False, _default: bool = False) -> str:
-        if isinstance(type, list) and (len(type) == 1):
-            type = type[0]
-            if type == str: option_type = Argv.STRINGS  # noqa
-            elif type == int: option_type = Argv.INTEGERS  # noqa
-            elif type == float: option_type = Argv.FLOATS  # noqa
-            elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else:
-                import pdb ; pdb.set_trace()  # noqa
-                return None  # noqa
-            if _default is True: option_type |= Argv.DEFAULTS  # noqa
-        else:
-            if type == str: option_type = Argv.STRING  # noqa
-            elif type == int: option_type = Argv.INTEGER  # noqa
-            elif type == float: option_type = Argv.FLOAT  # noqa
-            elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else:
-                import pdb ; pdb.set_trace()  # noqa
-                return None  # noqa
-            if _default is True: option_type |= Argv.DEFAULT  # noqa
-        if _required is True:
-            option_type |= Argv.REQUIRED
-        else:
-            option_type |= Argv.OPTIONAL
-        return str(option_type) + "_" + str(uuid())
-
-    @staticmethod
-    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
-        return OPTIONAL(type=type, _required=True)
-
-    @staticmethod
-    def ARGUMENT(type: Optional[Type[Union[str, int, float, bool]]] = str):
-        return OPTIONAL(type=type, _required=True, _default=True)
-
-
-ARGUMENT = ARGV.ARGUMENT
-OPTIONAL = ARGV.OPTIONAL
-REQUIRED = ARGV.REQUIRED
 
 if True:
     argv = ARGV({
