@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Type, Union
 from hms_utils.type_utils import to_float, to_integer, to_string_list
 
 
@@ -336,10 +336,15 @@ class Argv:
         if (len(args) == 1) and isinstance(options := args[0], dict):
             args = []
             for option_type in options:
-                if (Argv._is_option_type(option_type) and
-                    isinstance(option_options := options[option_type], (list, tuple, str))):  # noqa
-                    args.append(option_type)
-                    args.append(option_options)
+                if isinstance(option_type, str) and ((index := option_type.find("_")) > 1):
+                    if (actual_option_type := to_integer(option_type[0:index])) is not None:
+                        if isinstance(option_options := options[option_type], (list, tuple, str)):
+                            args.append(actual_option_type)
+                            args.append(option_options)
+                elif Argv._is_option_type(option_type):
+                    if isinstance(option_options := options[option_type], (list, tuple, str)):
+                        args.append(option_type)
+                        args.append(option_options)
 
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
@@ -572,6 +577,57 @@ if True:
         Argv.STRING: ["--password"],
         Argv.REQUIRED: "--req",
         Argv.DEFAULTS: "thedefaults",
+    })
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
+
+
+def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None, required: bool = False, multiple: bool = False):
+    if isinstance(type, list) and (len(type) == 1):
+        type = type[0]
+        multiple = True
+    if multiple is True:
+        if type == str: option_type = Argv.STRINGS  # noqa
+        elif type == int: option_type = Argv.INTEGERS  # noqa
+        elif type == float: option_type = Argv.FLOATS  # noqa
+        elif type == bool: option_type = Argv.BOOLEAN  # noqa
+        elif type is None: option_type = Argv.DEFAULTS  # noqa
+        else: return None  # noqa
+    else:
+        if type == str: option_type = Argv.STRING  # noqa
+        elif type == int: option_type = Argv.INTEGER  # noqa
+        elif type == float: option_type = Argv.FLOAT  # noqa
+        elif type == bool: option_type = Argv.BOOLEAN  # noqa
+        elif type is None: option_type = Argv.DEFAULT  # noqa
+        else: return None  # noqa
+    if required is True:
+        option_type |= Argv.REQUIRED
+    else:
+        option_type |= Argv.OPTIONAL
+    from uuid import uuid4 as uuid
+    return str(option_type) + "_" + str(uuid())
+
+
+def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None, multiple: bool = False):
+    return OPTIONAL(type=type, required=True, multiple=multiple)
+
+
+def ARGUMENT(type: Optional[Type[Union[str, int, float, bool]]] = None, multiple: bool = False):
+    return OPTIONAL(type=[None], required=True, multiple=multiple)
+
+
+def ARGUMENTS(type: Optional[Type[Union[str, int, float, bool]]] = None):
+    return OPTIONAL(type=None, required=True, multiple=True)
+
+
+if True:
+    argv = Argv({
+        OPTIONAL(str): ("--password"),
+        OPTIONAL(str): ("--xpassword"),
+        REQUIRED(bool): "--req",
+        ARGUMENT([str]): "thedefaults",
     })
     missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
     assert argv.password == "pas"
