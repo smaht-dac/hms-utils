@@ -7,16 +7,16 @@ from hms_utils.type_utils import to_float, to_integer, to_string_list
 class Argv:
 
     BOOLEAN = 0x0001
-    DEFAULT = 0x0002
-    DEFAULTS = 0x0004
-    FLOAT = 0x0008
-    FLOATS = 0x0010
-    INTEGER = 0x0020
-    INTEGERS = 0x0040
-    STRING = 0x0080
-    STRINGS = 0x0100
-    OPTIONAL = 0x1000
-    REQUIRED = 0x2000
+    FLOAT = 0x0002
+    FLOATS = 0x0004
+    INTEGER = 0x0008
+    INTEGERS = 0x0010
+    STRING = 0x0020
+    STRINGS = 0x0040
+    DEFAULT = 0x0080
+    DEFAULTS = 0x0100
+    OPTIONAL = 0x0200
+    REQUIRED = 0x0400
 
     _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
@@ -75,29 +75,22 @@ class Argv:
             return self._set_value_property_multiple(option, convert_type=to_float)
 
         def set_default_value_string(self, option: Argv._Option) -> bool:
-            if self and (not self.is_option):
-                for option in option._options:
-                    if not hasattr(self._argv._values, option):
-                        setattr(self._argv._values, option, self)
-                        return True
-            return False
+            return self._set_default_value_property(option)
+
+        def set_default_value_integer(self, option: Argv._Option) -> bool:
+            return self._set_default_value_property(option, convert_type=to_integer)
+
+        def set_default_value_float(self, option: Argv._Option) -> bool:
+            return self._set_default_value_property(option, convert_type=to_float)
 
         def set_default_value_strings(self, option: Argv._Option) -> bool:
-            parsed = False ; peek = self  # noqa
-            for option in option._options:
-                option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
-                while True:
-                    if peek and (not peek.is_option):
-                        if option_values is None:
-                            option_values = []
-                            setattr(self._argv._values, option, option_values)
-                        option_values.append(peek)
-                        self._argv._next
-                        peek = self._argv._peek
-                        parsed = True
-                    else:
-                        break
-            return parsed
+            return self._set_default_value_properties(option)
+
+        def set_default_value_integers(self, option: Argv._Option) -> bool:
+            return self._set_default_value_properties(option, convert_type=to_integer)
+
+        def set_default_value_floats(self, option: Argv._Option) -> bool:
+            return self._set_default_value_properties(option, convert_type=to_float)
 
         def _set_value_property(self, option: Argv._Option, convert_type: Optional[Callable] = None) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
@@ -133,6 +126,34 @@ class Argv:
                     return True
             return False
 
+        def _set_default_value_property(self, option: Argv._Option, convert_type: Optional[Callable] = None) -> bool:
+            if self and (not self.is_option):
+                property_value = self
+                for option in option._options:
+                    if (not callable(convert_type)) or ((property_value := convert_type(property_value)) is not None):
+                        if not hasattr(self._argv._values, option):
+                            setattr(self._argv._values, option, self)
+                            return True
+            return False
+
+        def _set_default_value_properties(self, option: Argv._Option, convert_type: Optional[Callable] = None) -> bool:
+            parsed = False ; peek = self  # noqa
+            for option in option._options:
+                option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
+                while True:
+                    if peek and (not peek.is_option):
+                        if (not callable(convert_type)) or ((peek := convert_type(peek)) is not None):
+                            if option_values is None:
+                                option_values = []
+                                setattr(self._argv._values, option, option_values)
+                            option_values.append(peek)
+                            self._argv._next
+                            peek = self._argv._peek
+                            parsed = True
+                            continue
+                    break
+            return parsed
+
     class _Values:
         pass
 
@@ -151,11 +172,33 @@ class Argv:
                 Argv.DEFAULT: Argv._Arg.set_default_value_string,
                 Argv.DEFAULTS: Argv._Arg.set_default_value_strings
             }
+            self._new_option_type_action_map = {
+                Argv.BOOLEAN: Argv._Arg.set_value_boolean,
+                Argv.STRING: Argv._Arg.set_value_string,
+                Argv.STRINGS: Argv._Arg.set_value_strings,
+                Argv.INTEGER: Argv._Arg.set_value_integer,
+                Argv.INTEGERS: Argv._Arg.set_value_integers,
+                Argv.FLOAT: Argv._Arg.set_value_float,
+                Argv.FLOATS: Argv._Arg.set_value_floats
+            }
+            self._default_option_type_action_map = {
+                Argv.STRING: Argv._Arg.set_default_value_string,
+                Argv.INTEGER: Argv._Arg.set_default_value_integer,
+                Argv.FLOAT: Argv._Arg.set_default_value_float
+            }
+            self._defaults_option_type_action_map = {
+                Argv.STRINGS: Argv._Arg.set_default_value_strings,
+                Argv.INTEGERS: Argv._Arg.set_default_value_integers,
+                Argv.FLOATS: Argv._Arg.set_default_value_floats
+            }
 
         def define_option(self, option_type: int, options: List[str]) -> None:
             if isinstance(option_type, int) and isinstance(options, list):
                 option_required = (option_type & Argv.REQUIRED) == Argv.REQUIRED
                 option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL)
+                # option_default = (option_type & Argv.DEFAULT) == Argv.DEFAULT
+                # option_defaults = (option_type & Argv.DEFAULTS) == Argv.DEFAULTS
+                # default_option_type &= ~(Argv.DEFAULT | Argv.DEFAULTS)
                 if action := self._option_type_action_map.get(option_type):
                     self._definitions.append(Argv._Option(
                         options=options, required=option_required, action=action, fuzzy=self._fuzzy))
