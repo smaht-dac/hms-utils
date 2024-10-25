@@ -320,10 +320,8 @@ class Argv:
                 for arg in args:
                     if isinstance(arg, (list, tuple)):
                         for itemi in range(len(arg)):
-                            item = arg[itemi]
-                            if isinstance(item, int) and ((itemi + 1) < len(arg)):
-                                next_item = arg[itemi + 1]
-                                if isinstance(next_item, tuple) or isinstance(next_item, str):
+                            if isinstance(item := arg[itemi], int) and ((itemi + 1) < len(arg)):
+                                if isinstance(next_item := arg[itemi + 1], tuple) or isinstance(next_item, str):
                                     if (item & Argv.OPTIONAL) != Argv.OPTIONAL:
                                         item |= Argv.REQUIRED
                             flatten(item)
