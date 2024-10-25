@@ -36,7 +36,13 @@ class Argv:
 
         @property
         def is_option(self) -> bool:
-            return self._argv._is_option(self)
+            if value := self.strip():
+                if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
+                    return True
+                elif (self._argv._fuzzy and value.startswith(Argv._FUZZY_OPTION_PREFIX) and
+                      (value := value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip())):
+                    return True
+            return False
 
         @property
         def is_null(self) -> bool:
@@ -389,16 +395,6 @@ class Argv:
             return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
                       Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
                       Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
-        return False
-
-    def _is_option(self, value: str) -> bool:
-        if isinstance(value, str) and (value := value.strip()):
-            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
-                return True
-            elif (self._fuzzy and
-                  value.startswith(Argv._FUZZY_OPTION_PREFIX) and
-                  (value := value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip())):
-                return True
         return False
 
     def __getattr__(self, name: str):
