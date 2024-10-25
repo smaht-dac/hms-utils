@@ -1,7 +1,8 @@
 from __future__ import annotations
 import sys
 from typing import Any, Callable, List, Optional, Type, Union
-from hms_utils.type_utils import to_float, to_integer, to_string_list
+from uuid import uuid4 as uuid
+from hms_utils.type_utils import to_float, to_integer, to_non_empty_string_list
 
 
 class Argv:
@@ -36,13 +37,8 @@ class Argv:
 
         @property
         def is_option(self) -> bool:
-            if value := self.strip():
-                if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
-                    return True
-                elif (self._argv._fuzzy and value.startswith(Argv._FUZZY_OPTION_PREFIX) and
-                      (value := value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip())):
-                    return True
-            return False
+            # return self._argv._is_option(self, fuzzy=self._argv._fuzzy)
+            return self._argv._is_option(self)
 
         @property
         def is_null(self) -> bool:
@@ -172,9 +168,9 @@ class Argv:
         pass
 
     class _OptionDefinitions:
-        def __init__(self, fuzzy: bool = False) -> None:
+        def __init__(self, fuzzy: bool = True) -> None:
             self._definitions = []
-            self._fuzzy = fuzzy is True
+            self._fuzzy = fuzzy is not False
             self._option_type_action_map = {
                 # 0: Argv._Arg.set_value_string,
                 0: Argv._Arg.set_value_boolean,
@@ -225,7 +221,7 @@ class Argv:
                      required: bool = False,
                      action: Optional[Callable] = None,
                      fuzzy: bool = True) -> None:
-            self._options = to_string_list(options)
+            self._options = to_non_empty_string_list(options)
             self._required = required is True
             self._fuzzy = fuzzy is not True
             self._action = action if callable(action) else lambda: None
@@ -336,15 +332,30 @@ class Argv:
         if (len(args) == 1) and isinstance(options := args[0], dict):
             args = []
             for option_type in options:
+                option_options = options[option_type]
                 if isinstance(option_type, str) and ((index := option_type.find("_")) > 1):
-                    if (actual_option_type := to_integer(option_type[0:index])) is not None:
-                        if isinstance(option_options := options[option_type], (list, tuple, str)):
-                            args.append(actual_option_type)
-                            args.append(option_options)
-                elif Argv._is_option_type(option_type):
-                    if isinstance(option_options := options[option_type], (list, tuple, str)):
-                        args.append(option_type)
-                        args.append(option_options)
+                    option_type = to_integer(option_type[0:index])
+                if Argv._is_option_type(option_type) and (option_options := to_non_empty_string_list(option_options)):
+                    if not any(self._is_option(option) for option in option_options):
+                        if option_type & (Argv.STRINGS | Argv.INTEGERS | Argv.INTEGERS | Argv.DEFAULTS):
+                            option_type |= Argv.DEFAULTS
+                        else:
+                            option_type |= Argv.DEFAULT
+                    args.append(option_type)
+                    args.append(option_options)
+
+#               if isinstance(option_type, str) and ((index := option_type.find("_")) > 1):
+#                   if (actual_option_type := to_integer(option_type[0:index])) is not None:
+#                       if isinstance(option_options := options[option_type], (list, tuple, str)):
+#                           if (value := to_non_empty_string_list(option_options)) and (not Argv._Arg(value).is_option):
+#                               import pdb ; pdb.set_trace()  # noqa
+#                               pass
+#                           args.append(actual_option_type)
+#                           args.append(option_options)
+#               if Argv._is_option_type(option_type):
+#                   if isinstance(option_options := options[option_type], (list, tuple, str)):
+#                       args.append(option_type)
+#                       args.append(option_options)
 
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
@@ -401,6 +412,15 @@ class Argv:
             return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
                       Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
                       Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
+        return False
+
+    def _is_option(self, value: str) -> bool:
+        if isinstance(value, str) and (value := value.strip()):
+            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
+                return True
+            elif self._fuzzy:
+                if value.startswith(Argv._FUZZY_OPTION_PREFIX) and value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip():
+                    return True
         return False
 
     def __getattr__(self, name: str):
@@ -563,7 +583,7 @@ if True:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if True:
+if True: # xxx
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -612,7 +632,6 @@ class ARGV(Argv):
             option_type |= Argv.REQUIRED
         else:
             option_type |= Argv.OPTIONAL
-        from uuid import uuid4 as uuid
         return str(option_type) + "_" + str(uuid())
 
     @staticmethod

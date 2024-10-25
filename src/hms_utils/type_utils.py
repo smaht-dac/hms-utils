@@ -50,7 +50,7 @@ def at_most_one_of_bool(*booleans) -> bool:
     return True
 
 
-def to_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
+def to_non_empty_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
     strings = []
     if isinstance(value, (list, tuple)):
         for item in value:
