@@ -285,7 +285,7 @@ class Argv:
                 return None, None
             self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
-        missing_options = unparsed_options = []
+        missing_options = [] ; unparsed_args = []  # noqa
 
         if self._option_definitions:
             for arg in self:
@@ -295,7 +295,7 @@ class Argv:
                         parsed = True
                         break
                 if not parsed:
-                    unparsed_options.append(arg)
+                    unparsed_args.append(arg)
             for option in self._option_definitions._definitions:
                 if not hasattr(self._values, property_name := option._property_name):
                     if option._required:
@@ -304,12 +304,12 @@ class Argv:
             if report is not False:
                 if not callable(printf):
                     printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-                for unparsed_option in unparsed_options:
-                    printf(f"Unparsed argument: {unparsed_option}")
+                for unparsed_arg in unparsed_args:
+                    printf(f"Unparsed argument: {unparsed_arg}")
                 for missing_option in missing_options:
                     printf(f"Missing argument: {missing_option}")
 
-        return missing_options, unparsed_options
+        return missing_options, unparsed_args
 
     def _process_option_definitions(self, *args) -> None:
 
@@ -426,12 +426,6 @@ if True:
         Argv.BOOLEAN, "--verbose",
         Argv.BOOLEAN, "--debug"
     )
-    print(argv._option_definitions._definitions[0]._options)
-    print(argv._option_definitions._definitions[0]._action)
-    print(argv._option_definitions._definitions[1]._options)
-    print(argv._option_definitions._definitions[1]._action)
-    print(argv._option_definitions._definitions[2]._options)
-    print(argv._option_definitions._definitions[2]._action)
     assert argv.values.verbose is True
     assert argv.values.debug is True
     assert argv.values.config == "file.json"
@@ -443,33 +437,29 @@ if True:
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
     #     [Argv.INTEGERS, "--count"],
-    #     [Argv.FLOATS, "--kay"]
+    #     [Argv.FLOATS, "--key"]
     # )
     args = Argv(
         Argv.STRINGS, "--config", "--conf",
         Argv.STRING, "--config", "--conf",
         Argv.INTEGERS, "--count",
-        Argv.FLOATS, "--kay",
+        Argv.FLOATS, "--key",
         Argv.STRING, "--foo",
         Argv.STRING, "goo",
         Argv.STRING, "--import-file",
-        # Argv.DEFAULT, "defaultt",
+        Argv.DEFAULT, "others",
     )
     missing, unparsed = args.parse(["--config", "abc", "ghi", "-xyz",
                                     "--config", "foo", "--import-file", "secrets.json",
-                                    "-count", "123", "456", "-kay", "321", "2342.234",
-                                    "-123", "somefile.json", "asdfasfd"])
+                                    "-count", "123", "456", "-key", "321", "2342.234",
+                                    "-124", "somefile.json", "some-other"])
 
-    print(args.values.config)
-    print(args.values.count)
-    print(args.values.kay)
-    print('--')
-    print(args.values.foo)
-    print(args.values.goo)
-    print(args.values.import_file)
-    print(args.foobar)
-
-    print('-------------------------------------------------------------------------')
+    assert args.config == ["abc", "ghi", "foo"]
+    assert args.count == [123, 456]
+    assert args.import_file == "secrets.json"
+    assert args.key == [321, 2342.234]
+    assert args.others == "somefile.json", "some-other"
+    assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
 
 if True:
     argv = Argv(
@@ -502,29 +492,9 @@ if True:
         Argv.DEFAULTS | Argv.OPTIONAL, "thedefaultfoo",
         #    Argv.DEFAULTS, "thedefaults"
     )
-    print(argv._option_definitions._definitions)
-    print(argv._option_definitions._definitions[1])
-    print(argv._option_definitions._definitions[1]._options)
-    print(argv._option_definitions._definitions[1]._action)
-    # import json
-    # print(json.dumps(argv._definitions, indent=4, default=str))
-    # TODO: accept literal (non-string) int/float/bool
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
                                     "-passwd", "pas", "--shell", "hoo", "-config", "configfile",
                                     "--max", "124", "--pie", "3.141562"])
-    print('unparsed:')
-    print(unparsed)
-    # print(argv.values.unparsed)
-    print('thedefault:')
-    print(argv.values.thedefault)
-    print('thedefault2:')
-    print(argv.values.thedefault2)
-    print('thedefaults:')
-    print(argv.values.thedefaults)
-    print('thedefaultb:')
-    print(argv.values.thedefaultb)
-    print('thedefaultfoo:')
-    print(argv.values.thedefaultfoo)
     assert argv.password == "pas"
     assert argv.max == 124
     assert argv.pi == 3.141562
@@ -580,7 +550,16 @@ if True:
 if True:
     argv = Argv(
         Argv.STRING, ["--password"],
-        Argv.DEFAULTS, "thedefaults", strip=False)
+        Argv.DEFAULTS, ("thedefaults"), strip=False)
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
+
+if False:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.DEFAULTS: "thedefaults"
+    })
     missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
