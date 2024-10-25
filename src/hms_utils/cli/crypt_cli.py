@@ -1,8 +1,9 @@
+from getpass import getpass as read_password
 import os
 import shutil
 import sys
 from dcicutils.command_utils import yes_or_no
-from dcicutils.tmpfile_utils import temporary_file
+from dcicutils.tmpfile_utils import create_temporary_file_name, temporary_file
 from hms_utils.crypt_utils import decrypt_file, encrypt_file
 
 
@@ -61,7 +62,8 @@ def main():
     if (file != STDIN) and (not os.path.isfile(file)):
         _error(f"Cannot find file: {file}")
     if not password:
-        _error("Must specify a password.")
+        if not (password := read_password("Enter password: ")):
+            _error("Must specify a password.")
     if output:
         if (output == "-") or (output == STDOUT):
             output = STDOUT
@@ -80,23 +82,26 @@ def main():
             function = decrypt_file
         else:
             _error("Must specify --encrypt or --decrypt")
-        if (not output) and (not yes_or_no(f"{verb} file {file} in place?")):
-            exit(0)
+        if (not output) and (not yes) and (not yes_or_no(f"{verb} file {file} in place?")):
+            output = tmpfile
+        else:
+            output = file
         if debug:
             _print(f"{verb}ing file {file} to {tmpfile}")
-        elif verbose:
+        elif verbose and (output == file):
             _print(f"{verb}ing file in place: {file}")
         function(file, password, tmpfile)
-        copy_file(tmpfile, "/tmp/foo")
         if debug:
             _print(f"Done {verb.lower()}ing file {file} to {tmpfile}")
-        if output:
-            file = output
-        if debug:
-            _print(f"Copying file {tmpfile} to: {file}")
-        copy_file(tmpfile, file)
-        if debug:
-            _print(f"Done copying file {tmpfile} to: {file}")
+        if tmpfile != output:
+            if debug:
+                _print(f"Copying file {tmpfile} to: {output}")
+            copy_file(tmpfile, output)
+            if debug:
+                _print(f"Done copying file {tmpfile} to: {output}")
+        else:
+            copy_file(tmpfile, output := create_temporary_file_name())
+            _print(f"{verb}ed file is here: {output}")
 
 
 def main_encrypt():
@@ -114,7 +119,7 @@ def _print(message: str) -> None:
 
 
 def _error(message: str) -> None:
-    _print(message, file=sys.stderr)
+    print(message, file=sys.stderr)
     exit(1)
 
 
