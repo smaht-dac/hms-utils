@@ -131,7 +131,7 @@ class Argv:
                 for option in option._options:
                     if (not callable(convert_type)) or ((property_value := convert_type(property_value)) is not None):
                         if not hasattr(self._argv._values, option):
-                            setattr(self._argv._values, option, self)
+                            setattr(self._argv._values, option, property_value)
                             return True
             return False
 
@@ -346,10 +346,6 @@ class Argv:
 
     @property
     def _peek(self) -> Optional[str]:
-        x = Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
-        if x is None:
-            import pdb ; pdb.set_trace()  # noqa
-            pass
         return Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
 
     @property
@@ -544,13 +540,23 @@ if True:
 
 if True:
     argv = Argv(
-        Argv.DEFAULTS | Argv.INTEGER, "maxes",
-        Argv.DEFAULTS | Argv.FLOAT, "floats", "flts"
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
     )
     x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
     print(x)
     print(y)
-    assert argv.maxes == [12, 34, 56]
+    assert argv.floats == [12, 34, 56, 1.2, 3.4]
+
+if True:
+    argv = Argv(
+        Argv.DEFAULT | Argv.INTEGER, "max",
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
+    )
+    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
+    print(x)
+    print(y)
+    assert argv.max == 12
+    assert argv.floats == [34, 56, 1.2, 3.4]
 
 
 if True:
