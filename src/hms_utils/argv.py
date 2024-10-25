@@ -83,13 +83,9 @@ class Argv:
             return False
 
         def set_default_value_strings(self, option: Argv._Option) -> bool:
-            parsed = False
-            peek = self
+            parsed = False ; peek = self  # noqa
             for option in option._options:
-                if hasattr(self._argv._values, option):
-                    option_values = getattr(self._argv._values, option)
-                else:
-                    option_values = None
+                option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
                     if peek and (not peek.is_option):
                         if option_values is None:
