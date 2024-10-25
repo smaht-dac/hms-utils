@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from typing import Any, Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union
 from hms_utils.type_utils import to_float, to_integer, to_string_list
 
 
@@ -20,9 +20,9 @@ class Argv:
 
     _ESCAPE_VALUE = "--"
     _FUZZY_OPTION_PREFIX = "-"
-    _FUZZY_OPTION_PREFIX_LENGTH = len(_FUZZY_OPTION_PREFIX)
+    _FUZZY_OPTION_PREFIX_LEN = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
-    _OPTION_PREFIX_LENGTH = len(_OPTION_PREFIX)
+    _OPTION_PREFIX_LEN = len(_OPTION_PREFIX)
     _TYPES = [BOOLEAN, DEFAULT, DEFAULTS, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
 
     class _Arg(str):
@@ -43,53 +43,36 @@ class Argv:
                 if self._argv._escaping:
                     return False
                 if isinstance(option, str) and (option := option.strip()):
-                    if ((self == option) or
-                        (self._argv._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
-                         (self == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LENGTH:]))):
+                    if ((self == option) or (self._argv._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
+                                             (self == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:]))):
                         return True
                 return False
             return any(match(option) for option in options)
 
         def set_value_boolean(self, option: Argv._Option) -> bool:
-            if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
-            if self.is_any_of(option._options):
-                if self._set_value_property(option, property_value=True):
-                    return True
+            if isinstance(option, str): option = Argv._Option(option)  # noqa
+            if self.is_any_of(option._options) and (property_name := option._property_name):
+                setattr(self._argv._values, property_name, True)
+                return True
             return False
 
         def set_value_string(self, option: Argv._Option) -> bool:
-            if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
-            if self.is_any_of(option._options):
-                if (peek := self._argv._peek) and (not peek.is_option):
-                    if self._set_value_property(option, property_value=peek):
-                        self._argv._next
-                        return True
-            return False
+            return self._set_value_property(option)
 
         def set_value_strings(self, option: Argv._Option) -> bool:
             return self._set_value_property_multiple(option)
 
         def set_value_integer(self, option: Argv._Option) -> bool:
-            if self.is_any_of(option._options):
-                if (peek := to_integer(self._argv._peek)) is not None:
-                    if self._set_value_property(option, property_value=peek):
-                        self._argv._next
-                        return True
-            return False
+            return self._set_value_property(option, convert_type=to_integer)
 
         def set_value_integers(self, option: Argv._Option) -> bool:
-            return self._set_value_property_multiple(option, to_type=to_integer)
+            return self._set_value_property_multiple(option, convert_type=to_integer)
 
         def set_value_float(self, option: Argv._Option) -> bool:
-            if self.is_any_of(option._options):
-                if (peek := to_float(self._argv._peek)) is not None:
-                    if self._set_value_property(option, property_value=peek):
-                        self._argv._next
-                        return True
-            return False
+            return self._set_value_property(option, convert_type=to_float)
 
         def set_value_floats(self, option: Argv._Option) -> bool:
-            return self._set_value_property_multiple(option, to_type=to_float)
+            return self._set_value_property_multiple(option, convert_type=to_float)
 
         def set_default_value_string(self, option: Argv._Option) -> bool:
             if self and (not self.is_option):
@@ -120,17 +103,21 @@ class Argv:
                         break
             return parsed
 
-        def _set_value_property(self, option: Argv._Option, property_value: Any = None) -> bool:
-            if property_name := option._property_name:
-                setattr(self._argv._values, property_name, property_value)
-                return True
+        def _set_value_property(self, option: Argv._Option, convert_type: Optional[Callable] = None) -> bool:
+            if isinstance(option, str): option = Argv._Option(option)  # noqa
+            if self.is_any_of(option._options) and (property_name := option._property_name):
+                if (peek := self._argv._peek) and (not peek.is_option):
+                    if (not callable(convert_type)) or ((peek := convert_type(peek)) is not None):
+                        setattr(self._argv._values, property_name, peek)
+                        self._argv._next
+                        return True
             return False
 
         def _set_value_property_multiple(self, option: Union[Argv._Option, str],
-                                         to_type: Optional[Callable] = None) -> bool:
-            if isinstance(option, str): option = Argv._Option(option)  # noqa xyzzy
-            if not callable(to_type):
-                to_type = lambda value: value if isinstance(value, str) else None  # noqa
+                                         convert_type: Optional[Callable] = None) -> bool:
+            if isinstance(option, str): option = Argv._Option(option)  # noqa
+            if not callable(convert_type):
+                convert_type = lambda value: value if isinstance(value, str) else None  # noqa
             if self.is_any_of(option._options):
                 if property_name := option._property_name:
                     property_values = []
@@ -138,12 +125,12 @@ class Argv:
                         (existing_property_value := getattr(self._argv._values, property_name))):  # noqa
                         if isinstance(existing_property_value, list):
                             property_values[:0] = existing_property_value
-                        elif (existing_property_value := to_type(existing_property_value)) is not None:
+                        elif (existing_property_value := convert_type(existing_property_value)) is not None:
                             property_values.append(existing_property_value)
                     setattr(self._argv._values, property_name, property_values)
                     while True:
                         if not ((peek := self._argv._peek) and
-                                (not peek.is_option) and ((peek := to_type(peek)) is not None)):
+                                (not peek.is_option) and ((peek := convert_type(peek)) is not None)):
                             break
                         property_values.append(peek)
                         self._argv._next
@@ -151,8 +138,7 @@ class Argv:
             return False
 
     class _Values:
-        def __init__(self) -> None:
-            pass
+        pass
 
     class _OptionDefinitions:
         def __init__(self, fuzzy: bool = False) -> None:
@@ -197,9 +183,9 @@ class Argv:
         def _property_name(self) -> str:
             if self._options and (option := self._options[0]):
                 if option.startswith(Argv._OPTION_PREFIX):
-                    option = option[Argv._OPTION_PREFIX_LENGTH:]
+                    option = option[Argv._OPTION_PREFIX_LEN:]
                 elif self._fuzzy and option.startswith(Argv._FUZZY_OPTION_PREFIX):
-                    option = option[Argv._FUZZY_OPTION_PREFIX_LENGTH:]
+                    option = option[Argv._FUZZY_OPTION_PREFIX_LEN:]
                 return option.replace("-", "_")
             return ""
 
@@ -348,11 +334,11 @@ class Argv:
 
     def _is_option(self, value: str) -> bool:
         if isinstance(value, str) and (value := value.strip()):
-            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LENGTH:].strip()):
+            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
                 return True
             elif (self._fuzzy and
                   value.startswith(Argv._FUZZY_OPTION_PREFIX) and
-                  (value := value[Argv._FUZZY_OPTION_PREFIX_LENGTH:].strip())):
+                  (value := value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip())):
                 return True
         return False
 
@@ -434,6 +420,8 @@ if True:
 if True:
     argv = Argv(
         # Argv.DEFAULT, "files",
+        Argv.INTEGER, ["--max", "--maximum"],
+        Argv.FLOAT, ["--pi", "--pie"],
         Argv.STRINGS, ("--config", "--conf"),
         Argv.STRINGS, ["--secrets", "--secret"],
         Argv.STRINGS, ("--merge"),
@@ -466,8 +454,10 @@ if True:
     print(argv._option_definitions._definitions[1]._action)
     # import json
     # print(json.dumps(argv._definitions, indent=4, default=str))
+    # TODO: accept literal (non-string) int/float/bool
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
-                                    "-passwd", "pas", "--shell", "hoo", "-config", "configfile"])
+                                    "-passwd", "pas", "--shell", "hoo", "-config", "configfile",
+                                    "--max", "124", "--pie", "3.141562"])
     print('unparsed:')
     print(unparsed)
     # print(argv.values.unparsed)
@@ -482,6 +472,8 @@ if True:
     print('thedefaultfoo:')
     print(argv.values.thedefaultfoo)
     assert argv.password == "pas"
+    assert argv.max == 124
+    assert argv.pi == 3.141562
 
     assert argv.values.thedefault == "foo"
     assert argv.values.thedefault2 == "bara"
