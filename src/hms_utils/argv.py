@@ -140,7 +140,8 @@ class Argv:
             for option in option._options:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
-                    if peek.is_option or (callable(convert_type) and ((peek := convert_type(peek)) is None)):
+                    if ((peek is None) or peek.is_option or
+                        (callable(convert_type) and ((peek := convert_type(peek)) is None))):
                         break
                     if option_values is None:
                         option_values = []
@@ -345,6 +346,10 @@ class Argv:
 
     @property
     def _peek(self) -> Optional[str]:
+        x = Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
+        if x is None:
+            import pdb ; pdb.set_trace()  # noqa
+            pass
         return Argv._Arg(self._argv[self._argi], self) if self._argi < len(self._argv) else Argv._Arg(None, self)
 
     @property
@@ -400,7 +405,7 @@ class Argv:
 # x = argv.foo
 
 
-if False:
+if True:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -434,7 +439,7 @@ if False:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if False:
+if True:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -467,7 +472,7 @@ if False:
 
     print('-------------------------------------------------------------------------')
 
-if False:
+if True:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -537,21 +542,23 @@ if False:
     print(unparsed)
     print(argv.values.config)
 
-if False:
+if True:
     argv = Argv(
-        Argv.DEFAULTS | Argv.INTEGER, "maxes"
+        Argv.DEFAULTS | Argv.INTEGER, "maxes",
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "flts"
     )
-    x, y = argv.parse(["12", "34", "56"])
+    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
     print(x)
     print(y)
-    print(argv.maxes)
+    assert argv.maxes == [12, 34, 56]
 
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ("--password", "--passwd")
     )
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
+    assert argv.password == "pas"
 
 if True:
     argv = Argv(
