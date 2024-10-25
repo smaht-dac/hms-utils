@@ -337,10 +337,16 @@ class Argv:
                     option_type = to_integer(option_type[0:index])
                 if Argv._is_option_type(option_type) and (option_options := to_non_empty_string_list(option_options)):
                     if not any(self._is_option(option) for option in option_options):
+                        if default_is_but_should_not_be_boolean := ((option_type & Argv.BOOLEAN) == Argv.BOOLEAN):
+                            option_type &= ~Argv.BOOLEAN
                         if option_type & (Argv.STRINGS | Argv.INTEGERS | Argv.INTEGERS | Argv.DEFAULTS):
                             option_type |= Argv.DEFAULTS
+                            if default_is_but_should_not_be_boolean:
+                                option_type | ~Argv.STRING
                         else:
                             option_type |= Argv.DEFAULT
+                            if default_is_but_should_not_be_boolean:
+                                option_type | ~Argv.STRINGS
                     args.append(option_type)
                     args.append(option_options)
 
@@ -419,27 +425,20 @@ class Argv:
 class ARGV(Argv):
 
     @staticmethod
-    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None,
-                 _required: bool = False, _default: bool = False) -> str:
+    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None, _required: bool = False) -> str:
         if isinstance(type, list) and (len(type) == 1):
             type = type[0]
             if type == str: option_type = Argv.STRINGS  # noqa
             elif type == int: option_type = Argv.INTEGERS  # noqa
             elif type == float: option_type = Argv.FLOATS  # noqa
             elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else:
-                import pdb ; pdb.set_trace()  # noqa
-                return None  # noqa
-            if _default is True: option_type |= Argv.DEFAULTS  # noqa
+            else: option_type = Argv.BOOLEAN  # noqa
         else:
             if type == str: option_type = Argv.STRING  # noqa
             elif type == int: option_type = Argv.INTEGER  # noqa
             elif type == float: option_type = Argv.FLOAT  # noqa
             elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else:
-                import pdb ; pdb.set_trace()  # noqa
-                return None  # noqa
-            if _default is True: option_type |= Argv.DEFAULT  # noqa
+            else: option_type = Argv.BOOLEAN  # noqa
         if _required is True:
             option_type |= Argv.REQUIRED
         else:
