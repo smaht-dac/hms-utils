@@ -140,15 +140,15 @@ class Argv:
             for option in option._options:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
-                    if ((peek is None) or peek.is_option or
-                        (callable(convert_type) and ((peek := convert_type(peek)) is None))):  # noqa
+                    if (peek is None) or peek.is_option or (callable(convert_type) and ((peek := convert_type(peek)) is None)):
                         break
                     if option_values is None:
                         option_values = []
                         setattr(self._argv._values, option, option_values)
-                    option_values.append(peek)
+                    option_values.append(peek if callable(convert_type) else str(peek))
                     parsed = True
-                    if (peek := self._argv._peek).is_option:
+                    # if (peek := self._argv._peek).is_option:
+                    if (not (peek := self._argv._peek)) or peek.is_option:
                         break
                     self._argv._next
             return parsed
@@ -579,5 +579,6 @@ if True:
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, "thedefaults"
     )
-    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas"])
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", "argwithspace"])
     assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace"]
