@@ -162,17 +162,7 @@ class Argv:
             self._definitions = []
             self._fuzzy = fuzzy is True
             self._option_type_action_map = {
-                Argv.BOOLEAN: Argv._Arg.set_value_boolean,
-                Argv.STRING: Argv._Arg.set_value_string,
-                Argv.STRINGS: Argv._Arg.set_value_strings,
-                Argv.INTEGER: Argv._Arg.set_value_integer,
-                Argv.INTEGERS: Argv._Arg.set_value_integers,
-                Argv.FLOAT: Argv._Arg.set_value_float,
-                Argv.FLOATS: Argv._Arg.set_value_floats,
-                Argv.DEFAULT: Argv._Arg.set_default_value_string,
-                Argv.DEFAULTS: Argv._Arg.set_default_value_strings
-            }
-            self._new_option_type_action_map = {
+                0: Argv._Arg.set_value_string,
                 Argv.BOOLEAN: Argv._Arg.set_value_boolean,
                 Argv.STRING: Argv._Arg.set_value_string,
                 Argv.STRINGS: Argv._Arg.set_value_strings,
@@ -182,24 +172,35 @@ class Argv:
                 Argv.FLOATS: Argv._Arg.set_value_floats
             }
             self._default_option_type_action_map = {
+                0: Argv._Arg.set_default_value_string,
                 Argv.STRING: Argv._Arg.set_default_value_string,
+                Argv.STRINGS: Argv._Arg.set_default_value_string,
                 Argv.INTEGER: Argv._Arg.set_default_value_integer,
-                Argv.FLOAT: Argv._Arg.set_default_value_float
+                Argv.INTEGERS: Argv._Arg.set_default_value_integer,
+                Argv.FLOAT: Argv._Arg.set_default_value_float,
+                Argv.FLOATS: Argv._Arg.set_default_value_float
             }
             self._defaults_option_type_action_map = {
+                0: Argv._Arg.set_default_value_strings,
+                Argv.STRING: Argv._Arg.set_default_value_strings,
                 Argv.STRINGS: Argv._Arg.set_default_value_strings,
+                Argv.INTEGER: Argv._Arg.set_default_value_integers,
                 Argv.INTEGERS: Argv._Arg.set_default_value_integers,
+                Argv.FLOAT: Argv._Arg.set_default_value_floats,
                 Argv.FLOATS: Argv._Arg.set_default_value_floats
             }
 
         def define_option(self, option_type: int, options: List[str]) -> None:
             if isinstance(option_type, int) and isinstance(options, list):
                 option_required = (option_type & Argv.REQUIRED) == Argv.REQUIRED
-                option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL)
-                # option_default = (option_type & Argv.DEFAULT) == Argv.DEFAULT
-                # option_defaults = (option_type & Argv.DEFAULTS) == Argv.DEFAULTS
-                # default_option_type &= ~(Argv.DEFAULT | Argv.DEFAULTS)
-                if action := self._option_type_action_map.get(option_type):
+                if (option_type & Argv.DEFAULT) == Argv.DEFAULT:
+                    option_type_action_map = self._default_option_type_action_map
+                elif (option_type & Argv.DEFAULTS) == Argv.DEFAULTS:
+                    option_type_action_map = self._defaults_option_type_action_map
+                else:
+                    option_type_action_map = self._option_type_action_map
+                option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL | Argv.DEFAULT | Argv.DEFAULTS)
+                if action := option_type_action_map.get(option_type):
                     self._definitions.append(Argv._Option(
                         options=options, required=option_required, action=action, fuzzy=self._fuzzy))
 
