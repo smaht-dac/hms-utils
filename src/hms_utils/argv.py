@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 from hms_utils.type_utils import to_float, to_integer, to_string_list
 
 
@@ -23,7 +23,6 @@ class Argv:
     _FUZZY_OPTION_PREFIX_LEN = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LEN = len(_OPTION_PREFIX)
-    _TYPES = [BOOLEAN, DEFAULT, DEFAULTS, FLOAT, FLOATS, INTEGER, INTEGERS, STRING, STRINGS]
 
     class _Arg(str):
 
@@ -77,17 +76,17 @@ class Argv:
         def set_default_value_string(self, option: Argv._Option) -> bool:
             return self._set_default_value_property(option)
 
-        def set_default_value_integer(self, option: Argv._Option) -> bool:
-            return self._set_default_value_property(option, convert_type=to_integer)
-
-        def set_default_value_float(self, option: Argv._Option) -> bool:
-            return self._set_default_value_property(option, convert_type=to_float)
-
         def set_default_value_strings(self, option: Argv._Option) -> bool:
             return self._set_default_value_properties(option)
 
+        def set_default_value_integer(self, option: Argv._Option) -> bool:
+            return self._set_default_value_property(option, convert_type=to_integer)
+
         def set_default_value_integers(self, option: Argv._Option) -> bool:
             return self._set_default_value_properties(option, convert_type=to_integer)
+
+        def set_default_value_float(self, option: Argv._Option) -> bool:
+            return self._set_default_value_property(option, convert_type=to_float)
 
         def set_default_value_floats(self, option: Argv._Option) -> bool:
             return self._set_default_value_properties(option, convert_type=to_float)
@@ -141,17 +140,16 @@ class Argv:
             for option in option._options:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
-                    if peek and (not peek.is_option):
-                        if (not callable(convert_type)) or ((peek := convert_type(peek)) is not None):
-                            if option_values is None:
-                                option_values = []
-                                setattr(self._argv._values, option, option_values)
-                            option_values.append(peek)
-                            self._argv._next
-                            peek = self._argv._peek
-                            parsed = True
-                            continue
-                    break
+                    if peek.is_option or (callable(convert_type) and ((peek := convert_type(peek)) is None)):
+                        break
+                    if option_values is None:
+                        option_values = []
+                        setattr(self._argv._values, option, option_values)
+                    option_values.append(peek)
+                    parsed = True
+                    if (peek := self._argv._peek).is_option:
+                        break
+                    self._argv._next
             return parsed
 
     class _Values:
@@ -262,13 +260,13 @@ class Argv:
             # Here, the given args are the actual command-line arguments to process/parse;
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._option_definitions:
-                return
+                return None, None
             self._argv = args[0]
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
             if not self._argv:
-                return
+                return None, None
             self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
         missing_options = unparsed_options = []
@@ -323,7 +321,6 @@ class Argv:
         if (len(args) == 1) and isinstance(args[0], dict):
             # TODO
             for key in args[0]:
-                import pdb ; pdb.set_trace()  # noqa
                 pass
             return option_definitions
 
@@ -377,8 +374,12 @@ class Argv:
         return Argv._Arg(arg, self)
 
     @staticmethod
-    def _is_option_type(option_type: int) -> bool:
-        return isinstance(option_type, int) and (option_type & ~(Argv.REQUIRED | Argv.OPTIONAL)) in Argv._TYPES
+    def _is_option_type(option_type: Any) -> bool:
+        if isinstance(option_type, int):
+            return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
+                      Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
+                      Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
+        return False
 
     def _is_option(self, value: str) -> bool:
         if isinstance(value, str) and (value := value.strip()):
@@ -393,12 +394,13 @@ class Argv:
     def __getattr__(self, name: str):
         return getattr(self._values, name) if hasattr(self._values, name) else None
 
+
 # args = Argv({"foo": "bar"})
 # argv = Argv()
 # x = argv.foo
 
 
-if True:
+if False:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -432,7 +434,7 @@ if True:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if True:
+if False:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -465,7 +467,7 @@ if True:
 
     print('-------------------------------------------------------------------------')
 
-if True:
+if False:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -534,3 +536,35 @@ if True:
     print("UNPARSED:")
     print(unparsed)
     print(argv.values.config)
+
+if False:
+    argv = Argv(
+        Argv.DEFAULTS | Argv.INTEGER, "maxes"
+    )
+    x, y = argv.parse(["12", "34", "56"])
+    print(x)
+    print(y)
+    print(argv.maxes)
+
+
+if False:
+    argv = Argv(
+        Argv.STRING, ("--password", "--passwd")
+    )
+    missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
+
+if True:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, "file"
+    )
+    missing, unparsed = argv.parse(["foo", "--password", "pas"])
+    assert argv.password == "pas"
+
+if True:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, "thedefaults"
+    )
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas"])
+    assert argv.password == "pas"
