@@ -189,7 +189,7 @@ class Argv:
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
         self._argi = 0
         self._fuzzy = fuzzy is not False
-        self._strip = strip is not False
+        self._strip = strip is not False  # TODO: make strip = False by default
         self._escape = escape is not False
         self._escaping = False
         self._delete = delete is True
