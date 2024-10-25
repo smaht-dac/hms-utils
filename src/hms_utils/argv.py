@@ -274,6 +274,11 @@ class Argv:
             flatten(args)
             return flattened_args
 
+        if (len(args) == 1) and isinstance(args[0], dict):
+            # TODO
+            import pdb ; pdb.set_trace()  # noqa
+            pass
+
         option_definitions = Argv._OptionDefinitions(fuzzy=self._fuzzy)
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
