@@ -329,36 +329,34 @@ class Argv:
             if not parsed:
                 unparsed_args.append(arg)
 
-        if defined_value_options := set(self._defined_value_options()):
+        defined_value_options = set(self._defined_value_options())
 
-            for rule_options in self._option_definitions._rule_exactly_one_of:
-                if rule_options := set(self._find_options(rule_options)):
-                    if len(intersection_options := rule_options & defined_value_options) == 0:
-                        # Exactly one of the specifed rule options should be specified but none are.
-                        rule_violations_exactly_one_of_missing.append(
-                            [option._option_name for option in rule_options])
-                    elif len(intersection_options) != 1:
-                        # Exactly one of the specifed rule options should be specified more than one are.
-                        rule_violations_exactly_one_of_toomany.append(
-                            [option._option_name for option in rule_options])
+        for rule_options in self._option_definitions._rule_exactly_one_of:
+            if rule_options := set(self._find_options(rule_options)):
+                if len(intersection_options := rule_options & defined_value_options) == 0:
+                    # Exactly one of the specifed rule options should be specified but none are.
+                    rule_violations_exactly_one_of_missing.append(
+                        [option._option_name for option in rule_options])
+                elif len(intersection_options) != 1:
+                    # Exactly one of the specifed rule options should be specified more than one are.
+                    rule_violations_exactly_one_of_toomany.append(
+                        [option._option_name for option in rule_options])
 
-            for rule_options in self._option_definitions._rule_at_least_one_of:
-                if rule_options := set(self._find_options(rule_options)):
-                    import pdb ; pdb.set_trace()  # noqa
-                    pass
-                    intersection_options = rule_options & defined_value_options
-                    if len(intersection_options) == 0:
-                        # At least one of the specifed rule options should be specified but none are.
-                        rule_violations_at_least_one_of_missing.append(
-                            [option._option_name for option in rule_options])
+        for rule_options in self._option_definitions._rule_at_least_one_of:
+            if rule_options := set(self._find_options(rule_options)):
+                intersection_options = rule_options & defined_value_options
+                if len(intersection_options) == 0:
+                    # At least one of the specifed rule options should be specified but none are.
+                    rule_violations_at_least_one_of_missing.append(
+                        [option._option_name for option in rule_options])
 
-            for rule_options in self._option_definitions._rule_at_most_one_of:
-                if rule_options := set(self._find_options(rule_options)):
-                    intersection_options = rule_options & defined_value_options
-                    if len(intersection_options) > 0:
-                        # At most one of the specifed rule options should be specified but more than one are.
-                        rule_violations_at_most_one_of_toomany.append(
-                            [option._option_name for option in rule_options])
+        for rule_options in self._option_definitions._rule_at_most_one_of:
+            if rule_options := set(self._find_options(rule_options)):
+                intersection_options = rule_options & defined_value_options
+                if len(intersection_options) > 0:
+                    # At most one of the specifed rule options should be specified but more than one are.
+                    rule_violations_at_most_one_of_toomany.append(
+                        [option._option_name for option in rule_options])
 
         # Define value properties as None for any options/properties not specified; must be after above.
         for option in self._option_definitions._definitions:
