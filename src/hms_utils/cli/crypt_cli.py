@@ -23,6 +23,7 @@ def main():
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
         ARGV.REQUIRED(str): ["file"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
+        ARGV.AT_MOST_ONE_OF: ["--verbose", "--debug"]
     }, parse=True, exit=True)
 
     def copy_file(source: str, destination: str) -> None:
