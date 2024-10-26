@@ -52,8 +52,9 @@ def main():
     if argv.output:
         if (argv.output == "-") or (argv.output == STDOUT):
             argv.output = STDOUT
-        elif (not argv.yes) and os.path.isfile(argv.output):
-            _error(f"Output file already exists: {argv.output}")
+        elif os.path.isfile(argv.output):
+            if not (argv.yes or yes_or_no(f"Overwrite file: {argv.output} ?")):
+                exit(0)
         elif (output_directory := os.path.dirname(argv.output)) and (not os.path.isdir(output_directory)):
             _error(f"Output file directory does not exist: {output_directory}")
         elif file == STDIN:
@@ -69,6 +70,9 @@ def main():
         argv.password = read_password("Enter password: ")
         if not argv.password:
             _error("Must specify a password.")
+        verify_password = read_password("Verify password: ")
+        if verify_password != argv.password:
+            _error("Passwords to not match.")
 
     with temporary_file() as tmpfile:
 
