@@ -507,7 +507,7 @@ class ARGV(Argv):
 # x = argv.foo
 
 
-if False:
+if True:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -535,7 +535,7 @@ if False:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if False:
+if True:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -564,7 +564,7 @@ if False:
     assert args.others == "somefile.json", "some-other"
     assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
 
-if False:
+if True:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -614,7 +614,7 @@ if False:
     print(unparsed)
     print(argv.values.config)
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
     )
@@ -623,7 +623,7 @@ if False:
     print(y)
     assert argv.floats == [12, 34, 56, 1.2, 3.4]
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULT | Argv.INTEGER, "max",
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
@@ -635,14 +635,14 @@ if False:
     assert argv.floats == [34, 56, 1.2, 3.4]
 
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ("--password", "--passwd")
     )
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, "file"
@@ -650,7 +650,7 @@ if False:
     missing, unparsed = argv.parse(["foo", "--password", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, ("thedefaults"), strip=False)
@@ -658,7 +658,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -667,7 +667,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.REQUIRED: "--req",
@@ -679,7 +679,7 @@ if False:
     assert argv.req is True
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ("--password"),
         ARGV.OPTIONAL(str): ("--xpassword"),
@@ -697,7 +697,7 @@ if False:
     assert missing == ["--maxn"]
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
