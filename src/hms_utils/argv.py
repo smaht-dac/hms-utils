@@ -267,19 +267,17 @@ class Argv:
     def values(self) -> Argv._Values:
         return self._values
 
-    def parse(self, *args, report: bool = True, printf: Optional[Callable] = None) -> None:
+    def parse(self, *args, skip: bool = True, report: bool = True, printf: Optional[Callable] = None) -> None:
 
-        if (len(args) == 1) and isinstance(args[0], list):
+        if ((len(args) == 1) and isinstance(args[0], list)) or (len(args) == 0):
             # Here, the given args are the actual command-line arguments to process/parse;
             # and this Argv object already should have the definitions for processing/parsing these.
             if not self._option_definitions:
                 return None, None
-            self._argv = args[0]
+            self._argv = args[0] if (len(args) > 0) else (sys.argv[1:] if (skip is not False) else sys.argv)
         else:
             # Here, the given args are the definitions for processing/parsing command-line args;
             # and this Argv object already as the actual command-line arguments to process/parse.
-            if not self._argv:
-                return None, None
             self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
         missing_options = [] ; unparsed_args = []  # noqa
