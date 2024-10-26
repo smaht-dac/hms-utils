@@ -269,7 +269,7 @@ class Argv:
             # Here, the given args should be the definitions for processing/parsing command-line args.
             self._option_definitions = self._process_option_definitions(*args)
         self._argv = argv if isinstance(argv, list) and argv else (sys.argv[1:] if skip is not False else sys.argv)
-        if parse is True:
+        if (parse is True) and self._option_definitions._definitions:
             self.parse()
 
     @property
