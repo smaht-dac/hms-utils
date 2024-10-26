@@ -17,12 +17,12 @@ def main():
         ARGV.OPTIONAL(bool): ["--encrypt"],
         ARGV.OPTIONAL(bool): ["--decrypt"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool): ["--yes", "--force"],
+        ARGV.OPTIONAL(bool): ["--yes", "--y", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
         ARGV.REQUIRED(str): ["file"],
-        ARGV.ONE_OF: ["--encrypt", "--decrypt"]
+        ARGV.ONE_OF: ["--encrypt", "--decrypt"],
     }, parse=True, exit=True)
 
     def copy_file(source: str, destination: str) -> None:

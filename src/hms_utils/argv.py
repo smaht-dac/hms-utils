@@ -309,12 +309,15 @@ class Argv:
                     unparsed_args.append(arg)
             for rule in self._option_definitions._rule_oneof:
                 oneof_args = []
-                for oneof in rule:
-                    if (option := self._find_option_definition(oneof)) and (property_name := option._property_name):
-                        if hasattr(self._values, property_name):
-                            oneof_args.append(option._option_name)
-                if (not oneof_args) and option:
-                    # oneof_rule_violations_missing.append(rule)
+                rule_options = []
+                for item in rule:
+                    if (item := self._find_option_definition(item)) and (property_name := item._property_name):
+                        rule_options.append(item)
+                for rule_option in rule_options:
+                    if hasattr(self._values, rule_option._property_name):
+                        oneof_args.append(rule_option._option_name)
+                if (not oneof_args) and rule_option:
+                    oneof_rule_violations_missing.append(rule)
                     pass
                 elif len(oneof_args) > 1:
                     oneof_rule_violations_toomany.append(oneof_args)
