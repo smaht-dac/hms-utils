@@ -173,6 +173,8 @@ class Argv:
             self._definitions = []
             self._fuzzy = fuzzy is not False
             self._rule_exactly_one_of = []
+            self._rule_at_least_one_of = []
+            self._rule_at_most_one_of = []
             self._option_type_action_map = {
                 # 0: Argv._Arg.set_value_string,
                 0: Argv._Arg.set_value_boolean,
@@ -221,8 +223,13 @@ class Argv:
             if options := list(set(to_non_empty_string_list(options))):
                 self._rule_exactly_one_of.append(options)
 
+        def add_rule_at_least_one_of(self, options: List[str]) -> None:
+            if options := list(set(to_non_empty_string_list(options))):
+                self._rule_at_least_one_of.append(options)
+
         def add_rule_at_most_one_of(self, options: List[str]) -> None:
-            pass  # TODO
+            if options := list(set(to_non_empty_string_list(options))):
+                self._rule_at_most_one_of.append(options)
 
     class _Option:
         def __init__(self,
@@ -389,6 +396,9 @@ class Argv:
                         if option_type == "exactly_one_of":
                             option_definitions.add_rule_exactly_one_of(option_options)
                             continue
+                        elif option_type == "at_least_one_of":
+                            option_definitions.add_rule_at_least_one_of(option_options)
+                            continue
                         elif option_type == "at_most_one_of":
                             option_definitions.add_rule_at_most_one_of(option_options)
                             continue
@@ -528,6 +538,11 @@ class ARGV(Argv):
 
     @classmethod
     @property
+    def AT_LEAST_ONE_OF(cls):
+        return f"rule:at_least_one_of:{str(uuid())}"
+
+    @classmethod
+    @property
     def AT_MOST_ONE_OF(cls):
         return f"rule:at_most_one_of:{str(uuid())}"
 
@@ -537,7 +552,7 @@ class ARGV(Argv):
 # x = argv.foo
 
 
-if False:
+if True:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -565,7 +580,7 @@ if False:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if False:
+if True:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -594,7 +609,7 @@ if False:
     assert args.others == "somefile.json", "some-other"
     assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
 
-if False:
+if True:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -644,7 +659,7 @@ if False:
     print(unparsed)
     print(argv.values.config)
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
     )
@@ -653,7 +668,7 @@ if False:
     print(y)
     assert argv.floats == [12, 34, 56, 1.2, 3.4]
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULT | Argv.INTEGER, "max",
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
@@ -665,14 +680,14 @@ if False:
     assert argv.floats == [34, 56, 1.2, 3.4]
 
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ("--password", "--passwd")
     )
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, "file"
@@ -680,7 +695,7 @@ if False:
     missing, unparsed = argv.parse(["foo", "--password", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, ("thedefaults"), strip=False)
@@ -688,7 +703,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -697,7 +712,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.REQUIRED: "--req",
@@ -709,7 +724,7 @@ if False:
     assert argv.req is True
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ("--password"),
         ARGV.OPTIONAL(str): ("--xpassword"),
@@ -727,7 +742,7 @@ if False:
     assert missing == ["--maxn"]
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
