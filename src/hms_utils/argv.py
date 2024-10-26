@@ -479,14 +479,9 @@ class ARGV(Argv):
 
     @staticmethod
     def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
-        return OPTIONAL(type=type, _required=True)
+        return ARGV.OPTIONAL(type=type, _required=True)
 
     @classmethod
     @property
     def ONE_OF(cls):
         return f"oneof_{str(uuid()).replace('-', '_')}"
-
-
-OPTIONAL = ARGV.OPTIONAL
-REQUIRED = ARGV.REQUIRED
-ONE_OF = ARGV.ONE_OF
