@@ -84,9 +84,10 @@ def main():
         argv.password = read_password("Enter password: ")
         if not argv.password:
             _error("Must specify a password.")
-        verify_password = read_password("Verify password: ")
-        if verify_password != argv.password:
-            _error("Passwords to not match.")
+        if function == encrypt_file:
+            verify_password = read_password("Verify password: ")
+            if verify_password != argv.password:
+                _error("Passwords to not match.")
 
     with temporary_file() as tmpfile:
 
