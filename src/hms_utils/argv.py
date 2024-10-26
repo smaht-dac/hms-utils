@@ -313,6 +313,8 @@ class Argv:
         unparsed_args = []
         rule_violations_exactly_one_of_missing = []
         rule_violations_exactly_one_of_toomany = []
+        rule_violations_at_least_one_of_missing = []
+        rule_violations_at_most_one_of_toomany = []
 
         if self._option_definitions:
             for arg in self:
@@ -325,23 +327,41 @@ class Argv:
                     unparsed_args.append(arg)
 
             if defined_value_options := set(self._defined_value_options()):
+
                 for rule_options in self._option_definitions._rule_exactly_one_of:
                     if rule_options := set(self._find_options(rule_options)):
-                        intersection_options = rule_options & defined_value_options
-                        if len(intersection_options) == 0:
-                            # Exactly one of the specifed rule options should be defined but none are.
+                        if len(intersection_options := rule_options & defined_value_options) == 0:
+                            # Exactly one of the specifed rule options should be specified but none are.
                             rule_violations_exactly_one_of_missing.append(
                                 [option._option_name for option in rule_options])
                         elif len(intersection_options) != 1:
-                            # Exactly one of the specifed rule options should be defined more than one are.
+                            # Exactly one of the specifed rule options should be specified more than one are.
                             rule_violations_exactly_one_of_toomany.append(
                                 [option._option_name for option in rule_options])
 
+                for rule_options in self._option_definitions._rule_at_least_one_of:
+                    if rule_options := set(self._find_options(rule_options)):
+                        intersection_options = rule_options & defined_value_options
+                        if len(intersection_options) == 0:
+                            # At least one of the specifed rule options should be specified but none are.
+                            rule_violations_at_least_one_of_missing.append(
+                                [option._option_name for option in rule_options])
+
+                for rule_options in self._option_definitions._rule_at_most_one_of:
+                    if rule_options := set(self._find_options(rule_options)):
+                        intersection_options = rule_options & defined_value_options
+                        if len(intersection_options) > 0:
+                            # At most one of the specifed rule options should be specified but more than one are.
+                            rule_violations_at_most_one_of_toomany.append(
+                                [option._option_name for option in rule_options])
+
+            # Define value properties as None for any options/properties not specified; must be after above.
             for option in self._option_definitions._definitions:
                 if not hasattr(self._values, property_name := option._property_name):
                     if option._required:
                         missing_options.append(option._option_name)
                     setattr(self._values, property_name, None)
+
             if report is not False:
                 if not callable(printf):
                     printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
@@ -545,231 +565,3 @@ class ARGV(Argv):
     @property
     def AT_MOST_ONE_OF(cls):
         return f"rule:at_most_one_of:{str(uuid())}"
-
-
-# args = Argv({"foo": "bar"})
-# argv = Argv()
-# x = argv.foo
-
-
-if True:
-    args = ["abc", "def", "--config", "file.json", "--verbose",
-            "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
-    argv = Argv(args, delete=True)
-    argv.parse(
-        "--config", "-file", Argv.STRING,
-        "--configs", Argv.STRINGS,
-        "--verbose", Argv.BOOLEAN,
-        "--debug", Argv.BOOLEAN
-    )
-#   argv.parse(
-#       Argv.STRING, "--config", "-file",
-#       Argv.STRINGS, "--configs",
-#       Argv.BOOLEAN, "--verbose",
-#       Argv.BOOLEAN, "--debug"
-#   )
-    argv.parse(
-        Argv.STRING, ("--config", "-file"),
-        Argv.STRINGS, ["--configs", "--configs"],
-        Argv.BOOLEAN, "--verbose",
-        Argv.BOOLEAN, "--debug"
-    )
-    assert argv.values.verbose is True
-    assert argv.values.debug is True
-    assert argv.values.config == "file.json"
-    assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
-
-
-if True:
-    # args = Argv(
-    #     [Argv.STRINGS, "--config", "--conf"],
-    #     [Argv.STRING, "--config", "--conf"],
-    #     [Argv.INTEGERS, "--count"],
-    #     [Argv.FLOATS, "--key"]
-    # )
-    args = Argv(
-        Argv.STRINGS, "--config", "--conf",
-        Argv.STRING, "--config", "--conf",
-        Argv.INTEGERS, "--count",
-        Argv.FLOATS, "--key",
-        Argv.STRING, "--foo",
-        Argv.STRING, "goo",
-        Argv.STRING, "--import-file",
-        Argv.DEFAULT, "others",
-    )
-    missing, unparsed = args.parse(["--config", "abc", "ghi", "-xyz",
-                                    "--config", "foo", "--import-file", "secrets.json",
-                                    "-count", "123", "456", "-key", "321", "2342.234",
-                                    "-124", "somefile.json", "some-other"])
-
-    assert args.config == ["abc", "ghi", "foo"]
-    assert args.count == [123, 456]
-    assert args.import_file == "secrets.json"
-    assert args.key == [321, 2342.234]
-    assert args.others == "somefile.json", "some-other"
-    assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
-
-if True:
-    argv = Argv(
-        # Argv.DEFAULT, "files",
-        Argv.INTEGER, ["--max", "--maximum"],
-        Argv.FLOAT, ["--pi", "--pie"],
-        Argv.STRINGS, ("--config", "--conf"),
-        Argv.STRINGS, ["--secrets", "--secret"],
-        Argv.STRINGS, ("--merge"),
-        Argv.STRINGS, ["--includes", "--include", "--imports", "--import",
-                       "--import-config", "--import-configs", "--import-conf"],
-        Argv.STRINGS, ["--include-secrets", "--include-secret", "--import-secrets", "--import-secret"],
-        Argv.BOOLEAN, ["--list"],
-        Argv.BOOLEAN, ["--tree"],
-        Argv.BOOLEAN, ["--dump"],
-        Argv.BOOLEAN, ["--json"],
-        Argv.BOOLEAN, ("--formatted", "--format"),
-        Argv.BOOLEAN, ["--jsonf"],
-        Argv.BOOLEAN, ["--raw"],
-        Argv.BOOLEAN, ["--verbose"],
-        Argv.BOOLEAN, ["--debug"],
-        Argv.STRINGS, ("--shell", "-shell", "--script", "-script", "--scripts", "-scripts", "--command", "-command",
-                       "--commands", "-commands", "--function", "-function", "--functions", "-functions"),
-        Argv.STRING, ("--password", "--passwd"),
-        Argv.STRING, ["--exports", "--export"],
-        Argv.STRING, ["--exports-file", "--export-file"],
-        Argv.DEFAULT, "thedefault", "thedefault2",
-        Argv.DEFAULTS, "thedefaults",
-        Argv.DEFAULT | Argv.OPTIONAL, "thedefaultb",
-        Argv.DEFAULTS | Argv.OPTIONAL, "thedefaultfoo",
-        #    Argv.DEFAULTS, "thedefaults"
-    )
-    missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
-                                    "-passwd", "pas", "--shell", "hoo", "-config", "configfile",
-                                    "--max", "124", "--pie", "3.141562"])
-    assert argv.password == "pas"
-    assert argv.max == 124
-    assert argv.pi == 3.141562
-
-    assert argv.values.thedefault == "foo"
-    assert argv.values.thedefault2 == "bara"
-    assert argv.values.thedefaults == ["barb", "goo"]
-    assert argv.values.thedefaultb is None
-    assert argv.values.thedefaultfoo is None
-
-    print("MISSING:")
-    print(missing)
-    print("UNPARSED:")
-    print(unparsed)
-    print(argv.values.config)
-
-if True:
-    argv = Argv(
-        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
-    )
-    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
-    print(x)
-    print(y)
-    assert argv.floats == [12, 34, 56, 1.2, 3.4]
-
-if True:
-    argv = Argv(
-        Argv.DEFAULT | Argv.INTEGER, "max",
-        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
-    )
-    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
-    print(x)
-    print(y)
-    assert argv.max == 12
-    assert argv.floats == [34, 56, 1.2, 3.4]
-
-
-if True:
-    argv = Argv(
-        Argv.STRING, ("--password", "--passwd")
-    )
-    missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
-    assert argv.password == "pas"
-
-if True:
-    argv = Argv(
-        Argv.STRING, ["--password"],
-        Argv.DEFAULTS, "file"
-    )
-    missing, unparsed = argv.parse(["foo", "--password", "pas"])
-    assert argv.password == "pas"
-
-if True:
-    argv = Argv(
-        Argv.STRING, ["--password"],
-        Argv.DEFAULTS, ("thedefaults"), strip=False)
-    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
-    assert argv.password == "pas"
-    assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
-
-if True:
-    argv = Argv({
-        Argv.STRING: ["--password"],
-        Argv.DEFAULTS: "thedefaults",
-    })
-    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
-    assert argv.password == "pas"
-    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
-
-if True:
-    argv = Argv({
-        Argv.STRING: ["--password"],
-        Argv.REQUIRED: "--req",
-        Argv.DEFAULTS: "thedefaults",
-    })
-    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
-    assert argv.password == "pas"
-    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
-    assert argv.req is True
-
-
-if True:
-    argv = ARGV({
-        ARGV.OPTIONAL(str): ("--password"),
-        ARGV.OPTIONAL(str): ("--xpassword"),
-        ARGV.REQUIRED(bool): ["--req", "--reqx"],
-        ARGV.REQUIRED([str]): "thedefaults",
-        ARGV.REQUIRED(float): "--maxn",
-    })
-    missing, unparsed = argv.parse(["foo", "bar", "-password", "pas", " argwithspace ", "", "", "-reqx", "xyz"])
-    assert argv.password == "pas"
-    print(argv.thedefaults)
-    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
-    assert argv.req is True
-    assert argv.values.xpassword is None
-    assert unparsed == []
-    assert missing == ["--maxn"]
-
-
-if True:
-    argv = ARGV({
-        ARGV.OPTIONAL(str): ["--encrypt"],
-        ARGV.OPTIONAL(str): ["--decrypt"],
-        ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool): ["--yes", "--force"],
-        ARGV.OPTIONAL(bool): ["--verbose"],
-        ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        # ARGV.ONE_OF: ["--encrypt", "--decrypt"]
-    })
-    missing, unparsed = argv.parse(["--encrypt", "somefile", "--encrypt", "anotherfile"], report=False)
-    assert missing == []
-    assert unparsed == ["--encrypt", "anotherfile"]
-    assert argv.encrypt == "somefile"
-    assert argv.decrypt is None
-
-if True:
-    argv = ARGV({
-        ARGV.OPTIONAL(bool): ["--encrypt"],
-        ARGV.OPTIONAL(bool): ["--decrypt"],
-        ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool): ["--yes", "--y", "--force"],
-        ARGV.OPTIONAL(bool): ["--verbose"],
-        ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        ARGV.REQUIRED(str): ["file"],
-        ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
-        ARGV.EXACTLY_ONE_OF: ["--output", "--yes"],
-    })
-    argv.parse(["--encrypt", "--decrypt", "somefile"])
