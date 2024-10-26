@@ -105,7 +105,8 @@ class Argv:
 
         def _set_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
-            if self.is_any_of(option._options) and (property_name := option._property_name):
+            if ((property_name := option._property_name) and
+                self.is_any_of(option._options) and (not hasattr(self._argv._values, property_name))):  # noqa
                 if (peek := self._argv._peek).is_not_null and (not peek.is_option):
                     if (not callable(convert)) or ((peek := convert(peek)) is not None):
                         setattr(self._argv._values, property_name, peek if callable(convert) else str(peek))
@@ -171,7 +172,7 @@ class Argv:
         def __init__(self, fuzzy: bool = True) -> None:
             self._definitions = []
             self._fuzzy = fuzzy is not False
-            self._rule_oneof_options = []
+            self._rule_oneof = []
             self._option_type_action_map = {
                 # 0: Argv._Arg.set_value_string,
                 0: Argv._Arg.set_value_boolean,
@@ -216,9 +217,9 @@ class Argv:
                     self._definitions.append(Argv._Option(
                         options=options, required=option_required, action=action, fuzzy=self._fuzzy))
 
-        def add_rule_oneof(self, options: List[List[str]]) -> None:
+        def add_rule_oneof(self, options: List[str]) -> None:
             if options := list(set(to_non_empty_string_list(options))):
-                self._rule_oneof_options.append(options)
+                self._rule_oneof.append(options)
 
     class _Option:
         def __init__(self,
@@ -273,7 +274,8 @@ class Argv:
     def values(self) -> Argv._Values:
         return self._values
 
-    def parse(self, *args, skip: bool = True, report: bool = True, printf: Optional[Callable] = None) -> None:
+    def parse(self, *args, skip: bool = True,
+              report: bool = True, exit: bool = False, printf: Optional[Callable] = None) -> None:
 
         if ((len(args) == 1) and isinstance(args[0], list)) or (len(args) == 0):
             # Here, the given args are the actual command-line arguments to process/parse;
@@ -288,8 +290,8 @@ class Argv:
 
         missing_options = []
         unparsed_args = []
-        oneof_rule_violations_too_many = []
-        oneof_rule_violations_not_found = []
+        oneof_rule_violations_toomany = []
+        oneof_rule_violations_missing = []
 
         if self._option_definitions:
             for arg in self:
@@ -300,33 +302,39 @@ class Argv:
                         break
                 if not parsed:
                     unparsed_args.append(arg)
+            for rule in self._option_definitions._rule_oneof:
+                oneof_args = []
+                for oneof in rule:
+                    if (option := self._find_option_definition(oneof)) and (property_name := option._property_name):
+                        if hasattr(self._values, property_name):
+                            oneof_args.append(option._option_name)
+                if (not oneof_args) and option:
+                    oneof_rule_violations_missing.append(oneof_args)
+                elif len(oneof_args) > 1:
+                    oneof_rule_violations_toomany.append(oneof_args)
             for option in self._option_definitions._definitions:
                 if not hasattr(self._values, property_name := option._property_name):
                     if option._required:
                         missing_options.append(option._option_name)
                     setattr(self._values, property_name, None)
-            for oneof_rule in self._option_definitions._rule_oneof_options:
-                oneof_rule = set(oneof_rule)
-                oneof_rule_has = False
-                for option in self._option_definitions._definitions:
-                    if set(option._options) & set(oneof_rule):
-                        if oneof_rule_has:
-                            oneof_rule_violations_too_many.append(list(oneof_rule))
-                            break
-                        oneof_rule_has = True
-                if not oneof_rule_has:
-                    oneof_rule_violations_not_found.append(list(oneof_rule))
             if report is not False:
                 if not callable(printf):
                     printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
-                for unparsed_arg in unparsed_args:
-                    printf(f"Unparsed argument: {unparsed_arg}")
-                for missing_option in missing_options:
-                    printf(f"Missing required option: {missing_option}")
-                for oneof_rule_violation in oneof_rule_violations_too_many:
-                    printf(f"Exactly one of these option required but more given: {' | '.join(oneof_rule_violation)}")
-                for oneof_rule_violation in oneof_rule_violations_not_found:
-                    printf(f"Exactly one of these option required but not found: {' | '.join(oneof_rule_violation)}")
+                errors = False
+                if unparsed_args:
+                    printf(f"Unrecognized arguments: {', '.join(unparsed_args)}")
+                    errors = True
+                if missing_options:
+                    printf(f"Missing required options: {', '.join(missing_options)}")
+                    errors = True
+                for oneof_rule_violation in oneof_rule_violations_toomany:
+                    printf(f"Options may not be specified together: {', '.join(oneof_rule_violation)}")
+                    errors = True
+                for oneof_rule_violation in oneof_rule_violations_missing:
+                    printf(f"One of these options must be specified: {', '.join(oneof_rule_violation)}")
+                    errors = True
+                if errors and (exit is True):
+                    sys.exit(1)
 
         return missing_options, unparsed_args
 
@@ -396,6 +404,13 @@ class Argv:
             if options:
                 option_definitions.define_option(option_type or Argv.BOOLEAN, options)
         return option_definitions
+
+    def _find_option_definition(self, option: str) -> Optional[Argv._Option]:
+        if isinstance(option, str) and option:
+            for option_definition in self._option_definitions._definitions:
+                if option in option_definition._options:
+                    return option_definition
+        return None
 
     @property
     def _peek(self) -> Optional[str]:
@@ -485,3 +500,216 @@ class ARGV(Argv):
     @property
     def ONE_OF(cls):
         return f"oneof_{str(uuid()).replace('-', '_')}"
+
+
+# args = Argv({"foo": "bar"})
+# argv = Argv()
+# x = argv.foo
+
+
+if False:
+    args = ["abc", "def", "--config", "file.json", "--verbose",
+            "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+    argv = Argv(args, delete=True)
+    argv.parse(
+        "--config", "-file", Argv.STRING,
+        "--configs", Argv.STRINGS,
+        "--verbose", Argv.BOOLEAN,
+        "--debug", Argv.BOOLEAN
+    )
+#   argv.parse(
+#       Argv.STRING, "--config", "-file",
+#       Argv.STRINGS, "--configs",
+#       Argv.BOOLEAN, "--verbose",
+#       Argv.BOOLEAN, "--debug"
+#   )
+    argv.parse(
+        Argv.STRING, ("--config", "-file"),
+        Argv.STRINGS, ["--configs", "--configs"],
+        Argv.BOOLEAN, "--verbose",
+        Argv.BOOLEAN, "--debug"
+    )
+    assert argv.values.verbose is True
+    assert argv.values.debug is True
+    assert argv.values.config == "file.json"
+    assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
+
+
+if False:
+    # args = Argv(
+    #     [Argv.STRINGS, "--config", "--conf"],
+    #     [Argv.STRING, "--config", "--conf"],
+    #     [Argv.INTEGERS, "--count"],
+    #     [Argv.FLOATS, "--key"]
+    # )
+    args = Argv(
+        Argv.STRINGS, "--config", "--conf",
+        Argv.STRING, "--config", "--conf",
+        Argv.INTEGERS, "--count",
+        Argv.FLOATS, "--key",
+        Argv.STRING, "--foo",
+        Argv.STRING, "goo",
+        Argv.STRING, "--import-file",
+        Argv.DEFAULT, "others",
+    )
+    missing, unparsed = args.parse(["--config", "abc", "ghi", "-xyz",
+                                    "--config", "foo", "--import-file", "secrets.json",
+                                    "-count", "123", "456", "-key", "321", "2342.234",
+                                    "-124", "somefile.json", "some-other"])
+
+    assert args.config == ["abc", "ghi", "foo"]
+    assert args.count == [123, 456]
+    assert args.import_file == "secrets.json"
+    assert args.key == [321, 2342.234]
+    assert args.others == "somefile.json", "some-other"
+    assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
+
+if False:
+    argv = Argv(
+        # Argv.DEFAULT, "files",
+        Argv.INTEGER, ["--max", "--maximum"],
+        Argv.FLOAT, ["--pi", "--pie"],
+        Argv.STRINGS, ("--config", "--conf"),
+        Argv.STRINGS, ["--secrets", "--secret"],
+        Argv.STRINGS, ("--merge"),
+        Argv.STRINGS, ["--includes", "--include", "--imports", "--import",
+                       "--import-config", "--import-configs", "--import-conf"],
+        Argv.STRINGS, ["--include-secrets", "--include-secret", "--import-secrets", "--import-secret"],
+        Argv.BOOLEAN, ["--list"],
+        Argv.BOOLEAN, ["--tree"],
+        Argv.BOOLEAN, ["--dump"],
+        Argv.BOOLEAN, ["--json"],
+        Argv.BOOLEAN, ("--formatted", "--format"),
+        Argv.BOOLEAN, ["--jsonf"],
+        Argv.BOOLEAN, ["--raw"],
+        Argv.BOOLEAN, ["--verbose"],
+        Argv.BOOLEAN, ["--debug"],
+        Argv.STRINGS, ("--shell", "-shell", "--script", "-script", "--scripts", "-scripts", "--command", "-command",
+                       "--commands", "-commands", "--function", "-function", "--functions", "-functions"),
+        Argv.STRING, ("--password", "--passwd"),
+        Argv.STRING, ["--exports", "--export"],
+        Argv.STRING, ["--exports-file", "--export-file"],
+        Argv.DEFAULT, "thedefault", "thedefault2",
+        Argv.DEFAULTS, "thedefaults",
+        Argv.DEFAULT | Argv.OPTIONAL, "thedefaultb",
+        Argv.DEFAULTS | Argv.OPTIONAL, "thedefaultfoo",
+        #    Argv.DEFAULTS, "thedefaults"
+    )
+    missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
+                                    "-passwd", "pas", "--shell", "hoo", "-config", "configfile",
+                                    "--max", "124", "--pie", "3.141562"])
+    assert argv.password == "pas"
+    assert argv.max == 124
+    assert argv.pi == 3.141562
+
+    assert argv.values.thedefault == "foo"
+    assert argv.values.thedefault2 == "bara"
+    assert argv.values.thedefaults == ["barb", "goo"]
+    assert argv.values.thedefaultb is None
+    assert argv.values.thedefaultfoo is None
+
+    print("MISSING:")
+    print(missing)
+    print("UNPARSED:")
+    print(unparsed)
+    print(argv.values.config)
+
+if False:
+    argv = Argv(
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
+    )
+    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
+    print(x)
+    print(y)
+    assert argv.floats == [12, 34, 56, 1.2, 3.4]
+
+if False:
+    argv = Argv(
+        Argv.DEFAULT | Argv.INTEGER, "max",
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
+    )
+    x, y = argv.parse(["12", "34", "56", "1.2", "3.4"])
+    print(x)
+    print(y)
+    assert argv.max == 12
+    assert argv.floats == [34, 56, 1.2, 3.4]
+
+
+if False:
+    argv = Argv(
+        Argv.STRING, ("--password", "--passwd")
+    )
+    missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
+    assert argv.password == "pas"
+
+if False:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, "file"
+    )
+    missing, unparsed = argv.parse(["foo", "--password", "pas"])
+    assert argv.password == "pas"
+
+if False:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, ("thedefaults"), strip=False)
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
+
+if False:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.DEFAULTS: "thedefaults",
+    })
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
+
+if False:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.REQUIRED: "--req",
+        Argv.DEFAULTS: "thedefaults",
+    })
+    missing, unparsed = argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
+
+
+if False:
+    argv = ARGV({
+        ARGV.OPTIONAL(str): ("--password"),
+        ARGV.OPTIONAL(str): ("--xpassword"),
+        ARGV.REQUIRED(bool): ["--req", "--reqx"],
+        ARGV.REQUIRED([str]): "thedefaults",
+        ARGV.REQUIRED(float): "--maxn",
+    })
+    missing, unparsed = argv.parse(["foo", "bar", "-password", "pas", " argwithspace ", "", "", "-reqx", "xyz"])
+    assert argv.password == "pas"
+    print(argv.thedefaults)
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
+    assert argv.values.xpassword is None
+    assert unparsed == []
+    assert missing == ["--maxn"]
+
+
+if False:
+    argv = ARGV({
+        ARGV.OPTIONAL(str): ["--encrypt"],
+        ARGV.OPTIONAL(str): ["--decrypt"],
+        ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(bool): ["--yes", "--force"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(str): ["--password", "--passwd"],
+        # ARGV.ONE_OF: ["--encrypt", "--decrypt"]
+    })
+    missing, unparsed = argv.parse(["--encrypt", "somefile", "--encrypt", "anotherfile"], report=False)
+    assert missing == []
+    assert unparsed == ["--encrypt", "anotherfile"]
+    assert argv.encrypt == "somefile"
+    assert argv.decrypt is None

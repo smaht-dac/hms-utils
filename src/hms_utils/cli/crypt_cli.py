@@ -21,8 +21,8 @@ def main():
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        ARGV.ONE_OF: ["--encrypt", "--decrypt"],
-        ARGV.ONE_OF: ["--xencrypt", "--xdecrypt"],
+        ARGV.OPTIONAL(str): ["file"],
+        ARGV.ONE_OF: ["--encrypt", "--decrypt", "file"]
     })
 
     def copy_file(source: str, destination: str) -> None:
