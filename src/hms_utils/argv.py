@@ -286,7 +286,10 @@ class Argv:
             # and this Argv object already as the actual command-line arguments to process/parse.
             self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
-        missing_options = [] ; unparsed_args = [] ; oneof_rule_violations = []  # noqa
+        missing_options = []
+        unparsed_args = []
+        oneof_rule_violations_too_many = []
+        oneof_rule_violations_not_found = []
 
         if self._option_definitions:
             for arg in self:
@@ -304,13 +307,15 @@ class Argv:
                     setattr(self._values, property_name, None)
             for oneof_rule in self._option_definitions._rule_oneof_options:
                 oneof_rule = set(oneof_rule)
-                oneof_rule_okay = False
+                oneof_rule_has = False
                 for option in self._option_definitions._definitions:
                     if set(option._options) & set(oneof_rule):
-                        oneof_rule_okay = True
-                        break
-                if not oneof_rule_okay:
-                    oneof_rule_violations.append(list(oneof_rule))
+                        if oneof_rule_has:
+                            oneof_rule_violations_too_many.append(list(oneof_rule))
+                            break
+                        oneof_rule_has = True
+                if not oneof_rule_has:
+                    oneof_rule_violations_not_found.append(list(oneof_rule))
             if report is not False:
                 if not callable(printf):
                     printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
@@ -318,8 +323,10 @@ class Argv:
                     printf(f"Unparsed argument: {unparsed_arg}")
                 for missing_option in missing_options:
                     printf(f"Missing required option: {missing_option}")
-                for oneof_rule_violation in oneof_rule_violations:
-                    printf(f"One of these option required but not found: {' | '.join(oneof_rule_violation)}")
+                for oneof_rule_violation in oneof_rule_violations_too_many:
+                    printf(f"Exactly one of these option required but more given: {' | '.join(oneof_rule_violation)}")
+                for oneof_rule_violation in oneof_rule_violations_not_found:
+                    printf(f"Exactly one of these option required but not found: {' | '.join(oneof_rule_violation)}")
 
         return missing_options, unparsed_args
 
