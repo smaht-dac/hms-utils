@@ -7,20 +7,6 @@ from dcicutils.tmpfile_utils import create_temporary_file_name, temporary_file
 from hms_utils.crypt_utils import decrypt_file, encrypt_file
 from hms_utils.argv import ARGV
 
-if False:
-    argv = ARGV({
-        ARGV.OPTIONAL(bool): ["--encrypt"],
-        ARGV.OPTIONAL(bool): ["--decrypt"],
-        ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool): ["--yes", "--force"],
-        ARGV.OPTIONAL(bool): ["--verbose"],
-        ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        ARGV.REQUIRED(str): ["file"],
-        ARGV.ONE_OF: ["--encrypt", "--decrypt"]
-    })
-    argv.parse()
-
 
 def main():
 
