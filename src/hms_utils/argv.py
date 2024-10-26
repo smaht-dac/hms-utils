@@ -249,6 +249,12 @@ class Argv:
                 return option.replace("-", "_")
             return ""
 
+        def __eq__(self, other):
+            return id(self) == id(other)
+
+        def __hash__(self):
+            return hash(id(self))
+
     def __init__(self, *args, argv: Optional[List[str]] = None,
                  parse: bool = False, exit: bool = False, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
@@ -298,8 +304,8 @@ class Argv:
 
         missing_options = []
         unparsed_args = []
-        exactly_one_of_rule_violations_toomany = []
-        exactly_one_of_rule_violations_missing = []
+        rule_violations_exactly_one_of_missing = []
+        rule_violations_exactly_one_of_toomany = []
 
         if self._option_definitions:
             for arg in self:
@@ -310,19 +316,20 @@ class Argv:
                         break
                 if not parsed:
                     unparsed_args.append(arg)
-            for rule in self._option_definitions._rule_exactly_one_of:
-                exactly_one_of_args = []
-                rule_options = []
-                for item in rule:
-                    if (item := self._find_option_definition(item)) and (property_name := item._property_name):
-                        rule_options.append(item)
-                for rule_option in rule_options:
-                    if hasattr(self._values, rule_option._property_name):
-                        exactly_one_of_args.append(rule_option._option_name)
-                if (not exactly_one_of_args) and rule_options:
-                    exactly_one_of_rule_violations_missing.append(rule)
-                elif len(exactly_one_of_args) > 1:
-                    exactly_one_of_rule_violations_toomany.append(exactly_one_of_args)
+
+            if defined_value_options := set(self._defined_value_options()):
+                for rule_options in self._option_definitions._rule_exactly_one_of:
+                    if rule_options := set(self._find_options(rule_options)):
+                        intersection_options = rule_options & defined_value_options
+                        if len(intersection_options) == 0:
+                            # Exactly one of the specifed rule options should be defined but none are.
+                            rule_violations_exactly_one_of_missing.append(
+                                [option._option_name for option in rule_options])
+                        elif len(intersection_options) != 1:
+                            # Exactly one of the specifed rule options should be defined more than one are.
+                            rule_violations_exactly_one_of_toomany.append(
+                                [option._option_name for option in rule_options])
+
             for option in self._option_definitions._definitions:
                 if not hasattr(self._values, property_name := option._property_name):
                     if option._required:
@@ -340,11 +347,11 @@ class Argv:
                     printf(f"Missing required option"
                            f"{'s' if len(missing_options) > 1 else ''}: {', '.join(missing_options)}")
                     errors = True
-                for exactly_one_of_rule_violation in exactly_one_of_rule_violations_toomany:
-                    printf(f"Options may not be specified together: {', '.join(exactly_one_of_rule_violation)}")
+                for violation in rule_violations_exactly_one_of_toomany:
+                    printf(f"Only one of these options may be specified: {', '.join(violation)}")
                     errors = True
-                for exactly_one_of_rule_violation in exactly_one_of_rule_violations_missing:
-                    printf(f"One of these options must be specified: {', '.join(exactly_one_of_rule_violation)}")
+                for violation in rule_violations_exactly_one_of_missing:
+                    printf(f"Exactly one of these options must be specified: {', '.join(violation)}")
                     errors = True
                 if errors and (exit is True):
                     sys.exit(1)
@@ -422,12 +429,34 @@ class Argv:
                 option_definitions.define_option(option_type or Argv.BOOLEAN, options)
         return option_definitions
 
-    def _find_option_definition(self, option: str) -> Optional[Argv._Option]:
-        if isinstance(option, str) and option:
-            for option_definition in self._option_definitions._definitions:
-                if option in option_definition._options:
-                    return option_definition
-        return None
+    def _defined_value_options(self) -> List[Argv._Option]:
+        defined_value_options = []
+        for option in self._option_definitions._definitions:
+            if hasattr(self._values, option._property_name):
+                defined_value_options.append(option)
+        return defined_value_options
+
+    def _find_options(self, options: Union[List[str], str]) -> List[Argv._Option]:
+        if options := set(to_non_empty_string_list(options)):
+            return [option for option in self._option_definitions._definitions if set(options) & set(option._options)]
+        return []
+
+    def _is_option(self, value: str) -> bool:
+        if isinstance(value, str) and (value := value.strip()):
+            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
+                return True
+            elif self._fuzzy:
+                if value.startswith(Argv._FUZZY_OPTION_PREFIX) and value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip():
+                    return True
+        return False
+
+    @staticmethod
+    def _is_option_type(option_type: Any) -> bool:
+        if isinstance(option_type, int):
+            return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
+                      Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
+                      Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
+        return False
 
     @property
     def _peek(self) -> Optional[str]:
@@ -458,23 +487,6 @@ class Argv:
             self._escaping = True
             return self.__next__()
         return Argv._Arg(arg, self)
-
-    def _is_option(self, value: str) -> bool:
-        if isinstance(value, str) and (value := value.strip()):
-            if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
-                return True
-            elif self._fuzzy:
-                if value.startswith(Argv._FUZZY_OPTION_PREFIX) and value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip():
-                    return True
-        return False
-
-    @staticmethod
-    def _is_option_type(option_type: Any) -> bool:
-        if isinstance(option_type, int):
-            return (((Argv.BOOLEAN | Argv.DEFAULT | Argv.DEFAULTS |
-                      Argv.FLOAT | Argv.FLOATS | Argv.INTEGER | Argv.INTEGERS |
-                      Argv.STRING | Argv.STRINGS | Argv.OPTIONAL | Argv.REQUIRED) & option_type) == option_type)
-        return False
 
     def __getattr__(self, name: str):
         if not hasattr(self._values, name):
@@ -525,7 +537,7 @@ class ARGV(Argv):
 # x = argv.foo
 
 
-if True:
+if False:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -553,7 +565,7 @@ if True:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if True:
+if False:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -582,7 +594,7 @@ if True:
     assert args.others == "somefile.json", "some-other"
     assert unparsed == ["-xyz", "-124", "some-other"]  # TODO: why goo
 
-if True:
+if False:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -632,7 +644,7 @@ if True:
     print(unparsed)
     print(argv.values.config)
 
-if True:
+if False:
     argv = Argv(
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
     )
@@ -641,7 +653,7 @@ if True:
     print(y)
     assert argv.floats == [12, 34, 56, 1.2, 3.4]
 
-if True:
+if False:
     argv = Argv(
         Argv.DEFAULT | Argv.INTEGER, "max",
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
@@ -653,14 +665,14 @@ if True:
     assert argv.floats == [34, 56, 1.2, 3.4]
 
 
-if True:
+if False:
     argv = Argv(
         Argv.STRING, ("--password", "--passwd")
     )
     missing, unparsed = argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
     assert argv.password == "pas"
 
-if True:
+if False:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, "file"
@@ -668,7 +680,7 @@ if True:
     missing, unparsed = argv.parse(["foo", "--password", "pas"])
     assert argv.password == "pas"
 
-if True:
+if False:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, ("thedefaults"), strip=False)
@@ -676,7 +688,7 @@ if True:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if True:
+if False:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -685,7 +697,7 @@ if True:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
 
-if True:
+if False:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.REQUIRED: "--req",
@@ -697,7 +709,7 @@ if True:
     assert argv.req is True
 
 
-if True:
+if False:
     argv = ARGV({
         ARGV.OPTIONAL(str): ("--password"),
         ARGV.OPTIONAL(str): ("--xpassword"),
@@ -715,7 +727,7 @@ if True:
     assert missing == ["--maxn"]
 
 
-if True:
+if False:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
@@ -731,3 +743,18 @@ if True:
     assert unparsed == ["--encrypt", "anotherfile"]
     assert argv.encrypt == "somefile"
     assert argv.decrypt is None
+
+if True:
+    argv = ARGV({
+        ARGV.OPTIONAL(bool): ["--encrypt"],
+        ARGV.OPTIONAL(bool): ["--decrypt"],
+        ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(bool): ["--yes", "--y", "--force"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(str): ["--password", "--passwd"],
+        ARGV.REQUIRED(str): ["file"],
+        ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
+        ARGV.EXACTLY_ONE_OF: ["--output", "--yes"],
+    })
+    argv.parse(["--encrypt", "--decrypt", "somefile"])
