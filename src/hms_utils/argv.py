@@ -171,6 +171,7 @@ class Argv:
         def __init__(self, fuzzy: bool = True) -> None:
             self._definitions = []
             self._fuzzy = fuzzy is not False
+            self._rule_oneof_options = []
             self._option_type_action_map = {
                 # 0: Argv._Arg.set_value_string,
                 0: Argv._Arg.set_value_boolean,
@@ -215,6 +216,10 @@ class Argv:
                     self._definitions.append(Argv._Option(
                         options=options, required=option_required, action=action, fuzzy=self._fuzzy))
 
+        def add_rule_oneof(self, options: List[List[str]]) -> None:
+            if options := list(set(to_non_empty_string_list(options))):
+                self._rule_oneof_options.append(options)
+
     class _Option:
         def __init__(self,
                      options: Optional[List[str]] = None,
@@ -249,6 +254,7 @@ class Argv:
         self._escaping = False
         self._delete = delete is True
         self._values = Argv._Values()
+        self._parsed = None
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
@@ -280,7 +286,7 @@ class Argv:
             # and this Argv object already as the actual command-line arguments to process/parse.
             self._option_definitions = self._process_option_definitions(*args)  # xyzzy
 
-        missing_options = [] ; unparsed_args = []  # noqa
+        missing_options = [] ; unparsed_args = [] ; oneof_rule_violations = []  # noqa
 
         if self._option_definitions:
             for arg in self:
@@ -296,6 +302,15 @@ class Argv:
                     if option._required:
                         missing_options.append(option._option_name)
                     setattr(self._values, property_name, None)
+            for oneof_rule in self._option_definitions._rule_oneof_options:
+                oneof_rule = set(oneof_rule)
+                oneof_rule_okay = False
+                for option in self._option_definitions._definitions:
+                    if set(option._options) & set(oneof_rule):
+                        oneof_rule_okay = True
+                        break
+                if not oneof_rule_okay:
+                    oneof_rule_violations.append(list(oneof_rule))
             if report is not False:
                 if not callable(printf):
                     printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
@@ -303,6 +318,8 @@ class Argv:
                     printf(f"Unparsed argument: {unparsed_arg}")
                 for missing_option in missing_options:
                     printf(f"Missing required option: {missing_option}")
+                for oneof_rule_violation in oneof_rule_violations:
+                    printf(f"One of these option required but not found: {' | '.join(oneof_rule_violation)}")
 
         return missing_options, unparsed_args
 
@@ -331,8 +348,12 @@ class Argv:
             args = []
             for option_type in options:
                 option_options = options[option_type]
-                if isinstance(option_type, str) and ((index := option_type.find("_")) > 1):
-                    option_type = to_integer(option_type[0:index])
+                if isinstance(option_type, str):
+                    if (index := option_type.find("_")) > 1:
+                        if (option_type := option_type[0:index]) == "oneof":
+                            option_definitions.add_rule_oneof(option_options)
+                            continue
+                        option_type = to_integer(option_type[0:index])
                 if Argv._is_option_type(option_type) and (option_options := to_non_empty_string_list(option_options)):
                     if not any(self._is_option(option) for option in option_options):
                         if default_is_but_should_not_be_boolean := ((option_type & Argv.BOOLEAN) == Argv.BOOLEAN):
@@ -347,6 +368,8 @@ class Argv:
                                 option_type | ~Argv.STRINGS
                     args.append(option_type)
                     args.append(option_options)
+                else:
+                    pass
 
         if args := flatten(args):
             option_type = None ; options = [] ; parsing_options = None  # noqa
@@ -415,6 +438,10 @@ class Argv:
         return False
 
     def __getattr__(self, name: str):
+        if self._parsed is None:
+            self._parsed = False
+            self.parse()
+            self._parsed = True
         if not hasattr(self._values, name):
             raise AttributeError(f"Property for argument not found: {name}")
         return getattr(self._values, name)
@@ -447,6 +474,12 @@ class ARGV(Argv):
     def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
         return OPTIONAL(type=type, _required=True)
 
+    @classmethod
+    @property
+    def ONE_OF(cls):
+        return f"oneof_{str(uuid()).replace('-', '_')}"
+
 
 OPTIONAL = ARGV.OPTIONAL
 REQUIRED = ARGV.REQUIRED
+ONE_OF = ARGV.ONE_OF

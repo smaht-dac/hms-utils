@@ -20,9 +20,10 @@ def main():
         ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(str): ["--password", "--passwd"]
+        ARGV.OPTIONAL(str): ["--password", "--passwd"],
+        ARGV.ONE_OF: ["--encrypt", "--decrypt"],
+        ARGV.ONE_OF: ["--xencrypt", "--xdecrypt"],
     })
-    argv.parse(skip=False)
 
     def copy_file(source: str, destination: str) -> None:
         nonlocal STDOUT
@@ -91,12 +92,12 @@ def main():
 
 
 def main_encrypt():
-    sys.argv = ["--encrypt"] + sys.argv[1:]
+    sys.argv.insert(1, "--encrypt")
     main()
 
 
 def main_decrypt():
-    sys.argv = ["--decrypt"] + sys.argv[1:]
+    sys.argv.insert(1, "--decrypt")
     main()
 
 
@@ -115,5 +116,5 @@ def _usage():
 
 
 if __name__ == "__main__":
-    sys.argv = sys.argv[1:]
+    sys.argv = sys.argv
     main()
