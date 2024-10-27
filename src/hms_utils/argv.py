@@ -581,13 +581,13 @@ class ARGV(Argv):
 
     @classmethod
     @property
-    def DEPENDS_ON(cls, *args):
-        return f"rule:depends_on:{str(uuid())}"
+    def DEPENDENCY(cls, *args):
+        return f"rule:dependency:{str(uuid())}"
 
     @classmethod
     @property
-    def DEPENDENCY(cls, *args):
-        return f"rule:dependency:{str(uuid())}"
+    def DEPENDS_ON(cls, *args):
+        return f"rule:depends_on:{str(uuid())}"
 
 
 # args = Argv({"foo": "bar"})
