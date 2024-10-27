@@ -102,8 +102,8 @@ class Argv:
                 self.is_any_of(option._options) and (not hasattr(self._argv._values, property_name))):  # noqa
                 if (peek := self._argv._peek).is_not_null and ((peek != Argv._ESCAPE_VALUE) or (not peek.is_option)):
                     if peek == Argv._ESCAPE_VALUE:
-                        self._argv._next
-                        peek = self._argv._next
+                        if (peek := self._argv._next).is_null:
+                            return False
                     if (not callable(convert)) or ((peek := convert(peek)) is not None):
                         setattr(self._argv._values, property_name, peek if callable(convert) else str(peek))
                         self._argv._next
@@ -128,9 +128,8 @@ class Argv:
                     while True:
                         if (peek := self._argv._peek).is_null or peek.is_option:
                             break
-                        if peek == Argv._ESCAPE_VALUE:
-                            if (peek := self._argv._next).is_null or peek.is_option:
-                                break
+                        if (peek == Argv._ESCAPE_VALUE) and (peek := self._argv._next).is_null or peek.is_option:
+                            break
                         if (peek := convert(peek)) is None:
                             break
                         property_values.append(peek)
@@ -850,7 +849,7 @@ if True:
         ARGV.OPTIONAL(bool): ["--encrypt"],
         ARGV.OPTIONAL(bool): ["--decrypt"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL([str]): ["--destination", "--dest"],
+        ARGV.OPTIONAL(str): ["--destination", "--dest"],
         ARGV.OPTIONAL(bool): ["-yes", "--y", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -866,4 +865,4 @@ if True:
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
                       "Exactly one of these options must be specified: --output, -yes",
                       "Option --formatted depends on option: --json"]
-    assert argv.destination == ["-destfile"]
+    assert argv.destination == "-destfile"
