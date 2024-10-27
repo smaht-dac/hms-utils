@@ -125,7 +125,7 @@ class Argv:
                 while True:
                     if (peek := self._argv._peek).is_null or peek.is_option:
                         break
-                    if (peek == Argv._ESCAPE_VALUE) and (peek := self._argv._next).is_null or peek.is_option:
+                    if ((peek == Argv._ESCAPE_VALUE) and (peek := self._argv._next).is_null) or peek.is_option:
                         break
                     if (peek := convert(peek)) is None:
                         break
@@ -136,8 +136,9 @@ class Argv:
 
         def _set_default_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if self and (not self.is_option):
-                property_value = self
-                # TODO: Handle -- escaping.
+                if (property_value := self) == Argv._ESCAPE_VALUE:
+                    if (property_value := argv._argv._next).is_null:
+                        return False
                 for option in option._options:
                     if (not callable(convert)) or ((property_value := convert(property_value)) is not None):
                         if not hasattr(self._argv._values, option):
@@ -146,20 +147,23 @@ class Argv:
             return False
 
         def _set_default_value_properties(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
-            parsed = False ; peek = self  # noqa
+            parsed = False ; property_value = self  # noqa
             for option in option._options:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
-                    # TODO: Handle -- escaping.
-                    if ((peek is None) or peek.is_null or peek.is_option or
-                        (callable(convert) and ((peek := convert(peek)) is None))):  # noqa
+                    if property_value.is_null:
+                        break
+                    if ((property_value == Argv._ESCAPE_VALUE) and
+                        (property_value := self._argv._next).is_null) or property_value.is_option:  # noqa
+                        break
+                    if callable(convert) and ((property_value := convert(property_value)) is None):
                         break
                     if option_values is None:
                         option_values = []
                         setattr(self._argv._values, option, option_values)
-                    option_values.append(peek if callable(convert) else str(peek))
+                    option_values.append(property_value if callable(convert) else str(property_value))
                     parsed = True
-                    if (peek := self._argv._peek).is_null or peek.is_option:
+                    if (property_value := self._argv._peek).is_null or property_value.is_option:
                         break
                     self._argv._next
             return parsed
