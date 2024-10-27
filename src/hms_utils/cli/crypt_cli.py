@@ -21,7 +21,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        ARGV.REQUIRED(str): ["file"],
+        ARGV.REQUIRED(str): ["file", ARGV.DEFAULT, "-"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
     })
 
@@ -35,17 +35,15 @@ def main():
 
     if argv.encrypt:
         verb = "Encrypt"
-        file = argv.file
         function = encrypt_file
     elif argv.decrypt:
         verb = "Decrypt"
-        file = argv.file
         function = decrypt_file
 
-    if file == "-":
-        file = STDIN
-    if (file != STDIN) and (not os.path.isfile(file)):
-        _error(f"Cannot find file: {file}")
+    if argv.file == "-":
+        argv.file = STDIN
+    if (argv.file != STDIN) and (not os.path.isfile(argv.file)):
+        _error(f"Cannot find file: {argv.file}")
 
     if argv.output:
         if (argv.output == "-") or (argv.output == STDOUT):
@@ -55,12 +53,12 @@ def main():
                 exit(0)
         elif (output_directory := os.path.dirname(argv.output)) and (not os.path.isdir(output_directory)):
             _error(f"Output file directory does not exist: {output_directory}")
-        elif file == STDIN:
+        elif argv.file == STDIN:
             argv.output = STDOUT
-    elif file == STDIN:
+    elif argv.file == STDIN:
         argv.output = STDOUT
-    elif argv.yes or yes_or_no(f"{verb} file {file} in place?"):
-        argv.output = file
+    elif argv.yes or yes_or_no(f"{verb} file {argv.file} in place?"):
+        argv.output = argv.file
     else:
         argv.output = None
 
@@ -76,12 +74,12 @@ def main():
     with temporary_file() as tmpfile:
 
         if argv.debug:
-            _print(f"{verb}ing file {file} to {tmpfile}")
-        elif argv.verbose and (argv.output == file):
-            _print(f"{verb}ing file in place: {file}")
-        function(file, argv.password, tmpfile)
+            _print(f"{verb}ing file {argv.file} to {tmpfile}")
+        elif argv.verbose and (argv.output == argv.file):
+            _print(f"{verb}ing file in place: {argv.file}")
+        function(argv.file, argv.password, tmpfile)
         if argv.debug:
-            _print(f"Done {verb.lower()}ing file {file} to {tmpfile}")
+            _print(f"Done {verb.lower()}ing file {argv.file} to {tmpfile}")
         if argv.output:
             if argv.debug:
                 _print(f"Copying file {tmpfile} to: {argv.output}")
