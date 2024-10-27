@@ -159,7 +159,7 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--json"],
         OPTIONAL(bool): ["--format", "--formatted"],
         OPTIONAL(bool): ["--exports", "--export"],
-        OPTIONAL(bool): ["--shell", "--functions", "--function"],
+        OPTIONAL(bool): ["--functions", "--function", "--shell"],
         OPTIONAL(str): ["--exports-file", "--export-file"],
         OPTIONAL(bool): ["--noaws"],
         OPTIONAL(str): ["--aws-profile", "--profile", "--env"],
@@ -168,7 +168,7 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--verbose"],
         OPTIONAL(bool): ["--debug"],
         OPTIONAL(bool): ["--version"],
-        AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump"]
+        AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump", "--exports", "--functions"]
     }, parse=False)
 
     class Args:
