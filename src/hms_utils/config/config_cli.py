@@ -146,11 +146,10 @@ def parse_args(argv: List[str]) -> object:
                           "--merge", "--merge-configs", "--merge-config", "--merge-confs", "--merge-conf"],
         OPTIONAL([str]): ["--secrets", "--secret", "--merge-secrets", "--merge-secret"],
         OPTIONAL([str]): ["--includes", "--include", "--include-configs", "--include-config",
-                          "--imports", "--import", "--import-configs", "--import-config"],
-        OPTIONAL([str]): ["--includes", "--include", "--include-configs", "--include-config",
-                          "--imports", "--import", "--import-configs", "--import-config"],
+                          "--include-confs", "--include-conf", "--imports", "--import",
+                          "--import-configs", "--import-config", "import-confs", "--import-conf"],
         OPTIONAL(str): ["--config-dir", "--conf-dir", "--dir", "--directory"],
-        OPTIONAL([str]): ["--lookup", "--lookups"],
+        OPTIONAL([str]): ["--lookup-paths", "--lookup-path", "--lookup", "--lookups"],
         OPTIONAL(bool): ["--tree"],
         OPTIONAL(bool): ["--list"],
         OPTIONAL(bool): ["--dump"],
@@ -168,7 +167,8 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--warnings", "--warning"],
         OPTIONAL(bool): ["--verbose"],
         OPTIONAL(bool): ["--debug"],
-        OPTIONAL(bool): ["--version"]
+        OPTIONAL(bool): ["--version"],
+        AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump"]
     }, parse=False)
 
     class Args:
