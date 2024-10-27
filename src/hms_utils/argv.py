@@ -55,8 +55,8 @@ class Argv:
 
         def set_value_boolean(self, option: Argv._Option) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
-            if self.is_any_of(option._options) and (property_name := option._property_name):
-                setattr(self._argv._values, property_name, True)
+            if self.is_any_of(option._options):
+                setattr(self._argv._values, option._property_name, True)
                 return True
             return False
 
@@ -64,19 +64,19 @@ class Argv:
             return self._set_value_property(option)
 
         def set_value_strings(self, option: Argv._Option) -> bool:
-            return self._set_value_property_multiple(option)
+            return self._set_value_properties(option)
 
         def set_value_integer(self, option: Argv._Option) -> bool:
             return self._set_value_property(option, convert=to_integer)
 
         def set_value_integers(self, option: Argv._Option) -> bool:
-            return self._set_value_property_multiple(option, convert=to_integer)
+            return self._set_value_properties(option, convert=to_integer)
 
         def set_value_float(self, option: Argv._Option) -> bool:
             return self._set_value_property(option, convert=to_float)
 
         def set_value_floats(self, option: Argv._Option) -> bool:
-            return self._set_value_property_multiple(option, convert=to_float)
+            return self._set_value_properties(option, convert=to_float)
 
         def set_default_value_string(self, option: Argv._Option) -> bool:
             return self._set_default_value_property(option)
@@ -98,43 +98,40 @@ class Argv:
 
         def _set_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
-            if ((property_name := option._property_name) and
-                self.is_any_of(option._options) and (not hasattr(self._argv._values, property_name))):  # noqa
+            if self.is_any_of(option._options) and (not hasattr(self._argv._values, option._property_name)):
                 if (peek := self._argv._peek).is_not_null and ((peek != Argv._ESCAPE_VALUE) or (not peek.is_option)):
                     if peek == Argv._ESCAPE_VALUE:
                         if (peek := self._argv._next).is_null:
                             return False
                     if (not callable(convert)) or ((peek := convert(peek)) is not None):
-                        setattr(self._argv._values, property_name, peek if callable(convert) else str(peek))
+                        setattr(self._argv._values, option._property_name, peek if callable(convert) else str(peek))
                         self._argv._next
                         return True
             return False
 
-        def _set_value_property_multiple(self, option: Union[Argv._Option, str],
-                                         convert: Optional[Callable] = None) -> bool:
+        def _set_value_properties(self, option: Union[Argv._Option, str], convert: Optional[Callable] = None) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
             if not callable(convert):
                 convert = lambda value: str(value)  # noqa
             if self.is_any_of(option._options):
-                if property_name := option._property_name:
-                    property_values = []
-                    if (hasattr(self._argv._values, property_name) and
-                        (property_value := getattr(self._argv._values, property_name))):  # noqa
-                        if isinstance(property_value, list):
-                            property_values[:0] = property_value
-                        elif (property_value := convert(property_value)) is not None:
-                            property_values.append(property_value)
-                    setattr(self._argv._values, property_name, property_values)
-                    while True:
-                        if (peek := self._argv._peek).is_null or peek.is_option:
-                            break
-                        if (peek == Argv._ESCAPE_VALUE) and (peek := self._argv._next).is_null or peek.is_option:
-                            break
-                        if (peek := convert(peek)) is None:
-                            break
-                        property_values.append(peek)
-                        self._argv._next
-                    return True
+                property_values = []
+                if (hasattr(self._argv._values, option._property_name) and
+                    (property_value := getattr(self._argv._values, option._property_name))):  # noqa
+                    if isinstance(property_value, list):
+                        property_values[:0] = property_value
+                    elif (property_value := convert(property_value)) is not None:
+                        property_values.append(property_value)
+                setattr(self._argv._values, option._property_name, property_values)
+                while True:
+                    if (peek := self._argv._peek).is_null or peek.is_option:
+                        break
+                    if (peek == Argv._ESCAPE_VALUE) and (peek := self._argv._next).is_null or peek.is_option:
+                        break
+                    if (peek := convert(peek)) is None:
+                        break
+                    property_values.append(peek)
+                    self._argv._next
+                return True
             return False
 
         def _set_default_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
@@ -387,11 +384,11 @@ class Argv:
 
         # Define value properties as None for any options/properties not specified; must be after above.
         for option in self._option_definitions._definitions:
-            if not hasattr(self._values, property_name := option._property_name):
+            if not hasattr(self._values, option._property_name):
                 if option._required:
                     if option._option_name not in missing_options:
                         missing_options.append(option._option_name)
-                setattr(self._values, property_name, None)
+                setattr(self._values, option._property_name, None)
 
         if unparsed_args:
             errors.append(f"Unrecognized argument"
