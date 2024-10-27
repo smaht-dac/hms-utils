@@ -17,7 +17,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--encrypt"],
         ARGV.OPTIONAL(bool): ["--decrypt"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool): ["--yes", "--y", "--force"],
+        ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
@@ -41,8 +41,6 @@ def main():
         verb = "Decrypt"
         file = argv.file
         function = decrypt_file
-    else:
-        _error("Must specify --encrypt or --decrypt")
 
     if file == "-":
         file = STDIN
