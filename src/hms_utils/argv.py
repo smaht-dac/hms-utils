@@ -115,8 +115,7 @@ class Argv:
                 convert = lambda value: str(value)  # noqa
             if self.is_any_of(option._options):
                 values = []
-                if (hasattr(self._argv._values, option._property_name) and
-                    (value := getattr(self._argv._values, option._property_name))):  # noqa
+                if (value := getattr(self._argv._values, option._property_name, None)) is not None:
                     if isinstance(value, list):
                         values[:0] = value
                     elif (value := convert(value)) is not None:
@@ -149,7 +148,7 @@ class Argv:
         def _set_default_value_properties(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             parsed = False ; value = self  # noqa
             for option in option._options:
-                option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
+                option_values = getattr(self._argv._values, option, None)
                 while True:
                     if value.is_null:
                         break
