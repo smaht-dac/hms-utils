@@ -49,16 +49,7 @@ class Argv:
             return not self._null
 
         def is_any_of(self, options) -> bool:
-            def match(option: str) -> bool:
-                nonlocal self
-                if self._argv._escaping:
-                    return False
-                if isinstance(option, str) and (option := option.strip()):
-                    if ((self == option) or (self._argv._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
-                                             (self == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:]))):
-                        return True
-                return False
-            return any(match(option) for option in options)
+            return self._argv._is_option_any_of(self, options)
 
         def set_value_boolean(self, option: Argv._Option) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
@@ -473,35 +464,14 @@ class Argv:
         return defined_value_options
 
     def _find_options(self, options: Union[List[str], str]) -> List[Argv._Option]:
-        def are_options_equal(optiona: str, optionb: str) -> bool:
-            nonlocal self
-            if optiona == optionb:
-                return True
-            if self._fuzzy:  # TODO: refactor code from is_any_of/match.
-                if optiona.startswith(Argv._OPTION_PREFIX):
-                    if (optiona := (Argv._FUZZY_OPTION_PREFIX + optiona[Argv._OPTION_PREFIX_LEN:])) == optionb:
-                        return True
-                    if optionb.startswith(Argv._OPTION_PREFIX):
-                        if (Argv._FUZZY_OPTION_PREFIX + optionb[Argv._OPTION_PREFIX_LEN:]) == optiona:
-                            return True
-                if optionb.startswith(Argv._OPTION_PREFIX):
-                    if (Argv._FUZZY_OPTION_PREFIX + optionb[Argv._OPTION_PREFIX_LEN:]) == optiona:
-                        return True
-            return False
         found_options = []
-        if options := set(to_non_empty_string_list(options)):
+        if options := to_non_empty_string_list(options):
             for option_definition in self._option_definitions._definitions:
-                found = False
                 for option_definition_option in option_definition._options:
-                    for option in options:
-                        if are_options_equal(option, option_definition_option):
-                            found_options.append(option_definition)
-                            found = True
-                            break
-                    if found:
+                    if self._is_option_any_of(option_definition_option, options):
+                        found_options.append(option_definition)
                         break
         return found_options
-        # return [option for option in self._option_definitions._definitions if set(options) & set(option._options)]
 
     def _is_option(self, value: str) -> bool:
         if isinstance(value, str) and (value := value.strip()):
@@ -511,6 +481,17 @@ class Argv:
                 if value.startswith(Argv._FUZZY_OPTION_PREFIX) and value[Argv._FUZZY_OPTION_PREFIX_LEN:].strip():
                     return True
         return False
+
+    def _is_option_any_of(self, value: str, options: List[str]) -> bool:
+        def match(value: str, option: str) -> bool:
+            if self._escaping:
+                return False
+            if isinstance(option, str) and (option := option.strip()):
+                if ((value == option) or (self._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
+                                          (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:]))):
+                    return True
+            return False
+        return any(match(value, option) for option in options) if isinstance(options, list) else False
 
     @staticmethod
     def _is_option_type(option_type: Any) -> bool:
@@ -598,13 +579,23 @@ class ARGV(Argv):
     def AT_MOST_ONE_OF(cls):
         return f"rule:at_most_one_of:{str(uuid())}"
 
+    @classmethod
+    @property
+    def DEPENDS_ON(cls, *args):
+        return f"rule:depends_on:{str(uuid())}"
+
+    @classmethod
+    @property
+    def DEPENDENCY(cls, *args):
+        return f"rule:dependency:{str(uuid())}"
+
 
 # args = Argv({"foo": "bar"})
 # argv = Argv()
 # x = argv.foo
 
 
-if False:
+if True:
     args = ["abc", "def", "--config", "file.json", "--verbose",
             "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
     argv = Argv(args, delete=True)
@@ -632,7 +623,7 @@ if False:
     assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
 
 
-if False:
+if True:
     # args = Argv(
     #     [Argv.STRINGS, "--config", "--conf"],
     #     [Argv.STRING, "--config", "--conf"],
@@ -662,7 +653,7 @@ if False:
     assert errors[0] == "Unrecognized arguments: -xyz, -124, some-other"
     assert errors[1] == "Missing required options: --foo, goo"
 
-if False:
+if True:
     argv = Argv(
         # Argv.DEFAULT, "files",
         Argv.INTEGER, ["--max", "--maximum"],
@@ -710,14 +701,14 @@ if False:
     assert errors[0] == "Unrecognized argument: -xyz"
     assert errors[1] == "Missing required options: --merge, --formatted"
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
     )
     argv.parse(["12", "34", "56", "1.2", "3.4"])
     assert argv.floats == [12, 34, 56, 1.2, 3.4]
 
-if False:
+if True:
     argv = Argv(
         Argv.DEFAULT | Argv.INTEGER, "max",
         Argv.DEFAULTS | Argv.FLOAT, "floats", "reals"
@@ -727,14 +718,14 @@ if False:
     assert argv.floats == [34, 56, 1.2, 3.4]
 
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ("--password", "--passwd")
     )
     argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, "file"
@@ -742,7 +733,7 @@ if False:
     argv.parse(["foo", "--password", "pas"])
     assert argv.password == "pas"
 
-if False:
+if True:
     argv = Argv(
         Argv.STRING, ["--password"],
         Argv.DEFAULTS, ("thedefaults"), strip=False)
@@ -750,7 +741,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.DEFAULTS: "thedefaults",
@@ -759,7 +750,7 @@ if False:
     assert argv.password == "pas"
     assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
 
-if False:
+if True:
     argv = Argv({
         Argv.STRING: ["--password"],
         Argv.REQUIRED: "--req",
@@ -771,7 +762,7 @@ if False:
     assert argv.req is True
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ("--password"),
         ARGV.OPTIONAL(str): ("--xpassword"),
@@ -788,7 +779,7 @@ if False:
     errors == ["Missing required option: --maxn"]
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
@@ -816,6 +807,7 @@ if True:
         ARGV.REQUIRED(str): ["file"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
         ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
+        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"],
     })
     errors = argv.parse(["--encrypt", "--decrypt", "somefile"])
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
