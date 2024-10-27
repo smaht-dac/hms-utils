@@ -24,6 +24,9 @@ class Argv:
     _FUZZY_OPTION_PREFIX_LEN = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LEN = len(_OPTION_PREFIX)
+    _RULE_DELIMITER = ":"
+    _RULE_PREFIX = f"__rule__{_RULE_DELIMITER}"
+    _RULE_PREFIX_LEN = len(_RULE_PREFIX)
 
     class _Arg(str):
 
@@ -237,7 +240,7 @@ class Argv:
             dependent_options = [] ; required_options = []  # noqa
             if options := to_non_empty_string_list(options):
                 for optioni in range(len(options)):
-                    if options[optioni].startswith("rule:depends_on"):
+                    if options[optioni].startswith(f"{Argv._RULE_PREFIX}depends_on"):
                         if dependent_options := options[:optioni]:
                             if (optioni + 1) < len(options):
                                 if required_options := options[optioni + 1:]:
@@ -445,8 +448,9 @@ class Argv:
             for option_type in options:
                 option_options = options[option_type]
                 if isinstance(option_type, str):
-                    if (option_type.startswith("rule:") and (option_type := option_type[5:]) and
-                        ((index := option_type.find(":")) > 0) and (option_type := option_type[:index])):  # noqa
+                    if (option_type.startswith(Argv._RULE_PREFIX) and
+                        (option_type := option_type[Argv._RULE_PREFIX_LEN:]) and
+                        ((index := option_type.find(Argv._RULE_DELIMITER)) > 0) and (option_type := option_type[:index])):  # noqa
                         if option_type == "exactly_one_of":
                             option_definitions.add_rule_exactly_one_of(option_options)
                             continue
@@ -460,7 +464,7 @@ class Argv:
                             option_definitions.add_rule_depends_on(option_options)
                             continue
                         option_type = to_integer(option_type[0:index])
-                    elif (index := option_type.find(":")) > 1:
+                    elif (index := option_type.find(Argv._RULE_DELIMITER)) > 1:
                         option_type = to_integer(option_type[0:index])
                 if Argv._is_option_type(option_type) and (option_options := to_non_empty_string_list(option_options)):
                     if not any(self._is_option(option) for option in option_options):
@@ -608,7 +612,7 @@ class ARGV(Argv):
             option_type |= Argv.REQUIRED
         else:
             option_type |= Argv.OPTIONAL
-        return str(option_type) + ":" + str(uuid())
+        return str(option_type) + Argv._RULE_DELIMITER + str(uuid())
 
     @staticmethod
     def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
@@ -617,27 +621,27 @@ class ARGV(Argv):
     @classmethod
     @property
     def EXACTLY_ONE_OF(cls):
-        return f"rule:exactly_one_of:{str(uuid())}"
+        return f"{Argv._RULE_PREFIX}exactly_one_of{Argv._RULE_DELIMITER}{str(uuid())}"
 
     @classmethod
     @property
     def AT_LEAST_ONE_OF(cls):
-        return f"rule:at_least_one_of:{str(uuid())}"
+        return f"{Argv._RULE_PREFIX}at_least_one_of{Argv._RULE_DELIMITER}{str(uuid())}"
 
     @classmethod
     @property
     def AT_MOST_ONE_OF(cls):
-        return f"rule:at_most_one_of:{str(uuid())}"
+        return f"{Argv._RULE_PREFIX}at_most_one_of{Argv._RULE_DELIMITER}{str(uuid())}"
 
     @classmethod
     @property
     def DEPENDENCY(cls, *args):
-        return f"rule:depends_on:{str(uuid())}"
+        return f"{Argv._RULE_PREFIX}depends_on:{str(uuid())}"
 
     @classmethod
     @property
     def DEPENDS_ON(cls, *args):
-        return f"rule:depends_on:{str(uuid())}"
+        return f"{Argv._RULE_PREFIX}depends_on:{str(uuid())}"
 
 # args = Argv({"foo": "bar"})
 # argv = Argv()
