@@ -6,7 +6,7 @@ import sys
 import traceback
 from typing import List, Optional, Tuple
 import yaml
-from hms_utils.argv import ARGV, OPTIONAL, AT_MOST_ONE_OF  # noqa
+from hms_utils.argv import ARGV, AT_LEAST_ONE_OF, AT_MOST_ONE_OF, OPTIONAL, REQUIRED   # noqa
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
@@ -156,6 +156,7 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--raw"],
         OPTIONAL(bool): ["--show"],
         OPTIONAL(str): ["--identity"],
+        OPTIONAL(str): ["--password"],
         OPTIONAL(bool): ["--json"],
         OPTIONAL(bool): ["--format", "--formatted"],
         OPTIONAL(bool): ["--exports", "--export"],
