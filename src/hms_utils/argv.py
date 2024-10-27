@@ -383,8 +383,6 @@ class Argv:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
                 if len(intersection_options) > 1:
-                    import pdb ; pdb.set_trace()  # noqa
-                    pass
                     # At most one of the specifed rule options should be specified but more than one are.
                     rule_violations_at_most_one_of_toomany.append(
                         [option._option_name for option in rule_options])
