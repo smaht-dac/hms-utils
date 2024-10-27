@@ -450,7 +450,8 @@ class Argv:
                 if isinstance(option_type, str):
                     if (option_type.startswith(Argv._RULE_PREFIX) and
                         (option_type := option_type[Argv._RULE_PREFIX_LEN:]) and
-                        ((index := option_type.find(Argv._RULE_DELIMITER)) > 0) and (option_type := option_type[:index])):  # noqa
+                        ((index := option_type.find(Argv._RULE_DELIMITER)) > 0) and
+                        (option_type := option_type[:index])):  # noqa
                         if option_type == "exactly_one_of":
                             option_definitions.add_rule_exactly_one_of(option_options)
                             continue
