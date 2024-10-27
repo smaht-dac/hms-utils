@@ -45,8 +45,8 @@ def test_argv_c():
         "--config", "-file", Argv.STRING,
         "--configs", Argv.STRINGS,
         "--verbose", Argv.BOOLEAN,
-        "--debug", Argv.BOOLEAN
-    )
+        "--debug", Argv.BOOLEAN,
+        exit=False)
     assert argv.values.verbose is True
     assert argv.values.debug is True
     assert argv.values.config == "file.json"

@@ -279,7 +279,7 @@ class Argv:
             return hash(id(self))
 
     def __init__(self, *args, argv: Optional[List[str]] = None,
-                 parse: bool = True, exit: bool = False, fuzzy: bool = True,
+                 parse: bool = True, exit: bool = True, fuzzy: bool = True,
                  strip: bool = True, skip: bool = True, escape: bool = True, delete: bool = False) -> None:
         self._argi = 0
         self._fuzzy = fuzzy is not False
@@ -288,7 +288,7 @@ class Argv:
         self._escaping = False
         self._delete = delete is True
         self._values = Argv._Values()
-        self._exit = exit is True
+        self._exit = (parse is True) and (exit is True)
         if (len(args) == 1) and isinstance(args[0], list):
             # Here, the given args are the actual command-line arguments to process/parse.
             if not (isinstance(argv, list) and argv):
@@ -661,8 +661,8 @@ if True:
         "--config", "-file", Argv.STRING,
         "--configs", Argv.STRINGS,
         "--verbose", Argv.BOOLEAN,
-        "--debug", Argv.BOOLEAN
-    )
+        "--debug", Argv.BOOLEAN,
+        exit=False)
 #   argv.parse(
 #       Argv.STRING, "--config", "-file",
 #       Argv.STRINGS, "--configs",
@@ -874,3 +874,5 @@ if True:
                       "Exactly one of these options must be specified: --output, -yes",
                       "Option --formatted depends on option: --json"]
     assert argv.destination == "-destfile"
+
+print("EOF")
