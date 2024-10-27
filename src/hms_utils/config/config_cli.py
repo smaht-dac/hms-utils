@@ -6,6 +6,7 @@ import sys
 import traceback
 from typing import List, Optional, Tuple
 import yaml
+from hms_utils.argv import ARGV, OPTIONAL, AT_MOST_ONE_OF  # noqa
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
@@ -138,6 +139,37 @@ def handle_exports_command(config: Config, args: object) -> int:
 
 
 def parse_args(argv: List[str]) -> object:
+
+    # TODO: Use to ARGV class ...
+    newargv = ARGV({  # noqa
+        OPTIONAL([str]): ["--configs", "--config", "--confs", "--conf",
+                          "--merge", "--merge-configs", "--merge-config", "--merge-confs", "--merge-conf"],
+        OPTIONAL([str]): ["--secrets", "--secret", "--merge-secrets", "--merge-secret"],
+        OPTIONAL([str]): ["--includes", "--include", "--include-configs", "--include-config",
+                          "--imports", "--import", "--import-configs", "--import-config"],
+        OPTIONAL([str]): ["--includes", "--include", "--include-configs", "--include-config",
+                          "--imports", "--import", "--import-configs", "--import-config"],
+        OPTIONAL(str): ["--config-dir", "--conf-dir", "--dir", "--directory"],
+        OPTIONAL([str]): ["--lookup", "--lookups"],
+        OPTIONAL(bool): ["--tree"],
+        OPTIONAL(bool): ["--list"],
+        OPTIONAL(bool): ["--dump"],
+        OPTIONAL(bool): ["--raw"],
+        OPTIONAL(bool): ["--show"],
+        OPTIONAL(str): ["--identity"],
+        OPTIONAL(bool): ["--json"],
+        OPTIONAL(bool): ["--format", "--formatted"],
+        OPTIONAL(bool): ["--exports", "--export"],
+        OPTIONAL(bool): ["--shell", "--functions", "--function"],
+        OPTIONAL(str): ["--exports-file", "--export-file"],
+        OPTIONAL(bool): ["--noaws"],
+        OPTIONAL(str): ["--aws-profile", "--profile", "--env"],
+        OPTIONAL(bool): ["--nocolor"],
+        OPTIONAL(bool): ["--warnings", "--warning"],
+        OPTIONAL(bool): ["--verbose"],
+        OPTIONAL(bool): ["--debug"],
+        OPTIONAL(bool): ["--version"]
+    }, parse=False)
 
     class Args:
         config_dir = None

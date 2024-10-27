@@ -3,6 +3,7 @@ import sys
 from typing import Any, Callable, List, Optional, Type, Union
 from uuid import uuid4 as uuid
 from hms_utils.type_utils import to_float, to_integer, to_non_empty_string_list
+from hms_utils.dictionary_utils import sort_dictionary
 
 
 class Argv:
@@ -567,6 +568,20 @@ class Argv:
                         return True
             return False
         return any(match(value, option) for option in options) if isinstance(options, list) else False
+
+    @property
+    def _property_names(self) -> List[str]:
+        property_names = []
+        for option in self._option_definitions._definitions:
+            property_names.append(option._property_name)
+        return property_names
+
+    @property
+    def _dict(self) -> dict:
+        values = {}
+        for property_name in self._property_names:
+            values[property_name] = getattr(self._values, property_name, None)
+        return sort_dictionary(values)
 
     @staticmethod
     def _is_option_type(option_type: Any) -> bool:
