@@ -100,7 +100,10 @@ class Argv:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
             if ((property_name := option._property_name) and
                 self.is_any_of(option._options) and (not hasattr(self._argv._values, property_name))):  # noqa
-                if (peek := self._argv._peek).is_not_null and (not peek.is_option):
+                if (peek := self._argv._peek).is_not_null and ((peek != Argv._ESCAPE_VALUE) or (not peek.is_option)):
+                    if peek == Argv._ESCAPE_VALUE:
+                        self._argv._next
+                        peek = self._argv._next
                     if (not callable(convert)) or ((peek := convert(peek)) is not None):
                         setattr(self._argv._values, property_name, peek if callable(convert) else str(peek))
                         self._argv._next
@@ -123,6 +126,7 @@ class Argv:
                             property_values.append(property_value)
                     setattr(self._argv._values, property_name, property_values)
                     while True:
+                        # TODO: Handle -- escaping.
                         if ((peek := self._argv._peek).is_null or peek.is_option or ((peek := convert(peek)) is None)):
                             break
                         property_values.append(peek)
@@ -133,6 +137,7 @@ class Argv:
         def _set_default_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if self and (not self.is_option):
                 property_value = self
+                # TODO: Handle -- escaping.
                 for option in option._options:
                     if (not callable(convert)) or ((property_value := convert(property_value)) is not None):
                         if not hasattr(self._argv._values, option):
@@ -145,6 +150,7 @@ class Argv:
             for option in option._options:
                 option_values = getattr(self._argv._values, option) if hasattr(self._argv._values, option) else None
                 while True:
+                    # TODO: Handle -- escaping.
                     if ((peek is None) or peek.is_null or peek.is_option or
                         (callable(convert) and ((peek := convert(peek)) is None))):  # noqa
                         break
@@ -816,7 +822,7 @@ if True:
     errors == ["Missing required option: --maxn"]
 
 
-if False:
+if True:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
@@ -836,6 +842,7 @@ if True:
         ARGV.OPTIONAL(bool): ["--encrypt"],
         ARGV.OPTIONAL(bool): ["--decrypt"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(str): ["--destination", "--dest"],
         ARGV.OPTIONAL(bool): ["-yes", "--y", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -847,7 +854,8 @@ if True:
         ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
         ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"]
     })
-    errors = argv.parse(["--encrypt", "--decrypt", "somefile", "--formatted"])
+    errors = argv.parse(["--encrypt", "--decrypt", "somefile", "--formatted", "--dest", "--", "-destfile"])
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
                       "Exactly one of these options must be specified: --output, -yes",
                       "Option --formatted depends on option: --json"]
+    assert argv.destination == "-destfile"
