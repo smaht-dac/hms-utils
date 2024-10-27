@@ -126,8 +126,12 @@ class Argv:
                             property_values.append(property_value)
                     setattr(self._argv._values, property_name, property_values)
                     while True:
-                        # TODO: Handle -- escaping.
-                        if ((peek := self._argv._peek).is_null or peek.is_option or ((peek := convert(peek)) is None)):
+                        if (peek := self._argv._peek).is_null or peek.is_option:
+                            break
+                        if peek == Argv._ESCAPE_VALUE:
+                            if (peek := self._argv._next).is_null or peek.is_option:
+                                break
+                        if (peek := convert(peek)) is None:
                             break
                         property_values.append(peek)
                         self._argv._next
@@ -512,6 +516,8 @@ class Argv:
         return found_options
 
     def _is_option(self, value: str) -> bool:
+        if self._escaping:
+            return False
         if isinstance(value, str) and (value := value.strip()):
             if value.startswith(Argv._OPTION_PREFIX) and (value := value[Argv._OPTION_PREFIX_LEN:].strip()):
                 return True
@@ -555,6 +561,9 @@ class Argv:
                 del self._argv[0]
             else:
                 self._argi += 1
+            if (not self._escaping) and (value == Argv._ESCAPE_VALUE):
+                self._escaping = True
+                return self._next
             return value
         return None
 
@@ -631,7 +640,6 @@ class ARGV(Argv):
     @property
     def DEPENDS_ON(cls, *args):
         return f"rule:depends_on:{str(uuid())}"
-
 
 # args = Argv({"foo": "bar"})
 # argv = Argv()
@@ -842,7 +850,7 @@ if True:
         ARGV.OPTIONAL(bool): ["--encrypt"],
         ARGV.OPTIONAL(bool): ["--decrypt"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(str): ["--destination", "--dest"],
+        ARGV.OPTIONAL([str]): ["--destination", "--dest"],
         ARGV.OPTIONAL(bool): ["-yes", "--y", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -858,4 +866,4 @@ if True:
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
                       "Exactly one of these options must be specified: --output, -yes",
                       "Option --formatted depends on option: --json"]
-    assert argv.destination == "-destfile"
+    assert argv.destination == ["-destfile"]
