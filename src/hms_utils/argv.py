@@ -382,7 +382,9 @@ class Argv:
         for rule_options in self._option_definitions._rule_at_most_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
-                if len(intersection_options) > 0:
+                if len(intersection_options) > 1:
+                    import pdb ; pdb.set_trace()  # noqa
+                    pass
                     # At most one of the specifed rule options should be specified but more than one are.
                     rule_violations_at_most_one_of_toomany.append(
                         [option._option_name for option in rule_options])
@@ -666,3 +668,239 @@ class ARGV(Argv):
     @property
     def DEPENDS_ON(cls, *args):
         return f"{Argv._RULE_PREFIX}depends_on:{str(uuid())}"
+
+
+OPTIONAL = ARGV.OPTIONAL
+REQUIRED = ARGV.REQUIRED
+AT_MOST_ONE_OF = ARGV.AT_MOST_ONE_OF
+
+# args = Argv({"foo": "bar"})
+# argv = Argv()
+# x = argv.foo
+
+
+debug = True
+
+if debug:
+    args = ["abc", "def", "--config", "file.json", "--verbose",
+            "-debug", "--configs", "ghi.json", "jkl.json", "mno.json"]
+    argv = Argv(args, delete=True)
+    argv.parse(
+        "--config", "-file", Argv.STRING,
+        "--configs", Argv.STRINGS,
+        "--verbose", Argv.BOOLEAN,
+        "--debug", Argv.BOOLEAN,
+        exit=False)
+#   argv.parse(
+#       Argv.STRING, "--config", "-file",
+#       Argv.STRINGS, "--configs",
+#       Argv.BOOLEAN, "--verbose",
+#       Argv.BOOLEAN, "--debug"
+#   )
+    argv.parse(
+        Argv.STRING, ("--config", "-file"),
+        Argv.STRINGS, ["--configs", "--configs"],
+        Argv.BOOLEAN, "--verbose",
+        Argv.BOOLEAN, "--debug"
+    )
+    assert argv.values.verbose is True
+    assert argv.values.debug is True
+    assert argv.values.config == "file.json"
+    assert argv.values.configs == ["ghi.json", "jkl.json", "mno.json"]
+
+
+if debug:
+    # args = Argv(
+    #     [Argv.STRINGS, "--config", "--conf"],
+    #     [Argv.STRING, "--config", "--conf"],
+    #     [Argv.INTEGERS, "--count"],
+    #     [Argv.FLOATS, "--key"]
+    # )
+    args = Argv(
+        Argv.STRINGS, "--config", "--conf",
+        Argv.STRING, "--config", "--conf",
+        Argv.INTEGERS, "--count",
+        Argv.FLOATS, "--key",
+        Argv.STRING, "--foo",
+        Argv.STRING, "goo",
+        Argv.STRING, "--import-file",
+        Argv.DEFAULT, "others",
+        parse=False)
+    errors = args.parse(["--config", "abc", "ghi", "-xyz",
+                         "--config", "foo", "--import-file", "secrets.json",
+                         "-count", "123", "456", "-key", "321", "2342.234",
+                         "-124", "somefile.json", "some-other"])
+
+    assert args.config == ["abc", "ghi", "foo"]
+    assert args.count == [123, 456]
+    assert args.import_file == "secrets.json"
+    assert args.key == [321, 2342.234]
+    assert args.others == "somefile.json", "some-other"
+    assert errors[0] == "Unrecognized arguments: -xyz, -124, some-other"
+    assert errors[1] == "Missing required options: --foo, goo"
+
+if debug:
+    argv = Argv(
+        # Argv.DEFAULT, "files",
+        Argv.INTEGER, ["--max", "--maximum"],
+        Argv.FLOAT, ["--pi", "--pie"],
+        Argv.STRINGS, ("--config", "--conf"),
+        Argv.STRINGS, ["--secrets", "--secret"],
+        Argv.STRINGS, ("--merge"),
+        Argv.STRINGS, ["--includes", "--include", "--imports", "--import",
+                       "--import-config", "--import-configs", "--import-conf"],
+        Argv.STRINGS, ["--include-secrets", "--include-secret", "--import-secrets", "--import-secret"],
+        Argv.BOOLEAN, ["--list"],
+        Argv.BOOLEAN, ["--tree"],
+        Argv.BOOLEAN, ["--dump"],
+        Argv.BOOLEAN, ["--json"],
+        Argv.BOOLEAN, ("--formatted", "--format"),
+        Argv.BOOLEAN, ["--jsonf"],
+        Argv.BOOLEAN, ["--raw"],
+        Argv.BOOLEAN, ["--verbose"],
+        Argv.BOOLEAN, ["--debug"],
+        Argv.STRINGS, ("--shell", "-shell", "--script", "-script", "--scripts", "-scripts", "--command", "-command",
+                       "--commands", "-commands", "--function", "-function", "--functions", "-functions"),
+        Argv.STRING, ("--password", "--passwd"),
+        Argv.STRING, ["--exports", "--export"],
+        Argv.STRING, ["--exports-file", "--export-file"],
+        Argv.DEFAULT, "thedefault", "thedefault2",
+        Argv.DEFAULTS, "thedefaults",
+        Argv.DEFAULT | Argv.OPTIONAL, "thedefaultb",
+        Argv.DEFAULTS | Argv.OPTIONAL, "thedefaultfoo",
+        # Argv.DEFAULTS, "thedefaults"
+        parse=False)
+    errors = argv.parse(["foo", "bara", "barb", "-xyz", "goo",
+                         "-passwd", "pas", "--shell", "hoo", "-config", "configfile",
+                         "--max", "124", "--pie", "3.141562"])
+    assert argv.password == "pas"
+    assert argv.max == 124
+    assert argv.pi == 3.141562
+
+    assert argv.values.thedefault == "foo"
+    assert argv.values.thedefault2 == "bara"
+    assert argv.values.thedefaults == ["barb", "goo"]
+    assert argv.values.thedefaultb is None
+    assert argv.values.thedefaultfoo is None
+    assert argv.config == ["configfile"]
+
+    assert errors[0] == "Unrecognized argument: -xyz"
+    assert errors[1] == "Missing required options: --merge, --formatted"
+
+if debug:
+    argv = Argv(
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals",
+        parse=False)
+    argv.parse(["12", "34", "56", "1.2", "3.4"])
+    assert argv.floats == [12, 34, 56, 1.2, 3.4]
+
+if debug:
+    argv = Argv(
+        Argv.DEFAULT | Argv.INTEGER, "max",
+        Argv.DEFAULTS | Argv.FLOAT, "floats", "reals",
+        parse=False)
+    argv.parse(["12", "34", "56", "1.2", "3.4"])
+    assert argv.max == 12
+    assert argv.floats == [34, 56, 1.2, 3.4]
+
+
+if debug:
+    argv = Argv(
+        Argv.STRING, ("--password", "--passwd"),
+        parse=False)
+    argv.parse(["foo", "bara", "barb", "-xyz", "goo", "-passwd", "pas"])
+    assert argv.password == "pas"
+
+if debug:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, "file",
+        parse=False)
+    argv.parse(["foo", "--password", "pas"])
+    assert argv.password == "pas"
+
+if debug:
+    argv = Argv(
+        Argv.STRING, ["--password"],
+        Argv.DEFAULTS, ("thedefaults"), strip=False, parse=False)
+    argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", " argwithspace ", "", ""]
+
+if debug:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.DEFAULTS: "thedefaults",
+    }, parse=False)
+    argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", ""])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", ""]
+
+if debug:
+    argv = Argv({
+        Argv.STRING: ["--password"],
+        Argv.REQUIRED: "--req",
+        Argv.DEFAULTS: "thedefaults",
+    }, parse=False)
+    argv.parse(["foo", "bar", "--password", "pas", " argwithspace ", "", "", "--req", "xyz"])
+    assert argv.password == "pas"
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
+
+
+if debug:
+    argv = ARGV({
+        ARGV.OPTIONAL(str): ("--password"),
+        ARGV.OPTIONAL(str): ("--xpassword"),
+        ARGV.REQUIRED(bool): ["--req", "--reqx"],
+        ARGV.REQUIRED([str]): "thedefaults",
+        ARGV.REQUIRED(float): "--maxn",
+    }, parse=False)
+    errors = argv.parse(["foo", "bar", "-password", "pas", " argwithspace ", "", "", "-reqx", "xyz"])
+    assert argv.password == "pas"
+    print(argv.thedefaults)
+    assert argv.thedefaults == ["foo", "bar", "argwithspace", "", "", "xyz"]
+    assert argv.req is True
+    assert argv.values.xpassword is None
+    errors == ["Missing required option: --maxn"]
+
+
+if debug:
+    argv = ARGV({
+        ARGV.OPTIONAL(str): ["--encrypt"],
+        ARGV.OPTIONAL(str): ["--decrypt"],
+        ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(bool): ["--yes", "--force"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(str): ["--password", "--passwd"]
+    }, parse=False)
+    errors = argv.parse(["--encrypt", "somefile", "--encrypt", "anotherfile"], report=False)
+    assert errors == ["Unrecognized arguments: --encrypt, anotherfile"]
+    assert argv.encrypt == "somefile"
+    assert argv.decrypt is None
+
+if debug:
+    argv = ARGV({
+        ARGV.OPTIONAL(bool): ["--encrypt"],
+        ARGV.OPTIONAL(bool): ["--decrypt"],
+        ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(str): ["--destination", "--dest"],
+        ARGV.OPTIONAL(bool): ["-yes", "--y", "--force"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(str): ["--password", "--passwd"],
+        ARGV.REQUIRED(str): ["file"],
+        ARGV.OPTIONAL(bool): ["--formatted"],
+        ARGV.OPTIONAL(bool): ["--json"],
+        ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
+        ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
+        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"]
+    }, parse=False)
+    errors = argv.parse(["--encrypt", "--decrypt", "somefile", "--formatted", "--dest", "--", "-destfile"])
+    assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
+                      "Exactly one of these options must be specified: --output, -yes",
+                      "Option --formatted depends on option: --json"]
+    assert argv.destination == "-destfile"
+
+print("EOF")
