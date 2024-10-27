@@ -787,8 +787,7 @@ if True:
         ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(str): ["--password", "--passwd"],
-        # ARGV.ONE_OF: ["--encrypt", "--decrypt"]
+        ARGV.OPTIONAL(str): ["--password", "--passwd"]
     })
     errors = argv.parse(["--encrypt", "somefile", "--encrypt", "anotherfile"], report=False)
     assert errors == ["Unrecognized arguments: --encrypt, anotherfile"]
@@ -807,7 +806,7 @@ if True:
         ARGV.REQUIRED(str): ["file"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
         ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
-        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"],
+        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"]
     })
     errors = argv.parse(["--encrypt", "--decrypt", "somefile"])
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
