@@ -149,7 +149,7 @@ def parse_args(argv: List[str]) -> object:
                           "--include-confs", "--include-conf", "--imports", "--import",
                           "--import-configs", "--import-config", "import-confs", "--import-conf"],
         OPTIONAL(str): ["--config-dir", "--conf-dir", "--dir", "--directory"],
-        OPTIONAL([str]): ["--lookup-paths", "--lookup-path", "--lookup", "--lookups"],
+        OPTIONAL([str]): ["--lookup-paths", "--lookup-path", "--lookups", "--lookup"],
         OPTIONAL(bool): ["--tree"],
         OPTIONAL(bool): ["--list"],
         OPTIONAL(bool): ["--dump"],
