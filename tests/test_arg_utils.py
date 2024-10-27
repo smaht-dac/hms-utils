@@ -58,8 +58,8 @@ def test_argv_c():
         Argv.STRING, "--config", "-file",
         Argv.STRINGS, "--configs",
         Argv.BOOLEAN, "--verbose",
-        Argv.BOOLEAN, "--debug"
-    )
+        Argv.BOOLEAN, "--debug",
+        parse=False)
     argv.parse(args)
     assert argv.values.verbose is True
     assert argv.values.debug is True

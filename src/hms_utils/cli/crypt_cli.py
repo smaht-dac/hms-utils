@@ -23,7 +23,7 @@ def main():
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
         ARGV.REQUIRED(str): ["file"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
-    }, parse=True, exit=True)
+    })
 
     def copy_file(source: str, destination: str) -> None:
         nonlocal STDOUT
