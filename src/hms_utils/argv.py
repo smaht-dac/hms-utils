@@ -419,6 +419,8 @@ class Argv:
                         elif option_type == "at_most_one_of":
                             option_definitions.add_rule_at_most_one_of(option_options)
                             continue
+                        elif option_type == "dependency":
+                            continue  # TODO
                         option_type = to_integer(option_type[0:index])
                     elif (index := option_type.find(":")) > 1:
                         option_type = to_integer(option_type[0:index])
@@ -806,6 +808,7 @@ if True:
         ARGV.REQUIRED(str): ["file"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
         ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
+        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"],
         ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"]
     })
     errors = argv.parse(["--encrypt", "--decrypt", "somefile"])
