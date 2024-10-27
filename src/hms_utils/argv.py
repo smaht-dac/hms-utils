@@ -49,6 +49,8 @@ class Argv:
             return not self._null
 
         def is_any_of(self, options) -> bool:
+            if self._argv._escaping:
+                return False
             return self._argv._is_option_any_of(self, options)
 
         def set_value_boolean(self, option: Argv._Option) -> bool:
@@ -166,6 +168,7 @@ class Argv:
             self._rule_exactly_one_of = []
             self._rule_at_least_one_of = []
             self._rule_at_most_one_of = []
+            self._rule_depends_on = []
             self._option_type_action_map = {
                 # 0: Argv._Arg.set_value_string,
                 0: Argv._Arg.set_value_boolean,
@@ -221,6 +224,17 @@ class Argv:
         def add_rule_at_most_one_of(self, options: List[str]) -> None:
             if options := list(set(to_non_empty_string_list(options))):
                 self._rule_at_most_one_of.append(options)
+
+        def add_rule_depends_on(self, options: List[str]) -> None:
+            dependent_options = [] ; required_options = []  # noqa
+            if options := to_non_empty_string_list(options):
+                for optioni in range(len(options)):
+                    if options[optioni].startswith("rule:depends_on"):
+                        if dependent_options := options[:optioni]:
+                            if (optioni + 1) < len(options):
+                                if required_options := options[optioni + 1:]:
+                                    self._rule_depends_on.append({"depends": dependent_options, "on": required_options})
+                                    return
 
     class _Option:
         def __init__(self,
@@ -310,6 +324,7 @@ class Argv:
         rule_violations_exactly_one_of_toomany = []
         rule_violations_at_least_one_of_missing = []
         rule_violations_at_most_one_of_toomany = []
+        rule_violations_depends_on = []
 
         for arg in self:
             parsed = False
@@ -349,6 +364,18 @@ class Argv:
                     rule_violations_at_most_one_of_toomany.append(
                         [option._option_name for option in rule_options])
 
+        for rule in self._option_definitions._rule_depends_on:
+            rule_dependent_options = to_non_empty_string_list(rule.get("depends"))
+            rule_required_options = to_non_empty_string_list(rule.get("on"))
+            rule_dependent_options = self._find_options(rule_dependent_options)
+            rule_required_options = self._find_options(rule_required_options)
+            for rule_dependent_option in rule_dependent_options:
+                if hasattr(self._values, rule_dependent_option._property_name):
+                    for rule_required_option in rule_required_options:
+                        if not hasattr(self._values, rule_required_option._property_name):
+                            rule_violations_depends_on.append([rule_dependent_option._option_name,
+                                                               rule_required_option._option_name])
+
         # Define value properties as None for any options/properties not specified; must be after above.
         for option in self._option_definitions._definitions:
             if not hasattr(self._values, property_name := option._property_name):
@@ -371,6 +398,8 @@ class Argv:
             errors.append(f"At least one of these options must be specified: {', '.join(violation)}")
         for violation in rule_violations_at_most_one_of_toomany:
             errors.append(f"At most one of these options must be specified: {', '.join(violation)}")
+        for violation in rule_violations_depends_on:
+            errors.append(f"Option {violation[0]} depends on option: {violation[1]}")
 
         if (report is not False) and errors:
             if not callable(printf):
@@ -419,8 +448,9 @@ class Argv:
                         elif option_type == "at_most_one_of":
                             option_definitions.add_rule_at_most_one_of(option_options)
                             continue
-                        elif option_type == "dependency":
-                            continue  # TODO
+                        elif option_type == "depends_on":
+                            option_definitions.add_rule_depends_on(option_options)
+                            continue
                         option_type = to_integer(option_type[0:index])
                     elif (index := option_type.find(":")) > 1:
                         option_type = to_integer(option_type[0:index])
@@ -486,12 +516,17 @@ class Argv:
 
     def _is_option_any_of(self, value: str, options: List[str]) -> bool:
         def match(value: str, option: str) -> bool:
-            if self._escaping:
-                return False
-            if isinstance(option, str) and (option := option.strip()):
-                if ((value == option) or (self._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
-                                          (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:]))):
+            if (isinstance(option, str) and (option := option.strip()) and
+                isinstance(value, str) and (value := value.strip())):  # noqa
+                if value == option:
                     return True
+                elif self._fuzzy:
+                    if (option.startswith(Argv._OPTION_PREFIX) and
+                        (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:])):  # noqa
+                        return True
+                    elif (value.startswith(Argv._OPTION_PREFIX) and
+                          (option == Argv._FUZZY_OPTION_PREFIX + value[Argv._OPTION_PREFIX_LEN:])):
+                        return True
             return False
         return any(match(value, option) for option in options) if isinstance(options, list) else False
 
@@ -584,7 +619,7 @@ class ARGV(Argv):
     @classmethod
     @property
     def DEPENDENCY(cls, *args):
-        return f"rule:dependency:{str(uuid())}"
+        return f"rule:depends_on:{str(uuid())}"
 
     @classmethod
     @property
@@ -781,7 +816,7 @@ if True:
     errors == ["Missing required option: --maxn"]
 
 
-if True:
+if False:
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--encrypt"],
         ARGV.OPTIONAL(str): ["--decrypt"],
@@ -806,11 +841,13 @@ if True:
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--password", "--passwd"],
         ARGV.REQUIRED(str): ["file"],
+        ARGV.OPTIONAL(bool): ["--formatted"],
+        ARGV.OPTIONAL(bool): ["--json"],
         ARGV.EXACTLY_ONE_OF: ["--encrypt", "--decrypt"],
         ARGV.EXACTLY_ONE_OF: ["--output", "-yes"],
-        ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"],
         ARGV.DEPENDENCY: ["--formatted", ARGV.DEPENDS_ON, "-json"]
     })
-    errors = argv.parse(["--encrypt", "--decrypt", "somefile"])
+    errors = argv.parse(["--encrypt", "--decrypt", "somefile", "--formatted"])
     assert errors == ["Exactly one of these options may be specified: --encrypt, --decrypt",
-                      "Exactly one of these options must be specified: --output, -yes"]
+                      "Exactly one of these options must be specified: --output, -yes",
+                      "Option --formatted depends on option: --json"]
