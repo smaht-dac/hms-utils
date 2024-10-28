@@ -227,22 +227,29 @@ def main():
         _print_output(yaml.dump(data))
     else:
         if args.refs and args.inserts:
-            if referenced_uuids := get_referenced_uuids(data):
+            while True:
+                if args.debug:
+                    print(f"Looking for referenced items.")
+                if not (referenced_uuids := get_referenced_uuids(data)):
+                    if args.debug:
+                        print(f"No more referenced items.")
+                    break
                 for referenced_uuid in referenced_uuids:
-                    if not contains_item(data, referenced_uuid):
-                        referenced_data = _get_portal_object(
-                            portal=portal, uuid=referenced_uuid, raw=args.raw, database=args.database,
-                            inserts=args.inserts, insert_files=args.insert_files,
-                            ignore=args.ignore, check=args.bool,
-                            force=args.force, verbose=args.verbose, debug=args.debug)
-                        add_referenced_data_to_data(referenced_data, data)
+                    if args.debug:
+                        print(f"Fetching referenced item: {referenced_uuid}")
+                    referenced_data = _get_portal_object(
+                        portal=portal, uuid=referenced_uuid, raw=args.raw, database=args.database,
+                        inserts=args.inserts, insert_files=args.insert_files,
+                        ignore=args.ignore, check=args.bool,
+                        force=args.force, verbose=args.verbose, debug=args.debug)
+                    add_referenced_data_to_data(referenced_data, data)
         if args.indent > 0:
             _print_output(_format_json_with_indent(data, indent=args.indent))
         else:
             _print_output(json.dumps(data, default=str, indent=4))
 
 
-def get_referenced_uuids(data: dict) -> List[str]:
+def get_referenced_uuids(data: dict, check: bool = True) -> List[str]:
     referenced_uuids = []
     def find_uuids(item: Union[dict, list, str]):  # noqa
         if isinstance(item, dict):
@@ -251,8 +258,9 @@ def get_referenced_uuids(data: dict) -> List[str]:
         elif isinstance(item, list):
             for value in item:
                 find_uuids(value)
-        elif is_uuid(item) and item not in referenced_uuids:
-            referenced_uuids.append(item)
+        elif isinstance(item, str) and is_uuid(item) and (item not in referenced_uuids):
+            if (check is False) or (not contains_item(data, item)):
+                referenced_uuids.append(item)
     find_uuids(data)
     return referenced_uuids
 
