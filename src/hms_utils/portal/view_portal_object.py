@@ -66,8 +66,9 @@ from typing import Callable, List, Optional, TextIO, Tuple, Union
 import yaml
 from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.command_utils import yes_or_no
-from dcicutils.misc_utils import get_error_message, is_uuid, PRINT, to_snake_case
+from dcicutils.misc_utils import get_error_message, PRINT, to_snake_case
 from dcicutils.portal_utils import Portal
+from hms_utils.type_utils import is_uuid
 
 
 # Schema properties to ignore (by default) for the view schema usage.

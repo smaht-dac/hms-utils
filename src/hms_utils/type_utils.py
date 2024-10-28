@@ -1,3 +1,4 @@
+import re
 from typing import Any, List, Optional, Tuple, Union
 
 primitive_type = (int, float, str, bool)
@@ -59,3 +60,10 @@ def to_non_empty_string_list(value: Union[List[str], Tuple[str, ...], str], stri
     elif isinstance(value, str) and ((strip is False) or (value := value.strip())):
         strings = [value]
     return strings
+
+
+_UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def is_uuid(value: str) -> bool:
+    return _UUID_PATTERN.match(value) if isinstance(value, str) else False
