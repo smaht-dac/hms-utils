@@ -44,6 +44,10 @@ def main():
         _error(f"Specified output file already exists: {argv.output}")
 
     result = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
+    object_type = portal.get_schema_type(result)
+
+    if argv.debug:
+        _print(f"OBJECT TYPE: {object_type}")
 
     if argv.output:
         with io.open(argv.output, "w") as f:
