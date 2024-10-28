@@ -143,17 +143,17 @@ class Argv:
                 if (value := self) == Argv._ESCAPE_VALUE:
                     if (value := self._argv._next).is_null:
                         return False
-                for option in option._options:
-                    if (not callable(convert)) or ((value := convert(value)) is not None):
-                        if not hasattr(self._argv._values, option):
-                            setattr(self._argv._values, option, value)
-                            return True
+                if (not callable(convert)) or ((value := convert(value)) is not None):
+                    if not hasattr(self._argv._values, option._property_name):
+                        setattr(self._argv._values, option._property_name, value)
+                        return True
             return False
 
         def _set_default_value_properties(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             parsed = False ; value = self  # noqa
-            for option in option._options:
-                option_values = getattr(self._argv._values, option, None)
+            for option_option in option._options:
+                option_property_name = Argv._property_name_ize(option_option)
+                option_values = getattr(self._argv._values, option_property_name, None)
                 while True:
                     if value.is_null:
                         break
@@ -163,7 +163,7 @@ class Argv:
                         break
                     if option_values is None:
                         option_values = []
-                        setattr(self._argv._values, option, option_values)
+                        setattr(self._argv._values, option_property_name, option_values)
                     option_values.append(value if callable(convert) else str(value))
                     parsed = True
                     if (value := self._argv._peek).is_null or value.is_option:
@@ -278,7 +278,7 @@ class Argv:
                     option = option[Argv._OPTION_PREFIX_LEN:]
                 elif self._fuzzy and option.startswith(Argv._FUZZY_OPTION_PREFIX):
                     option = option[Argv._FUZZY_OPTION_PREFIX_LEN:]
-                return option.replace("-", "_")
+                return Argv._property_name_ize(option)  # option.replace("-", "_")
             return ""
 
         def __eq__(self, other):
@@ -575,6 +575,10 @@ class Argv:
         for option in self._option_definitions._definitions:
             property_names.append(option._property_name)
         return property_names
+
+    @staticmethod
+    def _property_name_ize(value: str) -> str:
+        return value.replace("-", "_") if isinstance(value, str) else ""
 
     @property
     def _dict(self) -> dict:
