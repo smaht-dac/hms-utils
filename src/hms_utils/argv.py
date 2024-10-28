@@ -143,10 +143,12 @@ class Argv:
                 if (value := self) == Argv._ESCAPE_VALUE:
                     if (value := self._argv._next).is_null:
                         return False
-                if (not callable(convert)) or ((value := convert(value)) is not None):
-                    if not hasattr(self._argv._values, option._property_name):
-                        setattr(self._argv._values, option._property_name, value)
-                        return True
+                for option in option._options:
+                    option_property_name = Argv._property_name_ize(option)
+                    if (not callable(convert)) or ((value := convert(value)) is not None):
+                        if not hasattr(self._argv._values, option_property_name):
+                            setattr(self._argv._values, option_property_name, value)
+                            return True
             return False
 
         def _set_default_value_properties(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
