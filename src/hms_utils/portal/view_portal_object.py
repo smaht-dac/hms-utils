@@ -112,6 +112,8 @@ def main():
                         help="Read from database output.")
     parser.add_argument("--bool", action="store_true", required=False,
                         default=False, help="Only return whether found or not.")
+    parser.add_argument("--refs", action="store_true", required=False,
+                        default=False, help="Include object for referenced uuids.")
     parser.add_argument("--yaml", action="store_true", required=False, default=False, help="YAML output.")
     parser.add_argument("--copy", "-c", action="store_true", required=False, default=False,
                         help="Copy object data to clipboard.")
@@ -224,10 +226,62 @@ def main():
     if args.yaml:
         _print_output(yaml.dump(data))
     else:
+        if args.refs and args.inserts:
+            if referenced_uuids := get_referenced_uuids(data):
+                for referenced_uuid in referenced_uuids:
+                    if not contains_item(data, referenced_uuid):
+                        referenced_data = _get_portal_object(
+                            portal=portal, uuid=referenced_uuid, raw=args.raw, database=args.database,
+                            inserts=args.inserts, insert_files=args.insert_files,
+                            ignore=args.ignore, check=args.bool,
+                            force=args.force, verbose=args.verbose, debug=args.debug)
+                        add_referenced_data_to_data(referenced_data, data)
         if args.indent > 0:
             _print_output(_format_json_with_indent(data, indent=args.indent))
         else:
             _print_output(json.dumps(data, default=str, indent=4))
+
+
+def get_referenced_uuids(data: dict) -> List[str]:
+    referenced_uuids = []
+    def find_uuids(item: Union[dict, list, str]):  # noqa
+        if isinstance(item, dict):
+            for value in item.values():
+                find_uuids(value)
+        elif isinstance(item, list):
+            for value in item:
+                find_uuids(value)
+        elif is_uuid(item) and item not in referenced_uuids:
+            referenced_uuids.append(item)
+    find_uuids(data)
+    return referenced_uuids
+
+
+def add_referenced_data_to_data(referenced_data: dict, data: dict) -> None:
+    if isinstance(referenced_data, dict) and isinstance(data, dict):
+        for referenced_data_type in referenced_data:
+            if not isinstance(referenced_data := referenced_data[referenced_data_type], list):
+                continue
+            for referenced_data_item in referenced_data:
+                referenced_data_item_uuid = referenced_data_item.get("uuid")
+                if isinstance(data_items := data.get(referenced_data_type), list):
+                    data_item_existing = [
+                        element for element in data_items
+                        if isinstance(element, dict) and (element.get("uuid") == referenced_data_item_uuid)]
+                    if not data_item_existing:
+                        data_items.append(referenced_data_item)
+                else:
+                    data[referenced_data_type] = referenced_data
+
+
+def contains_item(data: dict, uuid: str) -> bool:
+    if isinstance(data, dict) and is_uuid(uuid):
+        for data_type in data:
+            if isinstance(data_items := data[data_type], list):
+                for data_item in data_items:
+                    if data_item.get("uuid") == uuid:
+                        return True
+    return False
 
 
 def _format_json_with_indent(value: dict, indent: int = 0) -> Optional[str]:
