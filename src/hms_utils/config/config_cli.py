@@ -75,6 +75,9 @@ def main(argv: Optional[List] = None):
             for warning in config._warnings:
                 print(f"  {chars.rarrow_hollow} {warning}", file=sys.stderr)
 
+    if args.new:
+        parse_args_new()
+
     sys.exit(status)
 
 
@@ -138,10 +141,8 @@ def handle_exports_command(config: Config, args: object) -> int:
     return status
 
 
-def parse_args(argv: List[str]) -> object:
-
-    # TODO: Use to ARGV class ...
-    newargv = ARGV({  # noqa
+def parse_args_new() -> object:
+    argv = ARGV({
         OPTIONAL([str]): ["--configs", "--config", "--confs", "--conf",
                           "--merge", "--merge-configs", "--merge-config", "--merge-confs", "--merge-conf"],
         OPTIONAL([str]): ["--secrets", "--secret", "--merge-secrets", "--merge-secret"],
@@ -169,9 +170,19 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--verbose"],
         OPTIONAL(bool): ["--debug"],
         OPTIONAL(bool): ["--version"],
+        OPTIONAL(bool): ["--new"],
         AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump", "--exports", "--functions"],
-        DEPENDENCY: ["--format", DEPENDS_ON, "--json", "--json", "--dump", "--exports", "--functions"]
-    }, parse=False)
+        DEPENDENCY: ["--format", DEPENDS_ON, "--json"]
+    }, parse=True, exit=False)
+
+    argv.parse(exit=False)
+    print(">>> NEW ARGV PARSING:")
+    print(json.dumps(argv._dict, indent=4))
+
+
+def parse_args(argv: List[str]) -> object:
+
+    # TODO: Use to ARGV class ...
 
     class Args:
         config_dir = None
@@ -197,6 +208,7 @@ def parse_args(argv: List[str]) -> object:
         password = False
         warnings = False
         debug = False
+        new = False
 
     args = Args()
 
@@ -412,6 +424,8 @@ def parse_args(argv: List[str]) -> object:
                 args.warnings = True
             elif arg in ["--format", "-format", "--formatted", "-formatted"]:
                 args.formatted = True
+            elif arg in ["--new"]:
+                args.new = True
             elif arg in ["--password", "-password", "--passwd", "-passwd"]:
                 if (argi >= argn) or not (arg := argv[argi]) or (not arg):
                     _usage()
