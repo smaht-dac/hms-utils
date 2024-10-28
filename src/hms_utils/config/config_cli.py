@@ -6,7 +6,7 @@ import sys
 import traceback
 from typing import List, Optional, Tuple
 import yaml
-from hms_utils.argv import ARGV, AT_LEAST_ONE_OF, AT_MOST_ONE_OF, OPTIONAL, REQUIRED   # noqa
+from hms_utils.argv import ARGV, AT_LEAST_ONE_OF, AT_MOST_ONE_OF, DEPENDENCY, DEPENDS_ON, OPTIONAL, REQUIRED   # noqa
 from hms_utils.chars import chars
 from hms_utils.config.config import Config
 from hms_utils.config.config_output import ConfigOutput
@@ -163,13 +163,14 @@ def parse_args(argv: List[str]) -> object:
         OPTIONAL(bool): ["--functions", "--function", "--shell"],
         OPTIONAL(str): ["--exports-file", "--export-file"],
         OPTIONAL(bool): ["--noaws"],
-        OPTIONAL(str): ["--aws-profile", "--profile", "--env"],
+        OPTIONAL(str): ["--aws-profile", "--aws", "--profile", "--env"],
         OPTIONAL(bool): ["--nocolor"],
         OPTIONAL(bool): ["--warnings", "--warning"],
         OPTIONAL(bool): ["--verbose"],
         OPTIONAL(bool): ["--debug"],
         OPTIONAL(bool): ["--version"],
-        AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump", "--exports", "--functions"]
+        AT_MOST_ONE_OF: ["--tree", "--list", "--json", "--dump", "--exports", "--functions"],
+        DEPENDENCY: ["--format", DEPENDS_ON, "--json", "--json", "--dump", "--exports", "--functions"]
     }, parse=False)
 
     class Args:
