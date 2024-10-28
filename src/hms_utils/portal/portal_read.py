@@ -1,5 +1,6 @@
 # TODO: Rewrite/refactor view_portal_object.py
 
+import io
 import json
 import os
 import sys
@@ -39,15 +40,20 @@ def main():
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
 
-    result = portal.get_metadata(argv.arg, raw=argv.raw)
-
-    if argv.noformat:
-        print(result)
-    else:
-        print(json.dumps(result, indent=4))
-
     if argv.output and os.path.exists(argv.output):
-        _error(f"Specified output file already exists as a directory: {argv.output}")
+        _error(f"Specified output file already exists: {argv.output}")
+
+    result = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
+
+    if argv.output:
+        with io.open(argv.output, "w") as f:
+            json.dump(result, f, indent=None if argv.noformat else 4)
+        if argv.verbose:
+            _print(f"Output file written: {argv.output}")
+    elif argv.noformat:
+        _print(result)
+    else:
+        _print(json.dumps(result, indent=4))
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
@@ -75,7 +81,8 @@ def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Op
                 _print(f"Portal server: {portal.server}")
     if ping:
         if portal.ping():
-            _print(f"Portal connectivity: OK {chars.check}")
+            if verbose:
+                _print(f"Portal connectivity: OK {chars.check}")
         else:
             _print(f"Portal connectivity: ERROR {chars.xmark}")
     return portal
