@@ -228,6 +228,8 @@ class Argv:
                     if (index := options[0].find("=")) > 0:
                         default = options[0][index + 1:]
                         options[0] = options[0][0:index]
+                    elif (option_type & Argv.BOOLEAN):
+                        default = False
                     else:
                         default = None
                     self._definitions.append(Argv._Option(

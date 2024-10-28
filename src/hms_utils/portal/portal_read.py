@@ -1,6 +1,7 @@
 # TODO: Rewrite/refactor view_portal_object.py
 
 import json
+import os
 import sys
 from typing import Optional
 from dcicutils.captured_output import captured_output
@@ -12,26 +13,41 @@ from hms_utils.portal.portal_utils import Portal
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["uuid"],
+        ARGV.REQUIRED(str): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
-        ARGV.OPTIONAL(bool): ["--output", "--out"],
+        ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
+        ARGV.OPTIONAL(bool): ["--noformat"],
+        ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
+        ARGV.OPTIONAL(bool): ["--argv"]
     })
 
-    _create_portal(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show, verbose=argv.verbose, debug=argv.debug)
+    if argv.argv:
+        print(json.dumps(argv._dict, indent=4))
 
-    print(json.dumps(argv._dict, indent=4))
+    portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
+                            show=argv.show, verbose=argv.verbose, debug=argv.debug)
+
+    result = portal.get_metadata(argv.arg, raw=argv.raw)
+
+    if argv.noformat:
+        print(result)
+    else:
+        print(json.dumps(result, indent=4))
+
+    if argv.output and os.path.exists(argv.output):
+        _error(f"Specified output file already exists as a directory: {argv.output}")
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
