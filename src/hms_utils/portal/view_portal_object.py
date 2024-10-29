@@ -111,7 +111,7 @@ def main():
     parser.add_argument("--tree", action="store_true", required=False, default=False, help="Tree output for schemas.")
     parser.add_argument("--database", action="store_true", required=False, default=False,
                         help="Read from database output.")
-    parser.add_argument("--bool", action="store_true", required=False,
+    parser.add_argument("--check", "--bool", action="store_true", required=False,
                         default=False, help="Only return whether found or not.")
     parser.add_argument("--refs", action="store_true", required=False,
                         default=False, help="Include object for referenced uuids.")
@@ -210,12 +210,12 @@ def main():
 
     data = _get_portal_object(portal=portal, uuid=args.uuid, raw=args.raw, database=args.database,
                               inserts=args.inserts, insert_files=args.insert_files,
-                              ignore=args.ignore, check=args.bool,
+                              ignore=args.ignore, check=args.check,
                               force=args.force, verbose=args.verbose, debug=args.debug)
     if args.insert_files:
         return
 
-    if args.bool:
+    if args.check:
         if data:
             _print(f"{args.uuid}: found")
             _exit(0)
@@ -241,7 +241,7 @@ def main():
                     referenced_data = _get_portal_object(
                         portal=portal, uuid=referenced_uuid, raw=args.raw, database=args.database,
                         inserts=args.inserts, insert_files=args.insert_files,
-                        ignore=args.ignore, check=args.bool,
+                        ignore=args.ignore, check=args.check,
                         force=args.force, verbose=args.verbose, debug=args.debug)
                     add_referenced_data_to_data(referenced_data, data)
         if args.indent > 0:
@@ -250,7 +250,7 @@ def main():
             _print_output(json.dumps(data, default=str, indent=4))
 
 
-def get_referenced_uuids(data: dict, check: bool = True) -> List[str]:
+def get_referenced_uuids(data: dict, nocheck: bool = False) -> List[str]:
     referenced_uuids = []
     def find_uuids(item: Union[dict, list, str]):  # noqa
         if isinstance(item, dict):
@@ -260,7 +260,7 @@ def get_referenced_uuids(data: dict, check: bool = True) -> List[str]:
             for value in item:
                 find_uuids(value)
         elif isinstance(item, str) and is_uuid(item) and (item not in referenced_uuids):
-            if (check is False) or (not contains_item(data, item)):
+            if (nocheck is True) or (not contains_item(data, item)):
                 referenced_uuids.append(item)
     find_uuids(data)
     return referenced_uuids

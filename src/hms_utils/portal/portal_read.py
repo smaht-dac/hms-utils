@@ -27,6 +27,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
+        ARGV.OPTIONAL([str]): ["--ignore-fieldss", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
