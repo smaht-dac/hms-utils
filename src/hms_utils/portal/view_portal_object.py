@@ -353,9 +353,11 @@ def _get_portal_object(portal: Portal, uuid: str,
             _print()
         return None
 
-    def get_metadata_types(path: str) -> Optional[dict]:
+    def get_metadata_type_info(path: str) -> Optional[dict]:
+        # Returns a dictionary mapping uuids to their corresponding actual types for the given (search) path.
         nonlocal portal, debug
         metadata_types = {}
+        path = f"{path}&field=uuid" if ("?" in path) else f"{path}?field=uuid"
         try:
             if verbose:
                 _print(f"Executing separted query to get actual metadata types for raw/inserts query.")
@@ -457,7 +459,7 @@ def _get_portal_object(portal: Portal, uuid: str,
             # for each of the results; it may be the supertype (e.g. QualityMetric vs QualityMetricWorkflowRun);
             # so for types which are supertypes (gotten via Portal.get_schemas_super_type_map) we actually
             # lookup each result individually to determine its actual precise type. Although, if we have
-            # more than (say) 5 results to do this for, then do a separate query (get_metadata_types)
+            # more than (say) 5 results to do this for, then do a separate query (get_metadata_type_info)
             # to get the result types all at once.
             if not ((supertypes := portal.get_schemas_super_type_map()) and (subtypes := supertypes.get(results_type))):
                 subtypes = None
@@ -473,9 +475,9 @@ def _get_portal_object(portal: Portal, uuid: str,
                 if (subtypes and one_or_more_objects_of_types_exists(portal, subtypes, debug=debug) and
                     (result_uuid := result.get("uuid"))):  # noqa
                     # If we have more than (say) 5 results for which we need to determine that actual result type,
-                    # then get them all at once via separate query (get_metadata_types)) which is not the raw frame.
+                    # then get them all at once via separate query (get_metadata_type_info)) which is not the raw frame.
                     if (results_total > 5) and (not response_types):
-                        response_types = get_metadata_types(path)
+                        response_types = get_metadata_type_info(path)
                     if not (response_types and (result_type := response_types.get(result_uuid))):
                         if individual_result_type := get_metadata_for_individual_result_type(result_uuid):
                             result_type = individual_result_type
