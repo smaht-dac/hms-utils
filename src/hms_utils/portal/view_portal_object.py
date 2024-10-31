@@ -288,7 +288,7 @@ def contains_item(data: dict, uuid: str) -> bool:
         for data_type in data:
             if isinstance(data_items := data[data_type], list):
                 for data_item in data_items:
-                    if data_item.get("uuid") == uuid:
+                    if isinstance(data_item, dict) and (data_item.get("uuid") == uuid):
                         return True
     return False
 
