@@ -240,7 +240,7 @@ def _error(message: str, plain: bool = False) -> None:
 
 # https://docs.google.com/spreadsheets/d/1WYc_UKkpVUUBPJPbZdwwBX28f6Qr5I9PblOdGqu7g1M/view?gid=446162554#gid=446162554
 users_spreadsheet = "smaht_users_from_spreadsheet_20241028.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241029.tsv"
+users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241031.tsv"
 
 portal_env = "smaht-data"
 dump = False

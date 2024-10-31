@@ -1,4 +1,5 @@
 from functools import lru_cache
+import boto3
 import sys
 from typing import Optional, List
 from hms_utils.dictionary_utils import sort_dictionary
@@ -37,6 +38,16 @@ def get_submission_center_display_name(submission_center: str) -> str:
         return ""
 
 
+def get_file_size(file: dict) -> Optional[int]:
+    if isinstance(file, dict) and (key := file.get("upload_key")) and (file.get("status") != "uploading"):
+        bucket = "smaht-production-application-files"
+        try:
+            return boto3.client("s3").head_object(Bucket=bucket, Key=key)["ContentLength"]
+        except Exception:
+            pass
+    return None
+
+
 portal = Portal("smaht-data")
 total = None ; limit = 220 ; offset = 0 ; nfiles_total = 0  # noqa
 
@@ -49,10 +60,12 @@ while True:
     nfiles = len(files)
     for file in files:
         submission_centers = get_submission_centers(portal, file.get("submission_centers"))
+        if (file_size := file.get("file_size")) is None:
+            file_size = get_file_size(file)
         file_info = {
             "uuid": file.get("uuid"),
             "name": file.get("filename"),
-            "size": file.get("file_size"),
+            "size": file_size,
             "status": file.get("status"),
             "created": file.get("date_created"),
             "submission_centers": submission_centers
@@ -66,7 +79,6 @@ while True:
             submission_center = submission_centers[0]
         else:
             submission_center = submission_centers[0]
-
         if not (submission_center_file_info := file_info_per_submission_center.get(submission_center)):
             file_info_per_submission_center[submission_center] = [file_info]
         else:
