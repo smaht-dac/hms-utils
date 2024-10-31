@@ -12,9 +12,9 @@ def main():
     })
 
     portal = Portal(argv.env)
+    status = 0
 
     if argv.uuids:
-        status = 0
         for uuid in argv.uuids:
             if item := portal.get_metadata(uuid):
                 if _check_for_validation_errors(item):
@@ -30,6 +30,7 @@ def main():
                 if item := portal.get_metadata(item_uuid):
                     if _check_for_validation_errors(item):
                         status = 1
+    exit(status)
 
 
 def _check_for_validation_errors(item: dict) -> bool:
