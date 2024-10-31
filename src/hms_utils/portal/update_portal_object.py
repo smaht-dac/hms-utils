@@ -31,6 +31,7 @@ from dcicutils.ff_utils import delete_metadata, purge_metadata
 from dcicutils.misc_utils import get_error_message, ignored, normalize_string, PRINT, to_camel_case, to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.tmpfile_utils import temporary_directory
+from hms_utils.portal.view_portal_object import get_referenced_uuids
 
 
 class Portal(PortalFromUtils):
@@ -247,6 +248,8 @@ def _post_or_patch_or_upsert(portal: Portal, file_or_directory: str,
                 elif _is_schema_name_list(portal, list(data.keys())):
                     if debug:
                         _print(f"DEBUG: File ({file}) contains a dictionary of schema names.")
+                    if True:  # xyzzy
+                        data = _order_inserts_dictionary(data)
                     for schema_name in data:
                         if isinstance(schema_data := data[schema_name], list):
                             schema_data = _impose_special_ordering(schema_data, schema_name)
@@ -845,6 +848,21 @@ def _file_names_to_ordered_file_and_schema_names(portal: Portal,
             results.remove(result)
     ordered_results.extend(results) if results else None
     return ordered_results
+
+
+def _order_inserts_dictionary(data: dict) -> dict:
+    ordered_data = {}
+    for schema_name in _SCHEMA_ORDER:
+        schema_name = to_camel_case(schema_name)
+        if item := data.get(schema_name):
+            ordered_data[schema_name] = data[schema_name]
+            del data[schema_name]
+            for item in ordered_data[schema_name]:
+                if item.get("uuid") == "dd9fb313-4a7b-4866-8c5d-cd6acac1c009":  # xyzzy / TODO
+                    get_referenced_uuids(item)
+                if item.get("uuid") == "6d5cd545-516a-4da1-a204-3bcfb47878d2":  # xyzzy / TODO
+                    get_referenced_uuids(item)
+    return ordered_data
 
 
 def _parse_delete_fields(value: str) -> str:
