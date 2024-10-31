@@ -5,25 +5,13 @@
 import sys
 import time
 from dcicutils.ff_utils import search_metadata
-from dcicutils.portal_utils import Portal
-from hms_utils.type_utils import is_uuid
+from hms_utils.portal.portal_utils import Portal
+from hms_utils.chars import chars
 
 portal_env = "smaht-data"
 portal_env = "smaht-devtest"
 portal_env = "smaht-wolf"
 portal = Portal(portal_env)
-
-
-def reindex_item(uuid: str) -> bool:
-    if is_uuid(uuid):
-        uuids = [uuid]
-        query_indexing_post_data = {"uuids": uuids}
-        print(f"DEBUG: Reindexing item: {item_uuid}", file=sys.stderr, flush=True)
-        import pdb ; pdb.set_trace()  # noqa
-        pass
-        response = portal.post("/queue_indexing", json=query_indexing_post_data)
-        print(f"DEBUG: Done reindexing item: {item_uuid}", file=sys.stderr, flush=True)
-        return response.status_code == 200
 
 
 query = "/search/?type=Item&consortia.display_title=No+value"
@@ -36,16 +24,16 @@ for item in results:
     if isinstance(item, dict) and (item_uuid := item.get("uuid")):
         if (item_type := portal.get_schema_type(item)) not in ignored_types:
             if (existing_consortia := item.get("consortia", None)) is None:
-                print(f"{item_uuid}: {item_type} -> SETTING CONSORTIA TO {consortia}")
+                print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}")
                 try:
                     portal.patch_metadata(item_uuid, {"consortia": consortia})
-                except Exception as e:
-                    print(f"ERROR: Cannot patch {item_uuid}", file=sys.stderr, flush=True)
-                    reindex_item(item_uuid)
-                    time.sleep(7)
-                    print(f"DEBUG: Trying patch again {item_uuid}", file=sys.stderr, flush=True)
-                    portal.patch_metadata(item_uuid, {"consortia": consortia})
-                    print(f"DEBUG: Done trying patch again {item_uuid}", file=sys.stderr, flush=True)
-                    print(str(e), file=sys.stderr, flush=True)
+                except Exception:
+                    print(f"ERROR: Cannot patch {item_uuid}. Trying reindex of this item.", file=sys.stderr, flush=True)
+                    if not portal.reindex_metadata(item_uuid):
+                        print(f"ERROR: Reindex failed: {item_uuid}", file=sys.stderr, flush=True)
+                    else:
+                        time.sleep(2)
+                        print(f"Trying patch again: {item_uuid}", file=sys.stderr, flush=True)
+                        portal.patch_metadata(item_uuid, {"consortia": consortia})
             else:
-                print(f"{item_uuid}: {item_type} -> CONSORTIA ALREADY EXISTS")
+                print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} CONSORTIA ALREADY SET")

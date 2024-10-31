@@ -42,6 +42,7 @@ hms-portals = "hms_utils.portal.portal_envs:main" # new
 hms-portal-view = "hms_utils.portal.view_portal_object:main"
 hms-portal-update = "hms_utils.portal.update_portal_object:main"
 hms-portal-indexing-status = "hms_utils.portal.indexing_status:main"
+hms-portal-errors = "hms_utils.portal.portal_validation_errors:main"
 
 # TODO: In progress; rewrite/refactor of hms-portal-view/hms-portal-update.
 hms-portal-read = "hms_utils.portal.portal_read:main"

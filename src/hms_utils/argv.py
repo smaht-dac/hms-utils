@@ -462,6 +462,13 @@ class Argv:
 
         if (len(args) == 1) and isinstance(options := args[0], dict):
             args = []
+            copied_options = {}
+            for option_type in options:
+                if option_type == ARGV.REQUIRED:
+                    copied_options[ARGV.REQUIRED(bool)] = options[option_type]
+                else:
+                    copied_options[option_type] = options[option_type]
+            options = copied_options
             for option_type in options:
                 option_options = options[option_type]
                 if isinstance(option_type, str):
@@ -662,7 +669,7 @@ class ARGV(Argv):
         return str(option_type) + Argv._RULE_DELIMITER + str(uuid())
 
     @staticmethod
-    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = None):
+    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = bool):
         return ARGV.OPTIONAL(type=type, _required=True)
 
     @classmethod
