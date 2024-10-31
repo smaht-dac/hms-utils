@@ -7,22 +7,35 @@ from hms_utils.chars import chars
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): "--env"
+        ARGV.REQUIRED(str): "--env",
+        ARGV.OPTIONAL([str]): "uuids"
     })
 
     portal = Portal(argv.env)
-    query = "/search/?type=Item&validation_errors.name%21=No+value"
-    ignored_types = ["AccessKey", "TrackingItem", "Consortium", "SubmissionCenter"]
-    results = search_metadata(query, key=portal.key, is_generator=True)
 
-    for item in results:
+    if argv.uuids:
+        status = 0
+        for uuid in argv.uuids:
+            if item := portal.get_metadata(uuid):
+                if _check_for_validation_errors(item):
+                    status
+        exit(status)
+
+    query = "/search/?type=Item&validation_errors.name%21=No+value"
+    ignored_types = []
+    for item in search_metadata(query, key=portal.key, is_generator=True):
         if isinstance(item, dict) and (item_uuid := item.get("uuid")):
             if (item_type := portal.get_schema_type(item)) not in ignored_types:
                 print(f"{item_uuid}: {item_type}")
                 if item := portal.get_metadata(item_uuid):
-                    if errors := item.get("validation-errors"):
-                        for error in errors:
-                            print(f"{chars.rarrow_hollow} ERROR: {error.get('description')}")
+                    if _check_for_validation_errors(item):
+                        status = 1
+
+
+def _check_for_validation_errors(item: dict) -> bool:
+    if errors := item.get("validation-errors"):
+        for error in errors:
+            print(f"{chars.rarrow_hollow} ERROR: {error.get('description')}")
 
 
 if __name__ == "__main__":
