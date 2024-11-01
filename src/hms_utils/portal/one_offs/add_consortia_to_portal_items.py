@@ -10,10 +10,11 @@ from hms_utils.threading_utils import run_concurrently
 portal_env = "smaht-devtest"
 portal_env = "smaht-wolf"
 portal_env = "smaht-staging"
+portal_env = "smaht-local"
 portal = Portal(portal_env)
 
 
-query = "/search/?type=Item&consortia.display_title=No+value"
+query = "/search/?type=Item&consortia.display_title=No+value&uuid=154b3865-3b21-410a-88b9-548ccdc5b2e2"
 ignored_types = ["AccessKey", "TrackingItem", "Consortium", "SubmissionCenter"]
 results = search_metadata(query, key=portal.key, is_generator=True)
 consortia = ["smaht"]

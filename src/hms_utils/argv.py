@@ -2,8 +2,9 @@ from __future__ import annotations
 import sys
 from typing import Any, Callable, List, Optional, Type, Union
 from uuid import uuid4 as uuid
-from hms_utils.type_utils import to_float, to_integer, to_non_empty_string_list
+from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
+from hms_utils.type_utils import to_float, to_integer, to_non_empty_string_list
 
 
 class Argv:
@@ -20,7 +21,7 @@ class Argv:
     OPTIONAL = 0x0200
     REQUIRED = 0x0400
 
-    _ESCAPE_VALUE = "--"
+    _ESCAPE_OPTION = "--"
     _FUZZY_OPTION_PREFIX = "-"
     _FUZZY_OPTION_PREFIX_LEN = len(_FUZZY_OPTION_PREFIX)
     _OPTION_PREFIX = "--"
@@ -29,6 +30,10 @@ class Argv:
     _RULE_DELIMITER = ":"
     _RULE_PREFIX = f"__rule__{_RULE_DELIMITER}"
     _RULE_PREFIX_LEN = len(_RULE_PREFIX)
+    _NO_VALUE = object()
+
+    class MistypedValue(str):
+        pass
 
     class _Arg(str):
 
@@ -42,7 +47,6 @@ class Argv:
 
         @property
         def is_option(self) -> bool:
-            # return self._argv._is_option(self, fuzzy=self._argv._fuzzy)
             return self._argv._is_option(self)
 
         @property
@@ -104,14 +108,24 @@ class Argv:
         def _set_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if isinstance(option, str): option = Argv._Option(option)  # noqa
             if self.is_any_of(option._options) and (not hasattr(self._argv._values, option._property_name)):
-                if (value := self._argv._peek).is_not_null and ((value != Argv._ESCAPE_VALUE) or (not value.is_option)):
-                    if value == Argv._ESCAPE_VALUE:
-                        if (value := self._argv._next).is_null:
-                            return False
-                    if (not callable(convert)) or ((value := convert(value)) is not None):
-                        setattr(self._argv._values, option._property_name, value if callable(convert) else str(value))
-                        self._argv._next
-                        return True
+                if (value := self._argv._peek).is_not_null and ((value != Argv._ESCAPE_OPTION) or
+                                                                (not value.is_option)):
+                    if not ((value == Argv._ESCAPE_OPTION) and self._argv._next.is_null):
+                        if (not callable(convert)) or ((value := convert(value)) is not None):
+                            setattr(self._argv._values, option._property_name,
+                                    value if callable(convert) else str(value))
+                            self._argv._next
+                            return True
+                        else:
+                            # Here the option and associated argument was given but it is of the wrong type;
+                            # we set the value property to None and will flag it later as an error.
+                            setattr(self._argv._values, option._property_name, Argv.MistypedValue(self._argv._peek))
+                            self._argv._next
+                            return True
+                # Here the option was given but no associated argument as required;
+                # we set the value property to None and will flag it later as an error.
+                setattr(self._argv._values, option._property_name, Argv._NO_VALUE)
+                return True
             return False
 
         def _set_value_properties(self, option: Union[Argv._Option, str], convert: Optional[Callable] = None) -> bool:
@@ -129,10 +143,11 @@ class Argv:
                 while True:
                     if (value := self._argv._peek).is_null or value.is_option:
                         break
-                    if ((value == Argv._ESCAPE_VALUE) and (value := self._argv._next).is_null) or value.is_option:
+                    if ((value == Argv._ESCAPE_OPTION) and (value := self._argv._next).is_null) or value.is_option:
                         break
                     if (value := convert(value)) is None:
-                        break
+                        value = Argv.MistypedValue(self._argv._peek)
+                        # break
                     values.append(value)
                     self._argv._next
                 return True
@@ -140,7 +155,7 @@ class Argv:
 
         def _set_default_value_property(self, option: Argv._Option, convert: Optional[Callable] = None) -> bool:
             if self and (not self.is_option):
-                if (value := self) == Argv._ESCAPE_VALUE:
+                if (value := self) == Argv._ESCAPE_OPTION:
                     if (value := self._argv._next).is_null:
                         return False
                 for option in option._options:
@@ -159,7 +174,7 @@ class Argv:
                 while True:
                     if value.is_null:
                         break
-                    if ((value == Argv._ESCAPE_VALUE) and (value := self._argv._next).is_null) or value.is_option:
+                    if ((value == Argv._ESCAPE_OPTION) and (value := self._argv._next).is_null) or value.is_option:
                         break
                     if callable(convert) and ((value := convert(value)) is None):
                         break
@@ -347,6 +362,10 @@ class Argv:
 
         errors = []
         missing_options = []
+        missing_option_arguments = []
+        mistyped_option_arguments = []
+        missing_option_arguments_multiple = []
+        mistyped_option_arguments_multiple = []
         unparsed_args = []
         rule_violations_exactly_one_of_missing = []
         rule_violations_exactly_one_of_toomany = []
@@ -404,6 +423,20 @@ class Argv:
                             rule_violations_depends_on.append([rule_dependent_option._option_name,
                                                                rule_required_option._option_name])
 
+        for option in self._option_definitions._definitions:
+            if (value := getattr(self._values, option._property_name, None)) is not None:
+                if isinstance(value, Argv.MistypedValue):
+                    mistyped_option_arguments.append((option, value))
+                elif value == Argv._NO_VALUE:
+                    missing_option_arguments.append(option)
+                elif isinstance(value, list):
+                    if not value:
+                        missing_option_arguments_multiple.append(option)
+                    else:
+                        for item in value:
+                            if isinstance(item, Argv.MistypedValue):
+                                mistyped_option_arguments_multiple.append((option, item))
+
         # Define value properties as None for any options/properties not specified; must be after above.
         for option in self._option_definitions._definitions:
             if not hasattr(self._values, option._property_name):
@@ -418,6 +451,16 @@ class Argv:
         if missing_options:
             errors.append(f"Missing required option"
                           f"{'s' if len(missing_options) > 1 else ''}: {', '.join(missing_options)}")
+        for missing_option_argument in missing_option_arguments:
+            errors.append(f"Missing argument for option: {missing_option_argument._option_name}")
+        for missing_option_argument_multiple in missing_option_arguments_multiple:
+            errors.append(f"Missing argument(s) for option: {missing_option_argument_multiple._option_name}")
+        for mistyped_option, mistyped_argument in mistyped_option_arguments:
+            errors.append(f"Mistyped argument for option:"
+                          f" {mistyped_option._option_name} {chars.dot} {mistyped_argument}")
+        for mistyped_option, mistyped_argument in mistyped_option_arguments_multiple:
+            errors.append(f"Mistyped argument for option:"
+                          f" {mistyped_option._option_name} {chars.dot} {mistyped_argument}")
         for violation in rule_violations_exactly_one_of_toomany:
             errors.append(f"Exactly one of these options may be specified: {', '.join(violation)}")
         for violation in rule_violations_exactly_one_of_missing:
@@ -617,7 +660,7 @@ class Argv:
                 del self._argv[0]
             else:
                 self._argi += 1
-            if (not self._escaping) and (value == Argv._ESCAPE_VALUE):
+            if (not self._escaping) and (value == Argv._ESCAPE_OPTION):
                 self._escaping = True
                 return self._next
             return value
@@ -634,7 +677,7 @@ class Argv:
             del self._argv[0]
         else:
             self._argi += 1
-        if (arg == Argv._ESCAPE_VALUE) and self._escape and (not self._escaping):
+        if (arg == Argv._ESCAPE_OPTION) and self._escape and (not self._escaping):
             self._escaping = True
             return self.__next__()
         return Argv._Arg(arg, self)

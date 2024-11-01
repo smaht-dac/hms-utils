@@ -6,9 +6,10 @@ from hms_utils.argv import ARGV
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): "--env"
+        ARGV.REQUIRED([int]): ["--env", "-xx"]
     })
 
+    print(argv.env)
     portal = Portal(argv.env)
     status = 0
 
