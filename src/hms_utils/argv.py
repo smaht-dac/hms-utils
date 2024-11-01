@@ -4,7 +4,7 @@ from typing import Any, Callable, List, Optional, Type, Union
 from uuid import uuid4 as uuid
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
-from hms_utils.type_utils import to_float, to_integer, to_non_empty_string_list
+from hms_utils.type_utils import to_bool, to_float, to_integer, to_non_empty_string_list
 
 
 class Argv:
@@ -242,6 +242,8 @@ class Argv:
                 if action := option_type_action_map.get(option_type):
                     if (index := options[0].find("=")) > 0:
                         default = options[0][index + 1:]
+                        if (option_type & Argv.BOOLEAN):
+                            default = to_bool(default)
                         options[0] = options[0][0:index]
                     elif (option_type & Argv.BOOLEAN):
                         default = False

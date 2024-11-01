@@ -51,6 +51,11 @@ def at_most_one_of_bool(*booleans) -> bool:
     return True
 
 
+def to_bool(value: str) -> bool:
+    return value if isinstance(value, bool) else ((value.strip().lower() == "true")
+                                                  if isinstance(value, str) else False)
+
+
 def to_non_empty_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
     strings = []
     if isinstance(value, (list, tuple)):
