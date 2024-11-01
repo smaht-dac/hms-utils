@@ -743,6 +743,7 @@ class ARGV(Argv):
         return f"{Argv._RULE_PREFIX}depends_on:{str(uuid())}"
 
 
+DEFAULT = ARGV.DEFAULT
 OPTIONAL = ARGV.OPTIONAL
 REQUIRED = ARGV.REQUIRED
 AT_MOST_ONE_OF = ARGV.AT_MOST_ONE_OF

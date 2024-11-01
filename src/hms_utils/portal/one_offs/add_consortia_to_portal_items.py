@@ -5,7 +5,7 @@
 from typing import List
 from dcicutils.ff_utils import search_metadata
 from hms_utils.portal.portal_utils import Portal
-from hms_utils.argv import ARGV
+from hms_utils.argv import ARGV, DEFAULT, OPTIONAL, REQUIRED
 from hms_utils.chars import chars
 from hms_utils.threading_utils import run_concurrently
 
@@ -29,8 +29,8 @@ def _set_consortia(portal: Portal, item: dict, consortia: List[str]) -> None:
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["--env", ARGV.DEFAULT, "smaht-local"],
-        ARGV.REQUIRED(bool): ["--dryrun", ARGV.DEFAULT, True]
+        REQUIRED(str): ["--env", DEFAULT, "smaht-local"],
+        REQUIRED(bool): ["--dryrun", DEFAULT, True]
     })
 
     portal = Portal(argv.env)
