@@ -13,19 +13,6 @@ nerrors = 0
 total = 0
 
 
-def _set_consortia(portal: Portal, item: dict, consortia: List[str]) -> None:
-    global total, nerrors
-    try:
-        item_uuid = item.get("uuid")
-        item_type = portal.get_schema_type(item)
-        print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}", flush=True)
-        portal.patch_metadata(item_uuid, {"consortia": consortia})
-        total += 1
-    except Exception as e:
-        nerrors += 1
-        print(e, flush=True)
-
-
 def main():
 
     argv = ARGV({
@@ -41,6 +28,8 @@ def main():
     consortia = ["smaht"]
 
     print(f"SETTING CONSORTIA FOR PORTAL ITEMS WITHOUT IT: {portal.server}")
+    if argv.dryrun:
+        print(f"{chars.rarrow}{chars.rarrow}{chars.rarrow} DRY RUN {chars.larrow}{chars.larrow}{chars.larrow}")
     concurrency = 50
     functions = []
     for item in results:
@@ -63,6 +52,21 @@ def main():
     global total, nerrors
     print(f"DONE SETTING CONSORTIA FOR PORTAL ITEMS WITHOUT IT:"
           f" {portal.server} {chars.dot} total: {total} {chars.dot} errors: {nerrors}")
+    if argv.dryrun:
+        print(f"{chars.rarrow}{chars.rarrow}{chars.rarrow} DRY RUN {chars.larrow}{chars.larrow}{chars.larrow}")
+
+
+def _set_consortia(portal: Portal, item: dict, consortia: List[str]) -> None:
+    global total, nerrors
+    try:
+        item_uuid = item.get("uuid")
+        item_type = portal.get_schema_type(item)
+        print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}", flush=True)
+        portal.patch_metadata(item_uuid, {"consortia": consortia})
+        total += 1
+    except Exception as e:
+        nerrors += 1
+        print(e, flush=True)
 
 
 if __name__ == "__main__":
