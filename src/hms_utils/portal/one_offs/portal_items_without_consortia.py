@@ -6,7 +6,7 @@ from hms_utils.argv import ARGV
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["--env"]
+        ARGV.REQUIRED(str): ["--env", ARGV.DEFAULT, "smaht-local"]
     })
 
     portal = Portal(argv.env)

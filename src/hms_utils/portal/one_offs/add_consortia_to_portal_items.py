@@ -5,7 +5,7 @@
 from typing import List
 from dcicutils.ff_utils import search_metadata
 from hms_utils.portal.portal_utils import Portal
-from hms_utils.argv import ARGV, DEFAULT, OPTIONAL, REQUIRED
+from hms_utils.argv import ARGV, DEFAULT, REQUIRED
 from hms_utils.chars import chars
 from hms_utils.threading_utils import run_concurrently
 
