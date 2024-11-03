@@ -50,30 +50,31 @@ def main():
     if argv.output and os.path.exists(argv.output):
         _error(f"Specified output file already exists: {argv.output}")
 
-    result = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
+    item = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
 
     referenced_items = _get_portal_referenced_items(
-        portal, result, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
+        portal, item, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
+
     print("MAIN:")
-    print(json.dumps(result, indent=4))
+    print(json.dumps(item, indent=4))
     print("REFS:")
     print(json.dumps(referenced_items, indent=4))
     exit(0)
 
-    object_type = portal.get_schema_type(result)
+    object_type = portal.get_schema_type(item)
 
     if argv.debug:
         _print(f"OBJECT TYPE: {object_type}")
 
     if argv.output:
         with io.open(argv.output, "w") as f:
-            json.dump(result, f, indent=None if argv.noformat else 4)
+            json.dump(item, f, indent=None if argv.noformat else 4)
         if argv.verbose:
             _print(f"Output file written: {argv.output}")
     elif argv.noformat:
-        _print(result)
+        _print(item)
     else:
-        _print(json.dumps(result, indent=4))
+        _print(json.dumps(item, indent=4))
 
 
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
