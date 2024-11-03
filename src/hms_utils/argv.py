@@ -705,15 +705,13 @@ class ARGV(Argv):
             elif type == float: option_type = Argv.FLOATS  # noqa
             else:
                 raise Exception("Invalid argument to ARGV.OPTIONAL")
-                option_type = Argv.BOOLEAN  # noqa
         else:
             if type == str: option_type = Argv.STRING  # noqa
             elif type == int: option_type = Argv.INTEGER  # noqa
             elif type == float: option_type = Argv.FLOAT  # noqa
             elif type == bool: option_type = Argv.BOOLEAN  # noqa
             else:
-                raise Exception("Invalid argument to ARGV.OPTIONAL 2")
-                option_type = Argv.BOOLEAN  # noqa
+                raise Exception("Invalid argument to ARGV.OPTIONAL")
         if required is True:
             option_type |= Argv.REQUIRED
         else:
