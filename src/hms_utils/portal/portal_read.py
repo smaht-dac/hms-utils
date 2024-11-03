@@ -51,20 +51,16 @@ def main():
         _error(f"Specified output file already exists: {argv.output}")
 
     result = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
-    object_type = portal.get_schema_type(result)
 
-    ignore_uuids = []
-    while True:
-        if not (referenced_uuids := _get_referenced_uuids(result, ignore_uuids=ignore_uuids)):
-            break
-        referenced_items = _get_portal_metadata_for_uuids(portal, referenced_uuids,
-                                                          raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
-        ignore_uuids.extend([item.get(_UUID_PROPERTY_NAME) for item in referenced_items])
+    referenced_items = _get_portal_referenced_items(
+        portal, result, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
     print("MAIN:")
     print(json.dumps(result, indent=4))
     print("REFS:")
     print(json.dumps(referenced_items, indent=4))
     exit(0)
+
+    object_type = portal.get_schema_type(result)
 
     if argv.debug:
         _print(f"OBJECT TYPE: {object_type}")
@@ -80,9 +76,19 @@ def main():
         _print(json.dumps(result, indent=4))
 
 
+def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
+                                 database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
+    referenced_items = [] ; ignore_uuids = []  # noqa
+    while referenced_uuids := _get_referenced_uuids(item, ignore_uuids=ignore_uuids):
+        referenced_items = _get_portal_item_for_uuids(
+            portal, referenced_uuids, raw=raw, database=database, nthreads=nthreads)
+        ignore_uuids.extend([item.get(_UUID_PROPERTY_NAME) for item in referenced_items])
+    return referenced_items
+
+
 def _get_referenced_uuids(item: dict, ignore_uuids: Optional[List[str]] = None) -> List[str]:
     referenced_uuids = []
-    def find_referenced_uuids(item: Any) -> List[str]:  # noqa
+    def find_referenced_uuids(item: Any) -> None:  # noqa
         nonlocal referenced_uuids, ignore_uuids
         if isinstance(item, dict):
             for value in item.values():
@@ -104,27 +110,27 @@ def _get_referenced_uuids(item: dict, ignore_uuids: Optional[List[str]] = None) 
     return referenced_uuids
 
 
-def _get_portal_metadata_for_uuids(portal: Portal, uuids: Union[List[str], str],
-                                   raw: bool = False, database: bool = False,
-                                   nthreads: Optional[int] = None) -> List[str]:
+def _get_portal_item_for_uuids(portal: Portal, uuids: Union[List[str], str],
+                               raw: bool = False, database: bool = False,
+                               nthreads: Optional[int] = None) -> List[str]:
     items = []
     if not isinstance(uuids, list):
         if not (isinstance(uuids, str) and is_uuid(uuids)):
             return []
         uuids = [uuids]
-    fetch_metadata_functions = []
-    def fetch_portal_metatadata(uuid: str) -> Optional[dict]:  # noqa
+    fetch_item_functions = []
+    def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _get_portal_metatadata_for_uuid(portal, uuid, raw=raw, database=database):
+        if item := _get_portal_item_for_uuid(portal, uuid, raw=raw, database=database):
             items.append(item)
-    if fetch_metadata_functions := [lambda uuid=uuid: fetch_portal_metatadata(uuid) for uuid in uuids if is_uuid(uuid)]:
-        run_concurrently(fetch_metadata_functions, nthreads=nthreads)
+    if fetch_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
+        run_concurrently(fetch_item_functions, nthreads=nthreads)
     return items
 
 
 @lru_cache(maxsize=1024)
-def _get_portal_metatadata_for_uuid(portal: Portal, uuid: str,
-                                    raw: bool = False, database: bool = False) -> Optional[dict]:
+def _get_portal_item_for_uuid(portal: Portal, uuid: str,
+                              raw: bool = False, database: bool = False) -> Optional[dict]:
     return portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False) if is_uuid(uuid) else None
 
 
