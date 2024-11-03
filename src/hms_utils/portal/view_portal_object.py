@@ -68,6 +68,7 @@ from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import get_error_message, PRINT, to_snake_case
 from dcicutils.portal_utils import Portal
+from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import is_uuid
 
 
@@ -228,21 +229,34 @@ def main():
         _print_output(yaml.dump(data))
     else:
         if args.refs and args.inserts:
+            fetched_referenced_uuids = []
             while True:
                 if args.debug:
                     print(f"Looking for referenced items.")
-                if not (referenced_uuids := get_referenced_uuids(data)):
+                if not (referenced_uuids := get_referenced_uuids(data, fetched_referenced_uuids)):
                     if args.debug:
                         print(f"No more referenced items.")
                     break
+                fetch_reference_functions = []
+                fetch_reference_function_results = []
                 for referenced_uuid in referenced_uuids:
                     if args.debug:
                         print(f"Fetching referenced item: {referenced_uuid}")
-                    referenced_data = _get_portal_object(
-                        portal=portal, uuid=referenced_uuid, raw=args.raw, database=args.database,
-                        inserts=args.inserts, insert_files=args.insert_files,
-                        ignore=args.ignore, check=args.check,
-                        force=args.force, verbose=args.verbose, debug=args.debug)
+                    def fetch_reference(referenced_uuid):  # noqa
+                        nonlocal portal, fetched_referenced_uuids
+                        if referenced_uuid in fetched_referenced_uuids:
+                            return
+                        fetch_reference_function_results.append(
+                            _get_portal_object(portal=portal, uuid=referenced_uuid,
+                                               raw=args.raw, database=args.database,
+                                               inserts=args.inserts, insert_files=args.insert_files,
+                                               ignore=args.ignore, check=args.check, force=args.force,
+                                               verbose=args.verbose, debug=args.debug))
+                        fetched_referenced_uuids.append(referenced_uuid)
+                    fetch_reference_functions.append(
+                        lambda referenced_uuid=referenced_uuid: fetch_reference(referenced_uuid))
+                run_concurrently(fetch_reference_functions)
+                for referenced_data in fetch_reference_function_results:
                     add_referenced_data_to_data(referenced_data, data)
         if args.indent > 0:
             _print_output(_format_json_with_indent(data, indent=args.indent))
@@ -250,18 +264,19 @@ def main():
             _print_output(json.dumps(data, default=str, indent=4))
 
 
-def get_referenced_uuids(data: dict, nocheck: bool = False) -> List[str]:
+def get_referenced_uuids(data: dict, fetched_referenced_uuids: List[str]) -> List[str]:
     referenced_uuids = []
-    def find_uuids(item: Union[dict, list, str]):  # noqa
+    def find_uuids(item: Union[dict, list, str], ignore_uuid: Optional[str] = None):  # noqa
         if isinstance(item, dict):
             for value in item.values():
-                find_uuids(value)
+                find_uuids(value, ignore_uuid=item.get("uuid"))
         elif isinstance(item, list):
             for value in item:
                 find_uuids(value)
         elif isinstance(item, str) and is_uuid(item) and (item not in referenced_uuids):
-            if (nocheck is True) or (not contains_item(data, item)):
-                referenced_uuids.append(item)
+            if item != ignore_uuid:
+                if item not in fetched_referenced_uuids:
+                    referenced_uuids.append(item)
     find_uuids(data)
     return referenced_uuids
 
@@ -283,7 +298,7 @@ def add_referenced_data_to_data(referenced_data: dict, data: dict) -> None:
                     data[referenced_data_type] = referenced_data
 
 
-def contains_item(data: dict, uuid: str) -> bool:
+def _obsolete_contains_item(data: dict, uuid: str) -> bool:
     if isinstance(data, dict) and is_uuid(uuid):
         for data_type in data:
             if isinstance(data_items := data[data_type], list):
