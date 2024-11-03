@@ -171,6 +171,10 @@ def _print(*args, **kwargs) -> None:
     print(*args, **kwargs)
 
 
+def _verbose(*args, **kwargs) -> None:
+    _print(*args, **kwargs, file=sys.stderr, flush=True)
+
+
 def _error(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr, flush=True)
     sys.exit(1)
