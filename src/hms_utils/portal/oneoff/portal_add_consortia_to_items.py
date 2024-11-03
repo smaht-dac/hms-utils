@@ -5,7 +5,7 @@
 from typing import List
 from dcicutils.ff_utils import search_metadata
 from hms_utils.portal.portal_utils import Portal
-from hms_utils.argv import ARGV, DEFAULT, REQUIRED
+from hms_utils.argv import ARGV, REQUIRED
 from hms_utils.chars import chars
 from hms_utils.threading_utils import run_concurrently
 
@@ -16,8 +16,8 @@ total = 0
 def main():
 
     argv = ARGV({
-        REQUIRED(str): ["--env", DEFAULT, "smaht-local"],
-        REQUIRED(bool): ["--dryrun", DEFAULT, True]
+        REQUIRED(str, "smaht-local"): ["--env"],
+        REQUIRED(bool, True): ["--dryrun"]
     })
 
     portal = Portal(argv.env)

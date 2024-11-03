@@ -56,15 +56,25 @@ def to_bool(value: str) -> bool:
                                                   if isinstance(value, str) else False)
 
 
-def to_non_empty_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
+def to_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True, empty: bool = True) -> List[str]:
     strings = []
     if isinstance(value, (list, tuple)):
         for item in value:
-            if isinstance(item, str) and ((strip is False) or (item := item.strip())):
-                strings.append(item)
-    elif isinstance(value, str) and ((strip is False) or (value := value.strip())):
-        strings = [value]
+            if isinstance(item, str):
+                if (strip is not False):
+                    item = item.strip()
+                if (empty is True) or item:
+                    strings.append(item)
+    elif isinstance(value, str):
+        if (strip is not False):
+            value = value.strip()
+        if (empty is True) or value:
+            strings.append(value)
     return strings
+
+
+def to_non_empty_string_list(value: Union[List[str], Tuple[str, ...], str], strip: bool = True) -> List[str]:
+    return to_string_list(value, strip=strip, empty=False)
 
 
 _UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")

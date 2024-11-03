@@ -4,7 +4,7 @@ from typing import Any, Callable, List, Optional, Type, Union
 from uuid import uuid4 as uuid
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
-from hms_utils.type_utils import to_bool, to_float, to_integer, to_non_empty_string_list
+from hms_utils.type_utils import to_bool, to_float, to_integer, to_non_empty_string_list, to_string_list
 
 
 class Argv:
@@ -534,8 +534,11 @@ class Argv:
                             option_definitions.add_rule_depends_on(option_options)
                             continue
                         option_type = to_integer(option_type[0:index])
-                    elif (index := option_type.find(Argv._RULE_DELIMITER)) > 1:
-                        option_type = to_integer(option_type[0:index])
+                    elif option_type_components := to_string_list(option_type.split(Argv._RULE_DELIMITER)):
+                        option_type = to_integer(option_type_components[0])
+                        if option_default := option_type_components[1] if len(option_type_components) > 1 else None:
+                            option_options.append(ARGV.DEFAULT)
+                            option_options.append(option_default)
 
                 default_value = None
                 if isinstance(option_options, (list, tuple)) and option_options:
@@ -693,29 +696,37 @@ class Argv:
 class ARGV(Argv):
 
     @staticmethod
-    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None, _required: bool = False) -> str:
+    def OPTIONAL(type: Optional[Type[Union[str, int, float, bool]]] = None,
+                 default: Any = None, required: bool = False) -> str:
         if isinstance(type, list) and (len(type) == 1):
             type = type[0]
             if type == str: option_type = Argv.STRINGS  # noqa
             elif type == int: option_type = Argv.INTEGERS  # noqa
             elif type == float: option_type = Argv.FLOATS  # noqa
-            elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else: option_type = Argv.BOOLEAN  # noqa
+            else:
+                raise Exception("Invalid argument to ARGV.OPTIONAL")
+                option_type = Argv.BOOLEAN  # noqa
         else:
             if type == str: option_type = Argv.STRING  # noqa
             elif type == int: option_type = Argv.INTEGER  # noqa
             elif type == float: option_type = Argv.FLOAT  # noqa
             elif type == bool: option_type = Argv.BOOLEAN  # noqa
-            else: option_type = Argv.BOOLEAN  # noqa
-        if _required is True:
+            else:
+                raise Exception("Invalid argument to ARGV.OPTIONAL 2")
+                option_type = Argv.BOOLEAN  # noqa
+        if required is True:
             option_type |= Argv.REQUIRED
         else:
             option_type |= Argv.OPTIONAL
+        if default is not None:
+            return str(option_type) + Argv._RULE_DELIMITER + str(default) + Argv._RULE_DELIMITER + str(uuid())
+        else:
+            return str(option_type) + Argv._RULE_DELIMITER + Argv._RULE_DELIMITER + str(uuid())
         return str(option_type) + Argv._RULE_DELIMITER + str(uuid())
 
     @staticmethod
-    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = bool):
-        return ARGV.OPTIONAL(type=type, _required=True)
+    def REQUIRED(type: Optional[Type[Union[str, int, float, bool]]] = bool, default: Any = None):
+        return ARGV.OPTIONAL(type=type, default=default, required=True)
 
     @classmethod
     @property
