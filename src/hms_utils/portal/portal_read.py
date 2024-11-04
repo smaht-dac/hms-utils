@@ -20,22 +20,20 @@ _DEFAULT_IGNORE_PROPERTIES = [
     "submitted_by",
     "schema_version"
 ]
-_DEFAULT_PORTAL_ENV = "smaht-data"
 _UUID_PROPERTY_NAME = "uuid"
 
 
 def main():
 
     argv = ARGV({
-        # ARGV.REQUIRED(str, "58fd2534-8966-412c-a3a6-c12e20ef569b"): ["arg"],
-        ARGV.REQUIRED(str, "/output-files"): ["arg"],
+        ARGV.REQUIRED(str): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, _DEFAULT_PORTAL_ENV): ["--env", "--e"],
+        ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
-        ARGV.OPTIONAL(bool, True): ["--raw"],
+        ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--noformat"],
         ARGV.OPTIONAL(bool): ["--json"],
@@ -43,7 +41,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
         ARGV.OPTIONAL(bool): ["--all-properties", "--all"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
-        ARGV.OPTIONAL(int): ["--offset", "--skip"],
+        ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(int, 32): ["--nthreads", "--threads"],
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
@@ -62,12 +60,25 @@ def main():
     if argv.output and os.path.exists(argv.output):
         _error(f"Specified output file already exists: {argv.output}")
 
-    if items := _get_portal_metadata(portal, argv.arg, raw=argv.raw or argv.inserts):
+    if argv.arg.startswith("/"):
+        if isinstance(argv.limit, int):
+            if ("?limit=" not in argv.arg) and ("&limit=" not in argv.arg):
+                argv.arg += f"&limit={argv.limit}" if "?" in argv.arg else f"?limit={argv.limit}"
+        if isinstance(argv.offset, int):
+            if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
+                argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
+        portal_get = _portal_get
+    else:
+        portal_get = _portal_get_metadata
+
+    if items := portal_get(portal, argv.arg, raw=argv.raw or argv.inserts):
         if graph := items.get("@graph"):
             items = graph
+        elif isinstance(items, dict):
+            items = [items]
 
     referenced_items = _get_portal_referenced_items(
-        portal, items, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
+        portal, items, raw=argv.raw, database=argv.database, nthreads=argv.nthreads) if argv.refs else []
 
     if not argv.all_properties:
         _remove_ignored_properties(items, _DEFAULT_IGNORE_PROPERTIES)
@@ -139,7 +150,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
     fetch_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _get_portal_metadata(portal, uuid, raw=raw, database=database):
+        if item := _portal_get_metadata(portal, uuid, raw=raw, database=database):
             items.append(item)
     if fetch_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_item_functions, nthreads=nthreads)
@@ -147,9 +158,20 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
 
 
 @lru_cache(maxsize=1024)
-def _get_portal_metadata(portal: Portal, uuid: str, raw: bool = False, database: bool = False) -> dict:
-    if item := portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False):
-        return item
+def _portal_get_metadata(portal: Portal, uuid: str, raw: bool = False, database: bool = False) -> dict:
+    try:
+        return portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False)
+    except Exception:
+        pass
+    return {}
+
+
+@lru_cache(maxsize=64)
+def _portal_get(portal: Portal, path: str, raw: bool = False, database: bool = False) -> dict:
+    try:
+        return portal.get(path, raw=raw, database=database, raise_exception=False).json()
+    except Exception:
+        pass
     return {}
 
 
@@ -178,12 +200,14 @@ def _remove_ignored_properties(items: Union[List[dict], dict], ignored_propertie
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
                    ping: bool = True, show: bool = False, verbose: bool = False, debug: bool = False) -> Portal:
-    portal = None
+    portal = None ; error = None  # noqa
     with captured_output(not debug):
         try:
             portal = Portal(env, app=app) if env or app else Portal(ini)
         except Exception as e:
-            _error(str(e))
+            error = e
+    if error:
+        _error(str(error))
     if portal:
         if verbose:
             if portal.env:

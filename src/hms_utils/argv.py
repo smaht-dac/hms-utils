@@ -244,6 +244,10 @@ class Argv:
                         default = options[0][index + 1:]
                         if (option_type & Argv.BOOLEAN):
                             default = to_bool(default)
+                        elif (option_type & Argv.INTEGER):
+                            default = to_integer(default)
+                        elif (option_type & Argv.FLOAT):
+                            default = to_float(default)
                         options[0] = options[0][0:index]
                     elif (option_type & Argv.BOOLEAN):
                         default = False
