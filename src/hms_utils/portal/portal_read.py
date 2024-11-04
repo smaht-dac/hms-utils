@@ -13,27 +13,39 @@ from hms_utils.portal.portal_utils import Portal
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import is_uuid
 
+_DEFAULT_IGNORE_PROPERTIES = [
+    "date_created",
+    "last_modified",
+    "principals_allowed",
+    "submitted_by",
+    "schema_version"
+]
+_DEFAULT_PORTAL_ENV = "smaht-data"
 _UUID_PROPERTY_NAME = "uuid"
 
 
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str, "58fd2534-8966-412c-a3a6-c12e20ef569b"): ["arg"],
+        # ARGV.REQUIRED(str, "58fd2534-8966-412c-a3a6-c12e20ef569b"): ["arg"],
+        ARGV.REQUIRED(str, "/output-files"): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, "smaht-data"): ["--env", "--e"],
+        ARGV.OPTIONAL(str, _DEFAULT_PORTAL_ENV): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool, True): ["--raw"],
-        ARGV.OPTIONAL(bool, True): ["--database"],
+        ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--noformat"],
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
+        ARGV.OPTIONAL(bool): ["--all-properties", "--all"],
+        ARGV.OPTIONAL(int): ["--limit", "--count"],
+        ARGV.OPTIONAL(int): ["--offset", "--skip"],
         ARGV.OPTIONAL(int, 32): ["--nthreads", "--threads"],
-        ARGV.OPTIONAL([str]): ["--ignore-fields", "--ignore"],
+        ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -50,44 +62,46 @@ def main():
     if argv.output and os.path.exists(argv.output):
         _error(f"Specified output file already exists: {argv.output}")
 
-    item = portal.get_metadata(argv.arg, raw=argv.raw or argv.inserts)
+    if items := _get_portal_metadata(portal, argv.arg, raw=argv.raw or argv.inserts):
+        if graph := items.get("@graph"):
+            items = graph
 
     referenced_items = _get_portal_referenced_items(
-        portal, item, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
+        portal, items, raw=argv.raw, database=argv.database, nthreads=argv.nthreads)
 
-    print("MAIN:")
-    print(json.dumps(item, indent=4))
-    print("REFS:")
-    print(json.dumps(referenced_items, indent=4))
-    exit(0)
+    if not argv.all_properties:
+        _remove_ignored_properties(items, _DEFAULT_IGNORE_PROPERTIES)
+        _remove_ignored_properties(referenced_items, _DEFAULT_IGNORE_PROPERTIES)
 
-    object_type = portal.get_schema_type(item)
+    items.extend(referenced_items)
 
-    if argv.debug:
-        _print(f"OBJECT TYPE: {object_type}")
+    # TODO: Organize by type at least for --inserts ...
+    # object_type = portal.get_schema_type(items)
+    # if argv.debug:
+    #     _print(f"OBJECT TYPE: {object_type}")
 
     if argv.output:
         with io.open(argv.output, "w") as f:
-            json.dump(item, f, indent=None if argv.noformat else 4)
+            json.dump(items, f, indent=None if argv.noformat else 4)
         if argv.verbose:
             _print(f"Output file written: {argv.output}")
     elif argv.noformat:
-        _print(item)
+        _print(items)
     else:
-        _print(json.dumps(item, indent=4))
+        _print(json.dumps(items, indent=4))
 
 
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
                                  database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
     while referenced_uuids := _get_referenced_uuids(item, ignore_uuids=ignore_uuids):
-        referenced_items = _get_portal_item_for_uuids(
+        referenced_items = _get_portal_items_for_uuids(
             portal, referenced_uuids, raw=raw, database=database, nthreads=nthreads)
         ignore_uuids.extend([item.get(_UUID_PROPERTY_NAME) for item in referenced_items])
     return referenced_items
 
 
-def _get_referenced_uuids(item: dict, ignore_uuids: Optional[List[str]] = None) -> List[str]:
+def _get_referenced_uuids(item: Union[dict, List[dict]], ignore_uuids: Optional[List[str]] = None) -> List[str]:
     referenced_uuids = []
     def find_referenced_uuids(item: Any) -> None:  # noqa
         nonlocal referenced_uuids, ignore_uuids
@@ -97,23 +111,26 @@ def _get_referenced_uuids(item: dict, ignore_uuids: Optional[List[str]] = None) 
         elif isinstance(item, (list, tuple)):
             for element in item:
                 find_referenced_uuids(element)
-        elif is_uuid(item) and (item not in ignore_uuids) and (item not in referenced_uuids):
-            referenced_uuids.append(item)
-    if isinstance(item, dict) and (uuid := item.get(_UUID_PROPERTY_NAME)):
-        if isinstance(ignore_uuids, list):
-            if uuid not in ignore_uuids:
-                ignore_uuids.append(uuid)
-        else:
-            ignore_uuids = [uuid]
-    elif not isinstance(ignore_uuids, list):
+        elif uuids := _get_uuids_from_value(item):
+            for uuid in uuids:
+                if (uuid not in ignore_uuids) and (uuid not in referenced_uuids):
+                    referenced_uuids.append(item)
+    if not isinstance(ignore_uuids, list):
         ignore_uuids = []
+    if isinstance(item, dict):
+        if (uuid := item.get(_UUID_PROPERTY_NAME)) and (uuid not in ignore_uuids):
+            ignore_uuids.append(uuid)
+    elif isinstance(item, list):
+        for item in item:
+            if (uuid := item.get(_UUID_PROPERTY_NAME)) and (uuid not in ignore_uuids):
+                ignore_uuids.append(uuid)
     find_referenced_uuids(item)
     return referenced_uuids
 
 
-def _get_portal_item_for_uuids(portal: Portal, uuids: Union[List[str], str],
-                               raw: bool = False, database: bool = False,
-                               nthreads: Optional[int] = None) -> List[str]:
+def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
+                                raw: bool = False, database: bool = False,
+                                nthreads: Optional[int] = None) -> List[str]:
     items = []
     if not isinstance(uuids, list):
         if not (isinstance(uuids, str) and is_uuid(uuids)):
@@ -122,7 +139,7 @@ def _get_portal_item_for_uuids(portal: Portal, uuids: Union[List[str], str],
     fetch_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _get_portal_item_for_uuid(portal, uuid, raw=raw, database=database):
+        if item := _get_portal_metadata(portal, uuid, raw=raw, database=database):
             items.append(item)
     if fetch_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_item_functions, nthreads=nthreads)
@@ -130,9 +147,33 @@ def _get_portal_item_for_uuids(portal: Portal, uuids: Union[List[str], str],
 
 
 @lru_cache(maxsize=1024)
-def _get_portal_item_for_uuid(portal: Portal, uuid: str,
-                              raw: bool = False, database: bool = False) -> Optional[dict]:
-    return portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False) if is_uuid(uuid) else None
+def _get_portal_metadata(portal: Portal, uuid: str, raw: bool = False, database: bool = False) -> dict:
+    if item := portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False):
+        return item
+    return {}
+
+
+def _get_uuids_from_value(value: str) -> List[str]:
+    uuids = []
+    if isinstance(value, str):
+        if is_uuid(value):
+            uuids.append(value)
+        else:
+            for component in value.split("/"):
+                if is_uuid(component := component.strip()):
+                    uuids.append(component)
+    return uuids
+
+
+def _remove_ignored_properties(items: Union[List[dict], dict], ignored_properties: List[str]) -> None:
+    if isinstance(items, dict):
+        items = [items]
+    elif not isinstance(items, list):
+        return
+    for item in items:
+        for key in list(item.keys()):
+            if key in ignored_properties:
+                del item[key]
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
