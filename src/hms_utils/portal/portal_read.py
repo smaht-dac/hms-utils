@@ -26,9 +26,9 @@ _UUID_PROPERTY_NAME = "uuid"
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["arg"],
+        ARGV.REQUIRED(str, "/users"): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str): ["--env", "--e"],
+        ARGV.OPTIONAL(str, "smaht-local"): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
@@ -48,7 +48,10 @@ def main():
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
-        ARGV.OPTIONAL(bool): ["--argv"]
+        ARGV.OPTIONAL(bool): ["--argv"],
+        ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
+        # ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
+        ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
     if argv.argv:
@@ -74,8 +77,8 @@ def main():
     if items := portal_get(portal, argv.arg, raw=argv.raw or argv.inserts):
         if graph := items.get("@graph"):
             items = graph
-        elif isinstance(items, dict):
-            items = [items]
+    if isinstance(items, dict):
+        items = [items]
 
     referenced_items = _get_portal_referenced_items(
         portal, items, raw=argv.raw, database=argv.database, nthreads=argv.nthreads) if argv.refs else []
