@@ -128,7 +128,7 @@ def _get_referenced_uuids(item: Union[dict, List[dict]], ignore_uuids: Optional[
         elif uuids := _get_uuids_from_value(item):
             for uuid in uuids:
                 if (uuid not in ignore_uuids) and (uuid not in referenced_uuids):
-                    referenced_uuids.append(item)
+                    referenced_uuids.append(uuid)
     if not isinstance(ignore_uuids, list):
         ignore_uuids = []
     if isinstance(item, dict):
