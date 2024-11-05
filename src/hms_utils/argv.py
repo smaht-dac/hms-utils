@@ -309,7 +309,7 @@ class Argv:
                     option = option[Argv._OPTION_PREFIX_LEN:]
                 elif self._fuzzy and option.startswith(Argv._FUZZY_OPTION_PREFIX):
                     option = option[Argv._FUZZY_OPTION_PREFIX_LEN:]
-                return Argv._property_name_ize(option)  # option.replace("-", "_")
+                return Argv._property_name_ize(option)
             return ""
 
         def __eq__(self, other):
@@ -386,6 +386,7 @@ class Argv:
         rule_violations_at_most_one_of_toomany = []
         rule_violations_depends_on = []
 
+        # Parse each of the actual options/arguments.
         for arg in self:
             parsed = False
             for option in self._option_definitions._definitions:
@@ -408,10 +409,9 @@ class Argv:
                 elif isinstance(value, list):
                     if not value:
                         missing_option_arguments_multiple.append(option)
-                    else:
-                        for item in value:
-                            if isinstance(item, Argv.MistypedValue):
-                                mistyped_option_arguments_multiple.append((option, item))
+                        continue
+                    for item in [item for item in value if isinstance(item, Argv.MistypedValue)]:
+                        mistyped_option_arguments_multiple.append((option, item))
 
         # Define default value properties.
         for option in self._option_definitions._definitions:
@@ -420,6 +420,8 @@ class Argv:
 
         # Enfoce various auxiliary rules.
         defined_value_options = set(self._defined_value_options())
+
+        # Enfoce exactly-one-of rule.
         for rule_options in self._option_definitions._rule_exactly_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 if len(intersection_options := rule_options & defined_value_options) == 0:
@@ -431,6 +433,7 @@ class Argv:
                     rule_violations_exactly_one_of_toomany.append(
                         [option._option_name for option in rule_options])
 
+        # Enfoce at-least-one-of rule.
         for rule_options in self._option_definitions._rule_at_least_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
@@ -439,6 +442,7 @@ class Argv:
                     rule_violations_at_least_one_of_missing.append(
                         [option._option_name for option in rule_options])
 
+        # Enfoce at-most-one-of rule.
         for rule_options in self._option_definitions._rule_at_most_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
@@ -447,6 +451,7 @@ class Argv:
                     rule_violations_at_most_one_of_toomany.append(
                         [option._option_name for option in rule_options])
 
+        # Enfoce dependency rules.
         for rule in self._option_definitions._rule_depends_on:
             rule_dependent_options = to_non_empty_string_list(rule.get("depends"))
             rule_required_options = to_non_empty_string_list(rule.get("on"))
@@ -459,18 +464,16 @@ class Argv:
                             rule_violations_depends_on.append([rule_dependent_option._option_name,
                                                                rule_required_option._option_name])
 
-        # Set properties to None or appropriate default (e.g. False for boolean)
+        # Set properties to None or an appropriate default (e.g. False for boolean)
         # for any/all options/properties not specified at all; must be after above.
         for option in self._option_definitions._definitions:
             if not hasattr(self._values, option._property_name):
                 if option._required and (option._option_name not in missing_options):
                     missing_options.append(option._option_name)
-                if option._type & ARGV.BOOLEAN:
-                    value = False
-                else:
-                    value = None
-                setattr(self._values, option._property_name, value)
+                value = False if option._type & ARGV.BOOLEAN else None
+                setattr(self._values, option._property_name, False if option._type & ARGV.BOOLEAN else None)
 
+        # Collect/format any errors.
         for duplicate_option in duplicate_options:
             errors.append(f"Duplicate option: {duplicate_option}")
         if unparsed_options:
@@ -500,6 +503,7 @@ class Argv:
         for violation in rule_violations_depends_on:
             errors.append(f"Option {violation[0]} depends on option: {violation[1]}")
 
+        # Report any errors if desired.
         if (report is not False) and errors:
             if not callable(printf):
                 printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa

@@ -26,7 +26,7 @@ _UUID_PROPERTY_NAME = "uuid"
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str, "/users"): ["arg"],
+        ARGV.REQUIRED(str): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str, "smaht-data"): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
@@ -108,7 +108,6 @@ def main():
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
                                  database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
-#   while referenced_uuids := _get_referenced_uuids(item, ignore_uuids=ignore_uuids):
     while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
         referenced_items = _get_portal_items_for_uuids(
