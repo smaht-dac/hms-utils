@@ -5,13 +5,13 @@ import io
 import json
 import os
 import sys
-from typing import Any, List, Optional, Union
+from typing import List, Optional, Union
 from dcicutils.captured_output import captured_output
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.portal.portal_utils import Portal
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.type_utils import is_uuid
+from hms_utils.type_utils import get_referenced_uuids, is_uuid
 
 _DEFAULT_IGNORE_PROPERTIES = [
     "date_created",
@@ -28,7 +28,7 @@ def main():
     argv = ARGV({
         ARGV.REQUIRED(str, "/users"): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, "smaht-local"): ["--env", "--e"],
+        ARGV.OPTIONAL(str, "smaht-data"): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
@@ -50,7 +50,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
-        # ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
+        ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
@@ -108,38 +108,13 @@ def main():
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
                                  database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
-    while referenced_uuids := _get_referenced_uuids(item, ignore_uuids=ignore_uuids):
+#   while referenced_uuids := _get_referenced_uuids(item, ignore_uuids=ignore_uuids):
+    while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
+                                                   exclude_uuid=True, include_paths=True):
         referenced_items = _get_portal_items_for_uuids(
             portal, referenced_uuids, raw=raw, database=database, nthreads=nthreads)
         ignore_uuids.extend([item.get(_UUID_PROPERTY_NAME) for item in referenced_items])
     return referenced_items
-
-
-def _get_referenced_uuids(item: Union[dict, List[dict]], ignore_uuids: Optional[List[str]] = None) -> List[str]:
-    referenced_uuids = []
-    def find_referenced_uuids(item: Any) -> None:  # noqa
-        nonlocal referenced_uuids, ignore_uuids
-        if isinstance(item, dict):
-            for value in item.values():
-                find_referenced_uuids(value)
-        elif isinstance(item, (list, tuple)):
-            for element in item:
-                find_referenced_uuids(element)
-        elif uuids := _get_uuids_from_value(item):
-            for uuid in uuids:
-                if (uuid not in ignore_uuids) and (uuid not in referenced_uuids):
-                    referenced_uuids.append(uuid)
-    if not isinstance(ignore_uuids, list):
-        ignore_uuids = []
-    if isinstance(item, dict):
-        if (uuid := item.get(_UUID_PROPERTY_NAME)) and (uuid not in ignore_uuids):
-            ignore_uuids.append(uuid)
-    elif isinstance(item, list):
-        for item in item:
-            if (uuid := item.get(_UUID_PROPERTY_NAME)) and (uuid not in ignore_uuids):
-                ignore_uuids.append(uuid)
-    find_referenced_uuids(item)
-    return referenced_uuids
 
 
 def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],

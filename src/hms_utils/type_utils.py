@@ -87,7 +87,8 @@ def is_uuid(value: str) -> bool:
 
 
 def get_referenced_uuids(item: Union[dict, List[dict]],
-                         ignore_uuids: Optional[List[str]] = None, ignore_uuid: bool = False) -> List[str]:
+                         ignore_uuids: Optional[List[str]] = None,
+                         exclude_uuid: bool = False, include_paths: bool = False) -> List[str]:
     referenced_uuids = []
     def find_referenced_uuids(item: Any) -> None:  # noqa
         nonlocal referenced_uuids, ignore_uuids
@@ -106,7 +107,7 @@ def get_referenced_uuids(item: Union[dict, List[dict]],
         if isinstance(value, str):
             if is_uuid(value):
                 uuids.append(value)
-            else:
+            elif include_paths is True:
                 for component in value.split("/"):
                     if is_uuid(component := component.strip()):
                         uuids.append(component)
@@ -114,31 +115,31 @@ def get_referenced_uuids(item: Union[dict, List[dict]],
     if not isinstance(ignore_uuids, list):
         ignore_uuids = []
     if isinstance(item, dict):
-        if (ignore_uuid is True) and (uuid := item.get("uuid")) and (uuid not in ignore_uuids):
+        if (exclude_uuid is True) and (uuid := item.get("uuid")) and (uuid not in ignore_uuids):
             ignore_uuids.append(uuid)
     elif isinstance(item, list):
         for item in item:
-            if (ignore_uuid is True) and (uuid := item.get("uuid")) and (uuid not in ignore_uuids):
+            if (exclude_uuid is True) and (uuid := item.get("uuid")) and (uuid not in ignore_uuids):
                 ignore_uuids.append(uuid)
     find_referenced_uuids(item)
     return referenced_uuids
 
 
 def get_referenced_uuids_from_file(file: str,
-                                   ignore_uuids: Optional[List[str]] = None, ignore_uuid: bool = False) -> List[str]:
+                                   ignore_uuids: Optional[List[str]] = None, exclude_uuid: bool = False) -> List[str]:
     try:
         with io.open(file, "r") as f:
-            return get_referenced_uuids(json.load(f), ignore_uuids=ignore_uuids, ignore_uuid=ignore_uuid)
+            return get_referenced_uuids(json.load(f), ignore_uuids=ignore_uuids, exclude_uuid=exclude_uuid)
     except Exception:
         return []
 
 
 def get_referenced_uuids_from_files(directory: str,
-                                    ignore_uuids: Optional[List[str]] = None, ignore_uuid: bool = False) -> List[str]:
+                                    ignore_uuids: Optional[List[str]] = None, exclude_uuid: bool = False) -> List[str]:
     referenced_uuids = []
     try:
         for file in glob.glob(os.path.join(directory, '*.json')):
-            for uuid in get_referenced_uuids_from_file(file, ignore_uuids=ignore_uuids, ignore_uuid=ignore_uuid):
+            for uuid in get_referenced_uuids_from_file(file, ignore_uuids=ignore_uuids, exclude_uuid=exclude_uuid):
                 if uuid not in referenced_uuids:
                     referenced_uuids.append(uuid)
     except Exception:

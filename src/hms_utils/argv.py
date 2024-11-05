@@ -241,6 +241,7 @@ class Argv:
                 option_type &= ~(Argv.REQUIRED | Argv.OPTIONAL | Argv.DEFAULT | Argv.DEFAULTS)
                 if action := option_type_action_map.get(option_type):
                     if (index := options[0].find("=")) > 0:
+                        pass
                         default = options[0][index + 1:]
                         if (option_type & Argv.BOOLEAN):
                             default = to_bool(default)
@@ -250,11 +251,14 @@ class Argv:
                             default = to_float(default)
                         options[0] = options[0][0:index]
                     elif (option_type & Argv.BOOLEAN):
-                        default = False
+                        # default = False
+                        default = None
+                        pass
                     else:
                         default = None
                     self._definitions.append(Argv._Option(
-                        options=options, required=option_required, default=default, action=action, fuzzy=self._fuzzy))
+                        options=options, type=option_type, required=option_required,
+                        default=default, action=action, fuzzy=self._fuzzy))
 
         def add_rule_exactly_one_of(self, options: List[str]) -> None:
             if options := list(set(to_non_empty_string_list(options))):
@@ -282,11 +286,13 @@ class Argv:
     class _Option:
         def __init__(self,
                      options: Optional[List[str]] = None,
+                     type: Optional[int] = None,
                      required: bool = False,
                      default: Any = None,
                      action: Optional[Callable] = None,
                      fuzzy: bool = True) -> None:
             self._options = to_non_empty_string_list(options)
+            self._type = type if isinstance(type, int) else None
             self._required = required is True
             self._default = default
             self._fuzzy = fuzzy is not True
@@ -372,7 +378,8 @@ class Argv:
         mistyped_option_arguments = []
         missing_option_arguments_multiple = []
         mistyped_option_arguments_multiple = []
-        unparsed_args = []
+        duplicate_options = []
+        unparsed_options = []
         rule_violations_exactly_one_of_missing = []
         rule_violations_exactly_one_of_toomany = []
         rule_violations_at_least_one_of_missing = []
@@ -386,10 +393,33 @@ class Argv:
                     parsed = True
                     break
             if not parsed:
-                unparsed_args.append(arg)
+                if (option := self._find_option(arg)) and hasattr(self._values, option._property_name):
+                    duplicate_options.append(option._option_name)
+                else:
+                    unparsed_options.append(arg)
 
+        # Flag missing arguments for argument options.
+        for option in self._option_definitions._definitions:
+            if (value := getattr(self._values, option._property_name, None)) is not None:
+                if isinstance(value, Argv.MistypedValue):
+                    mistyped_option_arguments.append((option, value))
+                elif value == Argv._NO_VALUE:
+                    missing_option_arguments.append(option)
+                elif isinstance(value, list):
+                    if not value:
+                        missing_option_arguments_multiple.append(option)
+                    else:
+                        for item in value:
+                            if isinstance(item, Argv.MistypedValue):
+                                mistyped_option_arguments_multiple.append((option, item))
+
+        # Define default value properties.
+        for option in self._option_definitions._definitions:
+            if not hasattr(self._values, option._property_name) and (option._default is not None):
+                setattr(self._values, option._property_name, option._default)
+
+        # Enfoce various auxiliary rules.
         defined_value_options = set(self._defined_value_options())
-
         for rule_options in self._option_definitions._rule_exactly_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 if len(intersection_options := rule_options & defined_value_options) == 0:
@@ -429,31 +459,23 @@ class Argv:
                             rule_violations_depends_on.append([rule_dependent_option._option_name,
                                                                rule_required_option._option_name])
 
-        for option in self._option_definitions._definitions:
-            if (value := getattr(self._values, option._property_name, None)) is not None:
-                if isinstance(value, Argv.MistypedValue):
-                    mistyped_option_arguments.append((option, value))
-                elif value == Argv._NO_VALUE:
-                    missing_option_arguments.append(option)
-                elif isinstance(value, list):
-                    if not value:
-                        missing_option_arguments_multiple.append(option)
-                    else:
-                        for item in value:
-                            if isinstance(item, Argv.MistypedValue):
-                                mistyped_option_arguments_multiple.append((option, item))
-
-        # Define value properties as None for any options/properties not specified; must be after above.
+        # Set properties to None or appropriate default (e.g. False for boolean)
+        # for any/all options/properties not specified at all; must be after above.
         for option in self._option_definitions._definitions:
             if not hasattr(self._values, option._property_name):
-                if option._required and (option._default is None):
-                    if option._option_name not in missing_options:
-                        missing_options.append(option._option_name)
-                setattr(self._values, option._property_name, option._default)
+                if option._required and (option._option_name not in missing_options):
+                    missing_options.append(option._option_name)
+                if option._type & ARGV.BOOLEAN:
+                    value = False
+                else:
+                    value = None
+                setattr(self._values, option._property_name, value)
 
-        if unparsed_args:
+        for duplicate_option in duplicate_options:
+            errors.append(f"Duplicate option: {duplicate_option}")
+        if unparsed_options:
             errors.append(f"Unrecognized argument"
-                          f"{'s' if len(unparsed_args) > 1 else ''}: {', '.join(unparsed_args)}")
+                          f"{'s' if len(unparsed_options) > 1 else ''}: {', '.join(unparsed_options)}")
         if missing_options:
             errors.append(f"Missing required option"
                           f"{'s' if len(missing_options) > 1 else ''}: {', '.join(missing_options)}")
@@ -605,6 +627,13 @@ class Argv:
                         break
         return found_options
 
+    def _find_option(self, option: str) -> Optional[Argv._Option]:
+        for option_definition in self._option_definitions._definitions:
+            for option_definition_option in option_definition._options:
+                if self._is_option_any_of(option_definition_option, option):
+                    return option_definition
+        return None
+
     def _is_option(self, value: str) -> bool:
         if self._escaping:
             return False
@@ -616,7 +645,7 @@ class Argv:
                     return True
         return False
 
-    def _is_option_any_of(self, value: str, options: List[str]) -> bool:
+    def _is_option_any_of(self, value: str, options: Union[List[str], str]) -> bool:
         def match(value: str, option: str) -> bool:
             if (isinstance(option, str) and (option := option.strip()) and
                 isinstance(value, str) and (value := value.strip())):  # noqa
@@ -630,6 +659,8 @@ class Argv:
                           (option == Argv._FUZZY_OPTION_PREFIX + value[Argv._OPTION_PREFIX_LEN:])):
                         return True
             return False
+        if isinstance(options, str):
+            options = [options]
         return any(match(value, option) for option in options) if isinstance(options, list) else False
 
     @property
