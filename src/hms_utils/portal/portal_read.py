@@ -83,14 +83,22 @@ def main():
     if isinstance(items, dict):
         items = [items]
 
-    referenced_items = _get_portal_referenced_items(portal, items, raw=argv.raw, inserts=argv.inserts,
-                                                    database=argv.database, nthreads=argv.nthreads) if argv.refs else []
+    if argv.refs:
+        items.extend(_get_portal_referenced_items(
+            portal, items, raw=argv.raw, inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
 
     if not argv.all_properties:
         _remove_ignored_properties(items, _ITEM_IGNORE_PROPERTIES_DEFAULT)
-        _remove_ignored_properties(referenced_items, _ITEM_IGNORE_PROPERTIES_DEFAULT)
 
-    items.extend(referenced_items)
+    if argv.inserts:
+        items_by_type = {}
+        for item in items:
+            item_type = item.get(_ITEM_TYPE_PSEUDO_PROPERTY_NAME)
+            if not (item_list := items_by_type.get(item_type)):
+                items_by_type[item_type] = (item_list := [])
+            item_list.append(item)
+            del item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME]
+        items = items_by_type
 
     # TODO: Organize by type at least for --inserts ...
     # object_type = portal.get_schema_type(items)
@@ -130,7 +138,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _portal_get_metadata(portal, uuid, raw=raw, inserts=inserts, database=database):
+        if item := _portal_get_metadata(portal, uuid, raw=raw or inserts, inserts=inserts, database=database):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -156,6 +164,16 @@ def _portal_get_metadata_inserts(portal: Portal, uuid: str, database: bool = Fal
         item = None ; item_noraw = None  # noqa
         def fetch_portal_item() -> None:  # noqa
             nonlocal portal, uuid, database, item
+            # Note that /files?limit=3 with raw=True given non-raw result.
+            # but that /files with raw=True given raw result.
+            # and that /files?status=released with raw=True gives error
+            # Oh actually should use portal.get not portal.get_metadata for search.
+            # These FYI are the same results:
+            # portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False).json()
+            # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False)
+            # And these FYI are the same results:
+            # portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True).json()
+            # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
             item = portal.get_metadata(uuid, raw=True, database=database, raise_exception=False)
         def fetch_portal_item_noraw() -> None:  # noqa
             nonlocal portal, uuid, database, item_noraw
