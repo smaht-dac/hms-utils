@@ -16,8 +16,10 @@ total = 0
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str, "smaht-local"): ["--env"],
+        ARGV.REQUIRED(str, "smaht-data"): ["--env"],
         ARGV.OPTIONAL(bool): ["--dryrun"],
+        # Running into Internal Server Error on some Library types - this "fixes" it
+        ARGV.OPTIONAL(bool, True): ["--skip-links"],
         ARGV.OPTIONAL(int, 0): ["--limit"]
     })
 
@@ -45,7 +47,7 @@ def main():
                     print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}", flush=True)
                     if not argv.dryrun:
                         functions.append(lambda portal=portal, item=item, consortia=consortia:
-                                         _set_consortia(portal, item, consortia))
+                                         _set_consortia(portal, item, consortia, skip_links=argv.skip_links))
                         if len(functions) >= concurrency:
                             run_concurrently(functions, nthreads=concurrency)
                             functions = []
@@ -56,18 +58,23 @@ def main():
         run_concurrently(functions, nthreads=concurrency)
 
     global total, nerrors
-    print(f"DONE SETTING CONSORTIA FOR PORTAL ITEMS WITHOUT IT:"
-          f" {portal.server} {chars.dot} total: {total} {chars.dot} errors: {nerrors}")
     if argv.dryrun:
+        print(f"DONE REVIEWING PORTAL ITEMS WITHOUT CONSORTIA:"
+              f" {portal.server} {chars.dot} total: {nitems} {chars.dot} errors: {nerrors}")
         print(f"{chars.rarrow}{chars.rarrow}{chars.rarrow} DRY RUN {chars.larrow}{chars.larrow}{chars.larrow}")
+    else:
+        print(f"DONE SETTING CONSORTIA FOR PORTAL ITEMS WITHOUT IT:"
+              f" {portal.server} {chars.dot} total: {total} {chars.dot} errors: {nerrors}")
 
 
-def _set_consortia(portal: Portal, item: dict, consortia: List[str]) -> None:
+def _set_consortia(portal: Portal, item: dict, consortia: List[str], skip_links: bool = False) -> None:
     global total, nerrors
     try:
         item_uuid = item.get("uuid")
         item_type = portal.get_schema_type(item)
         print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}", flush=True)
+        if skip_links:
+            item_uuid += "?skip_links=true"
         portal.patch_metadata(item_uuid, {"consortia": consortia})
         total += 1
     except Exception as e:
