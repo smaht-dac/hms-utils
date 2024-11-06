@@ -26,7 +26,7 @@ def main():
                     status
 
     else:
-        query = "/search/?type=Item&validation_errors.name%21=No+value"
+        query = "/search/?type=Item&validation_errors.name%21=No+value&limit=100000"
         ignored_types = []
         for item in search_metadata(query, key=portal.key, is_generator=True):
             if isinstance(item, dict) and (item_uuid := item.get("uuid")):
