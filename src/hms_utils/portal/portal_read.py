@@ -11,7 +11,8 @@ from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.portal.portal_utils import Portal
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.type_utils import get_referenced_uuids, is_uuid
+from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
+
 
 _DEFAULT_IGNORE_PROPERTIES = [
     "date_created",
@@ -21,6 +22,7 @@ _DEFAULT_IGNORE_PROPERTIES = [
     "schema_version"
 ]
 _UUID_PROPERTY_NAME = "uuid"
+_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
 
 def main():
@@ -54,6 +56,10 @@ def main():
         ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
+    global _debug, _verbose, _nofunction
+    if not argv.debug: _debug = _nofunction  # noqa
+    if not argv.verbose: _verbose = _nofunction  # noqa
+
     if argv.argv:
         print(json.dumps(argv._dict, indent=4))
 
@@ -74,14 +80,16 @@ def main():
     else:
         portal_get = _portal_get_metadata
 
-    if items := portal_get(portal, argv.arg, raw=argv.raw or argv.inserts):
+    raw = argv.raw or argv.inserts
+
+    if items := portal_get(portal, argv.arg, raw=raw):
         if graph := items.get("@graph"):
             items = graph
     if isinstance(items, dict):
         items = [items]
 
     referenced_items = _get_portal_referenced_items(
-        portal, items, raw=argv.raw, database=argv.database, nthreads=argv.nthreads) if argv.refs else []
+        portal, items, raw=raw, database=argv.database, nthreads=argv.nthreads) if argv.refs else []
 
     if not argv.all_properties:
         _remove_ignored_properties(items, _DEFAULT_IGNORE_PROPERTIES)
@@ -118,26 +126,58 @@ def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
 
 def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
                                 raw: bool = False, database: bool = False,
-                                nthreads: Optional[int] = None) -> List[str]:
+                                nthreads: Optional[int] = None) -> List[dict]:
     items = []
     if not isinstance(uuids, list):
         if not (isinstance(uuids, str) and is_uuid(uuids)):
             return []
         uuids = [uuids]
-    fetch_item_functions = []
+    fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
-        nonlocal portal, raw, database, items
-        if item := _portal_get_metadata(portal, uuid, raw=raw, database=database):
+        nonlocal portal, database, items
+        if item := _portal_get_metadata(portal, uuid, database=database):
             items.append(item)
-    if fetch_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
-        run_concurrently(fetch_item_functions, nthreads=nthreads)
+    if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
+        run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
     return items
 
 
 @lru_cache(maxsize=1024)
 def _portal_get_metadata(portal: Portal, uuid: str, raw: bool = False, database: bool = False) -> dict:
     try:
-        return portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False)
+        if raw is True:
+            return _portal_get_metadata_raw(portal, uuid, database=database)
+        else:
+            return _portal_get_metadata_noraw(portal, uuid, database=database)
+    except Exception:
+        pass
+    return {}
+
+
+@lru_cache(maxsize=1024)
+def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) -> dict:
+    try:
+        item = None ; item_noraw = None  # noqa
+        def fetch_portal_item() -> None:  # noqa
+            nonlocal portal, uuid, database, item
+            item = portal.get_metadata(uuid, raw=True, database=database, raise_exception=False)
+        def fetch_portal_item_noraw() -> None:  # noqa
+            nonlocal portal, uuid, database, item_noraw
+            item_noraw = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
+        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=2)
+        item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item_noraw)
+        return item
+    except Exception:
+        pass
+    return {}
+
+
+@lru_cache(maxsize=1024)
+def _portal_get_metadata_noraw(portal: Portal, uuid: str, database: bool = False, concurrent: bool = True) -> dict:
+    try:
+        item = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
+        item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item)
+        return item
     except Exception:
         pass
     return {}
@@ -173,6 +213,14 @@ def _remove_ignored_properties(items: Union[List[dict], dict], ignored_propertie
         for key in list(item.keys()):
             if key in ignored_properties:
                 del item[key]
+
+
+def get_item_type(item: dict) -> Optional[str]:
+    if isinstance(item, dict):
+        if isinstance(item_types := item.get("@type"), list):
+            return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
+        return item_types if isinstance(item_types, str) and item_types else None
+    return None
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
@@ -215,6 +263,14 @@ def _print(*args, **kwargs) -> None:
 
 def _verbose(*args, **kwargs) -> None:
     _print(*args, **kwargs, file=sys.stderr, flush=True)
+
+
+def _debug(*args, **kwargs) -> None:
+    _print(*args, **kwargs, file=sys.stderr, flush=True)
+
+
+def _nofunction(*args, **kwargs) -> None:
+    pass
 
 
 def _error(message: str) -> None:

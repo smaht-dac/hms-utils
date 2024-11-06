@@ -5,7 +5,7 @@
 from typing import List
 from dcicutils.ff_utils import search_metadata
 from hms_utils.portal.portal_utils import Portal
-from hms_utils.argv import ARGV, REQUIRED
+from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.threading_utils import run_concurrently
 
@@ -16,8 +16,9 @@ total = 0
 def main():
 
     argv = ARGV({
-        REQUIRED(str, "smaht-local"): ["--env"],
-        REQUIRED(bool, True): ["--dryrun"]
+        ARGV.REQUIRED(str, "smaht-local"): ["--env"],
+        ARGV.OPTIONAL(bool): ["--dryrun"],
+        ARGV.OPTIONAL(int, 0): ["--limit"]
     })
 
     portal = Portal(argv.env)
@@ -32,10 +33,15 @@ def main():
         print(f"{chars.rarrow}{chars.rarrow}{chars.rarrow} DRY RUN {chars.larrow}{chars.larrow}{chars.larrow}")
     concurrency = 50
     functions = []
+    nitems = 0
     for item in results:
         if isinstance(item, dict) and (item_uuid := item.get("uuid")):
             if (item_type := portal.get_schema_type(item)) not in ignored_types:
                 if item.get("consortia", None) is None:
+                    if (argv.limit > 0) and (nitems >= argv.limit):
+                        print(f"REACHED LIMIT: {argv.limit}")
+                        break
+                    nitems += 1
                     print(f"{item_uuid}: {item_type} {chars.rarrow_hollow} SETTING CONSORTIA: {consortia}", flush=True)
                     if not argv.dryrun:
                         functions.append(lambda portal=portal, item=item, consortia=consortia:
