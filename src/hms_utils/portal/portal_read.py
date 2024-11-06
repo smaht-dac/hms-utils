@@ -28,9 +28,9 @@ _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str, "/files"): ["arg"],
+        ARGV.REQUIRED(str): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, "smaht-data"): ["--env", "--e"],
+        ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool, True): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
