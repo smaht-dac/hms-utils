@@ -14,25 +14,25 @@ from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
 
 
-_DEFAULT_IGNORE_PROPERTIES = [
+_ITEM_IGNORE_PROPERTIES_DEFAULT = [
     "date_created",
     "last_modified",
     "principals_allowed",
     "submitted_by",
     "schema_version"
 ]
-_UUID_PROPERTY_NAME = "uuid"
-_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
+_ITEM_UUID_PROPERTY_NAME = "uuid"
+_ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
 
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["arg"],
+        ARGV.REQUIRED(str, "/files"): ["arg"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str, "smaht-data"): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
-        ARGV.OPTIONAL(bool): ["--inserts"],
+        ARGV.OPTIONAL(bool, True): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool): ["--raw"],
@@ -76,24 +76,19 @@ def main():
         if isinstance(argv.offset, int):
             if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
                 argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
-        portal_get = _portal_get_metadata
-    else:
-        portal_get = _portal_get_metadata
 
-    raw = argv.raw or argv.inserts
-
-    if items := portal_get(portal, argv.arg, raw=raw):
+    if items := _portal_get_metadata(portal, argv.arg, raw=argv.raw, inserts=argv.inserts):
         if graph := items.get("@graph"):
             items = graph
     if isinstance(items, dict):
         items = [items]
 
-    referenced_items = _get_portal_referenced_items(
-        portal, items, raw=raw, database=argv.database, nthreads=argv.nthreads) if argv.refs else []
+    referenced_items = _get_portal_referenced_items(portal, items, raw=argv.raw, inserts=argv.inserts,
+                                                    database=argv.database, nthreads=argv.nthreads) if argv.refs else []
 
     if not argv.all_properties:
-        _remove_ignored_properties(items, _DEFAULT_IGNORE_PROPERTIES)
-        _remove_ignored_properties(referenced_items, _DEFAULT_IGNORE_PROPERTIES)
+        _remove_ignored_properties(items, _ITEM_IGNORE_PROPERTIES_DEFAULT)
+        _remove_ignored_properties(referenced_items, _ITEM_IGNORE_PROPERTIES_DEFAULT)
 
     items.extend(referenced_items)
 
@@ -113,19 +108,19 @@ def main():
         _print(json.dumps(items, indent=4))
 
 
-def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False,
+def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False, inserts: bool = False,
                                  database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
     while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
         referenced_items = _get_portal_items_for_uuids(
-            portal, referenced_uuids, raw=raw, database=database, nthreads=nthreads)
-        ignore_uuids.extend([item.get(_UUID_PROPERTY_NAME) for item in referenced_items])
+            portal, referenced_uuids, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
+        ignore_uuids.extend([item.get(_ITEM_UUID_PROPERTY_NAME) for item in referenced_items])
     return referenced_items
 
 
 def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
-                                raw: bool = False, database: bool = False,
+                                raw: bool = False, inserts: bool = False, database: bool = False,
                                 nthreads: Optional[int] = None) -> List[dict]:
     items = []
     if not isinstance(uuids, list):
@@ -134,8 +129,8 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
         uuids = [uuids]
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
-        nonlocal portal, database, items
-        if item := _portal_get_metadata(portal, uuid, database=database):
+        nonlocal portal, raw, database, items
+        if item := _portal_get_metadata(portal, uuid, raw=raw, inserts=inserts, database=database):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -143,19 +138,20 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
 
 
 @lru_cache(maxsize=1024)
-def _portal_get_metadata(portal: Portal, uuid: str, raw: bool = False, database: bool = False) -> dict:
+def _portal_get_metadata(portal: Portal, uuid: str,
+                         raw: bool = False, inserts: bool = False, database: bool = False) -> dict:
     try:
-        if raw is True:
-            return _portal_get_metadata_raw(portal, uuid, database=database)
+        if inserts is True:
+            return _portal_get_metadata_inserts(portal, uuid, database=database)
         else:
-            return _portal_get_metadata_noraw(portal, uuid, database=database)
+            return _portal_get_metadata_plain(portal, uuid, raw=raw, database=database)
     except Exception:
         pass
     return {}
 
 
 @lru_cache(maxsize=1024)
-def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) -> dict:
+def _portal_get_metadata_inserts(portal: Portal, uuid: str, database: bool = False) -> dict:
     try:
         item = None ; item_noraw = None  # noqa
         def fetch_portal_item() -> None:  # noqa
@@ -170,13 +166,15 @@ def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) 
                 def find_item_type(uuid: str) -> Optional[str]:
                     nonlocal item_noraw, item_noraw_graph
                     for item_element in item_noraw_graph:
-                        if item_element.get(_UUID_PROPERTY_NAME) == uuid:
+                        if item_element.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
                             return get_item_type(item_element)
                     return None
                 for graph_item in graph:
-                    graph_item[_TYPE_PSEUDO_PROPERTY_NAME] = find_item_type(graph_item.get(_UUID_PROPERTY_NAME))
+                    if graph_item_type := find_item_type(graph_item.get(_ITEM_UUID_PROPERTY_NAME)):
+                        graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
         else:
-            item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item_noraw)
+            if item_type := get_item_type(item_noraw):
+                item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
         return item
     except Exception:
         pass
@@ -184,14 +182,17 @@ def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) 
 
 
 @lru_cache(maxsize=1024)
-def _portal_get_metadata_noraw(portal: Portal, uuid: str, database: bool = False, concurrent: bool = True) -> dict:
+def _portal_get_metadata_plain(portal: Portal, uuid: str,
+                               raw: bool = False, database: bool = False, concurrent: bool = True) -> dict:
     try:
-        item = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
+        item = portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False)
         if isinstance(graph := item.get("@graph"), list):
             for graph_item in graph:
-                graph_item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(graph_item)
+                if graph_item_type := get_item_type(graph_item):
+                    graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
         else:
-            item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item)
+            if item_type := get_item_type(item):
+                item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
         return item
     except Exception:
         pass
