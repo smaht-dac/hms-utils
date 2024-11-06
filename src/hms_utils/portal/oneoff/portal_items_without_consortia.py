@@ -12,7 +12,7 @@ def main():
     portal = Portal(argv.env)
     status = 0
 
-    query = "/search/?type=Item&consortia.display_title=No+value"
+    query = "/search/?type=Item&consortia.display_title=No+value&limit=1000000"
     ignored_types = ["AccessKey", "TrackingItem", "Consortium", "SubmissionCenter"]
     total = 0
     for item in search_metadata(query, key=portal.key, is_generator=True):
