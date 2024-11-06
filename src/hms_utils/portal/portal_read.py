@@ -76,7 +76,7 @@ def main():
         if isinstance(argv.offset, int):
             if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
                 argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
-        portal_get = _portal_get
+        portal_get = _portal_get_metadata
     else:
         portal_get = _portal_get_metadata
 
@@ -129,7 +129,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
                                 nthreads: Optional[int] = None) -> List[dict]:
     items = []
     if not isinstance(uuids, list):
-        if not (isinstance(uuids, str) and is_uuid(uuids)):
+        if not is_uuid(uuids):
             return []
         uuids = [uuids]
     fetch_portal_item_functions = []
@@ -165,7 +165,18 @@ def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) 
             nonlocal portal, uuid, database, item_noraw
             item_noraw = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=2)
-        item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item_noraw)
+        if isinstance(graph := item.get("@graph"), list):
+            if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
+                def find_item_type(uuid: str) -> Optional[str]:
+                    nonlocal item_noraw, item_noraw_graph
+                    for item_element in item_noraw_graph:
+                        if item_element.get(_UUID_PROPERTY_NAME) == uuid:
+                            return get_item_type(item_element)
+                    return None
+                for graph_item in graph:
+                    graph_item[_TYPE_PSEUDO_PROPERTY_NAME] = find_item_type(graph_item.get(_UUID_PROPERTY_NAME))
+        else:
+            item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item_noraw)
         return item
     except Exception:
         pass
@@ -176,17 +187,12 @@ def _portal_get_metadata_raw(portal: Portal, uuid: str, database: bool = False) 
 def _portal_get_metadata_noraw(portal: Portal, uuid: str, database: bool = False, concurrent: bool = True) -> dict:
     try:
         item = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
-        item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item)
+        if isinstance(graph := item.get("@graph"), list):
+            for graph_item in graph:
+                graph_item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(graph_item)
+        else:
+            item[_TYPE_PSEUDO_PROPERTY_NAME] = get_item_type(item)
         return item
-    except Exception:
-        pass
-    return {}
-
-
-@lru_cache(maxsize=64)
-def _portal_get(portal: Portal, path: str, raw: bool = False, database: bool = False) -> dict:
-    try:
-        return portal.get(path, raw=raw, database=database, raise_exception=False).json()
     except Exception:
         pass
     return {}
