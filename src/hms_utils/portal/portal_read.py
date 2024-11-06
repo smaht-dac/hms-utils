@@ -32,7 +32,7 @@ def main():
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
-        ARGV.OPTIONAL(bool, True): ["--inserts"],
+        ARGV.OPTIONAL(bool): ["--inserts"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool): ["--raw"],
