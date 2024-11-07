@@ -60,10 +60,11 @@ def main():
         ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
-    global _debug, _verbose, _nofunction, _exceptions
+    global _debug, _verbose, _nofunction, _exceptions, _nthreads
     if not argv.debug: _debug = _nofunction  # noqa
     if not argv.verbose: _verbose = _nofunction  # noqa
     if argv.exceptions: _exceptions = True  # noqa
+    if isinstance(argv.nthreads, int) and (argv.nthreads >= 0): _nthreads = argv.nthreads  # noqa
 
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
@@ -184,6 +185,7 @@ def _portal_get(portal: Portal, uuid: str, metadata: bool = False,
 
 @lru_cache(maxsize=1024)
 def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, database: bool = False) -> dict:
+    global _exceptions, _nthreads
     try:
         item = None ; item_noraw = None  # noqa
         def fetch_portal_item() -> None:  # noqa
@@ -198,7 +200,6 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                            f" raw: True {chars.dot} database: {database}")
                     item = portal.get(uuid, raw=True, database=database).json()
             except Exception:
-                global _exceptions
                 if _exceptions: raise  # noqa
         def fetch_portal_item_noraw() -> None:  # noqa
             nonlocal portal, uuid, metadata, database, item_noraw
@@ -208,9 +209,8 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                 else:
                     item_noraw = portal.get_metadata(uuid, raw=False, database=database)
             except Exception:
-                global _exceptions
                 if _exceptions: raise  # noqa
-        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=2)
+        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, _nthreads))
         if isinstance(graph := item.get("@graph"), list):
             if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
                 def find_item_type(uuid: str) -> Optional[str]:
@@ -227,7 +227,6 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                 item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
         return item
     except Exception:
-        global _exceptions
         if _exceptions: raise  # noqa
     return {}
 
@@ -309,16 +308,17 @@ def _debug(message: str) -> None:
     _print(f"DEBUG: {message}", file=sys.stderr, flush=True)
 
 
-def _nofunction(*args, **kwargs) -> None:
-    pass
-
-
 def _error(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr, flush=True)
     sys.exit(1)
 
 
+def _nofunction(*args, **kwargs) -> None:
+    pass
+
+
 _exceptions = False
+_nthreads = 32
 
 
 if __name__ == "__main__":
