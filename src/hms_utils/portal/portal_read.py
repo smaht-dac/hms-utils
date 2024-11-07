@@ -49,13 +49,13 @@ def main():
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(bool): ["--merge"],
-        ARGV.OPTIONAL(bool): ["--yes"],
+        ARGV.OPTIONAL(bool): ["--overwrite"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
-        ARGV.OPTIONAL(int, 1): ["--nthreads", "--threads"],
+        ARGV.OPTIONAL(int, 32): ["--nthreads", "--threads"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
@@ -97,7 +97,8 @@ def main():
 
     if argv.refs:
         items.extend(_get_portal_referenced_items(
-            portal, items, raw=argv.raw, inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
+            portal, items, raw=argv.raw, metadata=argv.metadata,
+            inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
 
     if not argv.noignore_properties:
         if not (argv.ignore_properties and
@@ -122,11 +123,11 @@ def main():
 
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
-            _print_items_inserts(items, argv.output, yes=argv.yes, merge=argv.merge, noformat=argv.noformat)
+            _print_items_inserts(items, argv.output, overwrite=argv.overwrite, merge=argv.merge, noformat=argv.noformat)
         else:
             if os.path.isdir(argv.output):
                 _error(f"Specified output file already exists as a directory: {argv.output}")
-            elif os.path.exists(argv.output) and not argv.yes:
+            elif os.path.exists(argv.output) and not argv.overwrite:
                 _error(f"Specified output file already exists: {argv.output}")
             with io.open(argv.output, "w") as f:
                 json.dump(items, f, indent=None if argv.noformat else 4)
@@ -138,7 +139,7 @@ def main():
 
 
 def _print_items_inserts(items: dict, output_directory: str,
-                         yes: bool = False, merge: bool = False, noformat: bool = False) -> None:
+                         overwrite: bool = False, merge: bool = False, noformat: bool = False) -> None:
     os.makedirs(output_directory, exist_ok=True)
     for item_type in items:
         item_type_items = items[item_type]
@@ -148,7 +149,7 @@ def _print_items_inserts(items: dict, output_directory: str,
         if os.path.exists(output_file):
             if merge:
                 merge_into_output_file = True
-            elif yes:
+            elif overwrite:
                 overwriting_output_file = True
             else:
                 _print(f"Specified output file already exists: {output_file} {chars.dot}")
@@ -185,18 +186,22 @@ def _print_items_inserts(items: dict, output_directory: str,
                 _verbose(f"Output file written: {output_file}")
 
 
-def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False, inserts: bool = False,
-                                 database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
+def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = False,
+                                 raw: bool = False, inserts: bool = False, database: bool = False,
+                                 nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
     while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
         referenced_items = _get_portal_items_for_uuids(
-            portal, referenced_uuids, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
-        ignore_uuids.extend([item.get(_ITEM_UUID_PROPERTY_NAME) for item in referenced_items])
+            portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
+        for item in referenced_items:
+            if item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME):
+                if item_uuid not in ignore_uuids:
+                    ignore_uuids.append(item_uuid)
     return referenced_items
 
 
-def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
+def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str], metadata: bool = False,
                                 raw: bool = False, inserts: bool = False, database: bool = False,
                                 nthreads: Optional[int] = None) -> List[dict]:
     items = []
@@ -206,8 +211,9 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
         uuids = [uuids]
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
-        nonlocal portal, raw, database, items
-        if item := _portal_get(portal, uuid, raw=raw or inserts, inserts=inserts, database=database, nthreads=nthreads):
+        nonlocal portal, metadata, raw, database, items
+        if item := _portal_get(portal, uuid, metadata=metadata,
+                               raw=raw, inserts=inserts, database=database, nthreads=nthreads):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -269,6 +275,9 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
             try:
                 query = (f"{query}&field={_ITEM_UUID_PROPERTY_NAME}"
                          if ("?" in query) else f"{query}?field={_ITEM_UUID_PROPERTY_NAME}")
+                if "358aed10-9b9d-4e26-ab84-4bd162da182b" in query:
+                    # import pdb ; pdb.set_trace()  # noqa
+                    pass
                 if metadata is True:
                     _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
@@ -277,6 +286,9 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
                     _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
                     item_noraw = portal.get(query, raw=False, database=database).json()
+                if "358aed10-9b9d-4e26-ab84-4bd162da182b" in query:
+                    # import pdb ; pdb.set_trace()  # noqa
+                    pass
             except Exception:
                 if _exceptions: raise  # noqa
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
@@ -358,10 +370,9 @@ def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Op
                 _print(f"Portal server: {portal.server}")
     if ping:
         if portal.ping():
-            if verbose:
-                _print(f"Portal connectivity: OK {chars.check}")
+            _verbose(f"Portal connectivity: OK {chars.check}")
         else:
-            _print(f"Portal connectivity: ERROR {chars.xmark}")
+            _error(f"Portal connectivity: ERROR {chars.xmark}")
     return portal
 
 
