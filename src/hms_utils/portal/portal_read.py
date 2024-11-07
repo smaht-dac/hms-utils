@@ -127,11 +127,18 @@ def main():
         else:
             if os.path.isdir(argv.output):
                 _error(f"Specified output file already exists as a directory: {argv.output}")
-            elif os.path.exists(argv.output) and not argv.overwrite:
-                _error(f"Specified output file already exists: {argv.output}")
+            elif os.path.exists(argv.output):
+                if not argv.overwrite:
+                    _print(f"Specified output file already exists: {argv.output}")
+                    if not yes_or_no("Overwrite this file?"):
+                        return
+                overwriting_output_file = True
             with io.open(argv.output, "w") as f:
                 json.dump(items, f, indent=None if argv.noformat else 4)
-            _verbose(f"Output file written: {argv.output}")
+            if overwriting_output_file:
+                _verbose(f"Output file overwritten: {argv.output}")
+            else:
+                _verbose(f"Output file written: {argv.output}")
     elif argv.noformat:
         _print(items)
     else:
