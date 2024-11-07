@@ -60,11 +60,10 @@ def main():
         ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
-    global _debug, _verbose, _nofunction, _exceptions, _nthreads
-    if not argv.debug: _debug = _nofunction  # noqa
+    global _verbose, _debug, _nofunction, _exceptions
     if not argv.verbose: _verbose = _nofunction  # noqa
+    if not argv.debug: _debug = _nofunction  # noqa
     if argv.exceptions: _exceptions = True  # noqa
-    if isinstance(argv.nthreads, int) and (argv.nthreads >= 0): _nthreads = argv.nthreads  # noqa
 
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
@@ -85,7 +84,8 @@ def main():
 
     metadata = (argv.metadata or (not argv.arg.startswith("/"))) and (not argv.nometadata)
 
-    if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts):
+    if items := _portal_get(portal, argv.arg, metadata=metadata,
+                            raw=argv.raw, inserts=argv.inserts, nthreads=argv.nthreads):
         if graph := items.get("@graph"):
             items = graph
     if isinstance(items, dict):
@@ -146,7 +146,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _portal_get(portal, uuid, raw=raw or inserts, inserts=inserts, database=database):
+        if item := _portal_get(portal, uuid, raw=raw or inserts, inserts=inserts, database=database, nthreads=nthreads):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -154,11 +154,11 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
 
 
 @lru_cache(maxsize=1024)
-def _portal_get(portal: Portal, uuid: str, metadata: bool = False,
-                raw: bool = False, inserts: bool = False, database: bool = False) -> dict:
+def _portal_get(portal: Portal, uuid: str, metadata: bool = False, raw: bool = False,
+                inserts: bool = False, database: bool = False, nthreads: Optional[int] = None) -> dict:
     try:
         if inserts is True:
-            return _portal_get_inserts(portal, uuid, metadata=metadata, database=database)
+            return _portal_get_inserts(portal, uuid, metadata=metadata, database=database, nthreads=nthreads)
         elif metadata is True:
             _debug(f"portal.get_metadata {chars.dot} raw: {raw} {chars.dot} database: {database}")
             return portal.get_metadata(uuid, raw=raw, database=database)
@@ -184,8 +184,9 @@ def _portal_get(portal: Portal, uuid: str, metadata: bool = False,
 # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
 
 @lru_cache(maxsize=1024)
-def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, database: bool = False) -> dict:
-    global _exceptions, _nthreads
+def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False,
+                        database: bool = False, nthreads: Optional[int] = None) -> dict:
+    global _exceptions
     try:
         item = None ; item_noraw = None  # noqa
         def fetch_portal_item() -> None:  # noqa
@@ -210,7 +211,7 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                     item_noraw = portal.get_metadata(uuid, raw=False, database=database)
             except Exception:
                 if _exceptions: raise  # noqa
-        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, _nthreads))
+        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
         if isinstance(graph := item.get("@graph"), list):
             if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
                 def find_item_type(uuid: str) -> Optional[str]:
@@ -318,7 +319,6 @@ def _nofunction(*args, **kwargs) -> None:
 
 
 _exceptions = False
-_nthreads = 32
 
 
 if __name__ == "__main__":
