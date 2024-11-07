@@ -14,7 +14,7 @@ from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
 
 
-_ITEM_IGNORE_PROPERTIES_DEFAULT = [
+_ITEM_IGNORE_PROPERTIES_INSERTS = [
     "date_created",
     "last_modified",
     "principals_allowed",
@@ -43,11 +43,12 @@ def main():
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
-        ARGV.OPTIONAL(bool): ["--all-properties", "--all"],
+        ARGV.OPTIONAL(bool): ["--all-properties", "--no-ignore-properties",
+                              "--noignore-properties", "--noignore", "--all"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(int, 1): ["--nthreads", "--threads"],
-        ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
+        ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -96,7 +97,10 @@ def main():
             portal, items, raw=argv.raw, inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
 
     if not argv.all_properties:
-        _remove_ignored_properties(items, _ITEM_IGNORE_PROPERTIES_DEFAULT)
+        if not (argv.ignore_properties and
+                (ignore_properties := to_non_empty_string_list(argv.ignore_properties.split(",")))):
+            ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
+        _remove_ignored_properties(items, ignore_properties)
 
     if argv.inserts:
         items_by_type = {}
