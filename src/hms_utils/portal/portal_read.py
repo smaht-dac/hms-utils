@@ -32,11 +32,13 @@ def main():
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
-        ARGV.OPTIONAL(bool): ["--inserts"],
+        ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
         ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
+        ARGV.OPTIONAL(bool): ["--metadata"],
+        ARGV.OPTIONAL(bool): ["--nometadata"],
         ARGV.OPTIONAL(bool): ["--noformat"],
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
@@ -50,15 +52,18 @@ def main():
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
+        ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
+        ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
-    global _debug, _verbose, _nofunction
+    global _debug, _verbose, _nofunction, _exceptions
     if not argv.debug: _debug = _nofunction  # noqa
     if not argv.verbose: _verbose = _nofunction  # noqa
+    if argv.exceptions: _exceptions = True  # noqa
 
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
@@ -77,7 +82,7 @@ def main():
             if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
                 argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
 
-    metadata = not argv.arg.startswith("/")
+    metadata = (argv.metadata or (not argv.arg.startswith("/"))) and (not argv.nometadata)
 
     if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts):
         if graph := items.get("@graph"):
@@ -99,7 +104,6 @@ def main():
             if not (item_list := items_by_type.get(item_type)):
                 items_by_type[item_type] = (item_list := [])
             item_list.append(item)
-            pass
             del item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME]
         items = items_by_type
 
@@ -154,9 +158,15 @@ def _portal_get(portal: Portal, uuid: str, metadata: bool = False,
     try:
         if inserts is True:
             return _portal_get_inserts(portal, uuid, metadata=metadata, database=database)
+        elif metadata is True:
+            _debug(f"portal.get_metadata {chars.dot} raw: {raw} {chars.dot} database: {database}")
+            return portal.get_metadata(uuid, raw=raw, database=database)
         else:
-            return _portal_get_plain(portal, uuid, metadata=metadata, raw=raw, database=database)
+            _debug(f"portal.get {chars.dot} raw: {raw} {chars.dot} database: {database}")
+            return portal.get(uuid, raw=raw, database=database).json()
     except Exception:
+        global _exceptions
+        if _exceptions: raise  # noqa
         pass
     return {}
 
@@ -180,11 +190,16 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
             nonlocal portal, uuid, database, item
             try:
                 if metadata is True:
+                    _debug(f"portal.get_metadata {chars.dot} inserts: True {chars.dot}"
+                           f" raw: False {chars.dot} database: {database}")
                     item = portal.get_metadata(uuid, raw=True, database=database)
                 else:
+                    _debug(f"portal.get {chars.dot} inserts: True {chars.dot}"
+                           f" raw: True {chars.dot} database: {database}")
                     item = portal.get(uuid, raw=True, database=database).json()
             except Exception:
-                pass
+                global _exceptions
+                if _exceptions: raise  # noqa
         def fetch_portal_item_noraw() -> None:  # noqa
             nonlocal portal, uuid, metadata, database, item_noraw
             try:
@@ -193,7 +208,8 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                 else:
                     item_noraw = portal.get_metadata(uuid, raw=False, database=database)
             except Exception:
-                pass
+                global _exceptions
+                if _exceptions: raise  # noqa
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=2)
         if isinstance(graph := item.get("@graph"), list):
             if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
@@ -211,28 +227,8 @@ def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, datab
                 item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
         return item
     except Exception:
-        pass
-    return {}
-
-
-@lru_cache(maxsize=1024)
-def _portal_get_plain(portal: Portal, uuid: str, metadata: bool = False,
-                      raw: bool = False, database: bool = False, concurrent: bool = True) -> dict:
-    try:
-        if metadata is True:
-            item = portal.get_metadata(uuid, raw=raw, database=database)
-        else:
-            item = portal.get(uuid, raw=raw, database=database).json()
-        if isinstance(graph := item.get("@graph"), list):
-            for graph_item in graph:
-                if graph_item_type := get_item_type(graph_item):
-                    graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
-        else:
-            if item_type := get_item_type(item):
-                item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
-        return item
-    except Exception:
-        pass
+        global _exceptions
+        if _exceptions: raise  # noqa
     return {}
 
 
@@ -309,8 +305,8 @@ def _verbose(*args, **kwargs) -> None:
     _print(*args, **kwargs, file=sys.stderr, flush=True)
 
 
-def _debug(*args, **kwargs) -> None:
-    _print(*args, **kwargs, file=sys.stderr, flush=True)
+def _debug(message: str) -> None:
+    _print(f"DEBUG: {message}", file=sys.stderr, flush=True)
 
 
 def _nofunction(*args, **kwargs) -> None:
@@ -320,6 +316,9 @@ def _nofunction(*args, **kwargs) -> None:
 def _error(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr, flush=True)
     sys.exit(1)
+
+
+_exceptions = False
 
 
 if __name__ == "__main__":
