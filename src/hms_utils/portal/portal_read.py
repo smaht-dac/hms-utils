@@ -7,6 +7,8 @@ import os
 import sys
 from typing import List, Optional, Union
 from dcicutils.captured_output import captured_output
+from dcicutils.command_utils import yes_or_no
+from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.portal.portal_utils import Portal
@@ -33,7 +35,6 @@ def main():
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
-        ARGV.OPTIONAL(bool): ["--insert-files"],
         ARGV.OPTIONAL(str): ["--output", "--out"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
@@ -43,22 +44,22 @@ def main():
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
-        ARGV.OPTIONAL(bool): ["--all-properties", "--no-ignore-properties",
-                              "--noignore-properties", "--noignore", "--all"],
+        ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--all"],
+        ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
-        ARGV.OPTIONAL(int, 1): ["--nthreads", "--threads"],
-        ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
+        ARGV.OPTIONAL(int, 1): ["--nthreads", "--threads"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
+        ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
-        ARGV.DEPENDENCY: ["--all-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
+        ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
     global _verbose, _debug, _nofunction, _exceptions
@@ -71,9 +72,6 @@ def main():
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
-
-    if argv.output and os.path.exists(argv.output):
-        _error(f"Specified output file already exists: {argv.output}")
 
     if argv.arg.startswith("/"):
         if isinstance(argv.limit, int):
@@ -96,7 +94,7 @@ def main():
         items.extend(_get_portal_referenced_items(
             portal, items, raw=argv.raw, inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
 
-    if not argv.all_properties:
+    if not argv.noignore_properties:
         if not (argv.ignore_properties and
                 (ignore_properties := to_non_empty_string_list(argv.ignore_properties.split(",")))):
             ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
@@ -118,14 +116,48 @@ def main():
     #     _print(f"OBJECT TYPE: {object_type}")
 
     if argv.output:
-        with io.open(argv.output, "w") as f:
-            json.dump(items, f, indent=None if argv.noformat else 4)
-        if argv.verbose:
-            _print(f"Output file written: {argv.output}")
+        if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
+            _print_items_inserts(items, argv.output, noformat=argv.noformat)
+        else:
+            if os.path.isdir(argv.output):
+                _error(f"Specified output file already exists as a directory: {argv.output}")
+            elif os.path.exists(argv.output):
+                _error(f"Specified output file already exists: {argv.output}")
+            with io.open(argv.output, "w") as f:
+                json.dump(items, f, indent=None if argv.noformat else 4)
+            if argv.verbose:
+                _print(f"Output file written: {argv.output}")
     elif argv.noformat:
         _print(items)
     else:
         _print(json.dumps(items, indent=4))
+
+
+def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False) -> None:
+    os.makedirs(output_directory, exist_ok=True)
+    for item_type in items:
+        item_type_items = items[item_type]
+        output_file = os.path.join(output_directory, f"{to_snake_case(item_type)}.json")
+        merge = False
+        if os.path.exists(output_file):
+            _print(f"Specified output file already exists: {output_file} {chars.dot}")
+            if not yes_or_no("Overwrite this file?"):
+                if not yes_or_no("Merge into this file?"):
+                    continue
+                merge = True
+        if merge:
+            try:
+                with io.open(output_file, "r") as f:
+                    if not isinstance(existing_items := json.load(f), list):
+                        _print(f"JSON file does not contain a list: {output_file}")
+                        continue
+                    existing_items.append(item_type_items)
+                    item_type_items = existing_items
+            except Exception:
+                _print(f"Cannot load file as JSON: {output_file}")
+                continue
+        with io.open(output_file, "w") as f:
+            json.dump(item_type_items, f, indent=None if (noformat is True) else 4)
 
 
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False, inserts: bool = False,
