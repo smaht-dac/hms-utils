@@ -125,6 +125,7 @@ def main():
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
             _print_items_inserts(items, argv.output, overwrite=argv.overwrite, merge=argv.merge, noformat=argv.noformat)
         else:
+            overwriting_output_file = False
             if os.path.isdir(argv.output):
                 _error(f"Specified output file already exists as a directory: {argv.output}")
             elif os.path.exists(argv.output):
@@ -219,7 +220,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str], me
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, metadata, raw, database, items
-        if item := _portal_get(portal, uuid, metadata=metadata,
+        if item := _portal_get(portal, uuid, metadata=True,
                                raw=raw, inserts=inserts, database=database, nthreads=nthreads):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
@@ -282,9 +283,6 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
             try:
                 query = (f"{query}&field={_ITEM_UUID_PROPERTY_NAME}"
                          if ("?" in query) else f"{query}?field={_ITEM_UUID_PROPERTY_NAME}")
-                if "358aed10-9b9d-4e26-ab84-4bd162da182b" in query:
-                    # import pdb ; pdb.set_trace()  # noqa
-                    pass
                 if metadata is True:
                     _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
@@ -293,9 +291,6 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
                     _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
                     item_noraw = portal.get(query, raw=False, database=database).json()
-                if "358aed10-9b9d-4e26-ab84-4bd162da182b" in query:
-                    # import pdb ; pdb.set_trace()  # noqa
-                    pass
             except Exception:
                 if _exceptions: raise  # noqa
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
@@ -361,20 +356,19 @@ def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Op
     if error:
         _error(str(error))
     if portal:
-        if verbose:
-            if portal.env:
-                _print(f"Portal environment: {portal.env}")
-            if portal.keys_file:
-                _print(f"Portal keys file: {portal.keys_file}")
-            if portal.key_id:
-                if show:
-                    _print(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
-                else:
-                    _print(f"Portal key prefix: {portal.key_id[0:2]}******")
-            if portal.ini_file:
-                _print(f"Portal ini file: {portal.ini_file}")
-            if portal.server:
-                _print(f"Portal server: {portal.server}")
+        if portal.env:
+            _verbose(f"Portal environment: {portal.env}")
+        if portal.keys_file:
+            _verbose(f"Portal keys file: {portal.keys_file}")
+        if portal.key_id:
+            if show:
+                _verbose(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
+            else:
+                _verbose(f"Portal key prefix: {portal.key_id[0:2]}******")
+        if portal.ini_file:
+            _verbose(f"Portal ini file: {portal.ini_file}")
+        if portal.server:
+            _verbose(f"Portal server: {portal.server}")
     if ping:
         if portal.ping():
             _verbose(f"Portal connectivity: OK {chars.check}")

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from functools import lru_cache
 import json
 import sys
 from typing import List, Optional, Union
@@ -60,7 +61,7 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
     users_to_update = []
     for user in users:
         try:
-            user_metadata = portal.get_metadata(f"/users/{user[PROPERTY.EMAIL]}")
+            user_metadata = portal_get_user(portal, user[PROPERTY.EMAIL])
             user_portal = get_user_from_portal_metadata(user_metadata)
             if debug is True:
                 _debug(f"Read user from portal OK: {user[PROPERTY.EMAIL]}")
@@ -219,6 +220,20 @@ def compile_diffs(user_from_spreadsheet: dict, user_from_portal: dict) -> List[s
     return diffs
 
 
+@lru_cache(maxsize=1)
+def portal_get_users(portal: Portal) -> List[dict]:
+    users_query = f"/users?status=deleted&status=current&status=inactive&status=revoked&limit=100000"
+    return portal.get(users_query).json().get("@graph")
+
+
+def portal_get_user(portal: Portal, email: str) -> Optional[dict]:
+    if isinstance(email, str) and email:
+        for user in portal_get_users(portal):
+            if user.get("email") == email:
+                return user
+    return None
+
+
 def normalize_string(value: str) -> str:
     if isinstance(value, str):
         # Gets rid of ISO-8859/European characters.
@@ -242,6 +257,7 @@ def _error(message: str, plain: bool = False) -> None:
 users_spreadsheet = "smaht_users_from_spreadsheet_20241028.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241031.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241104.tsv"
+users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241107.tsv"
 
 portal_env = "smaht-data"
 dump = False
