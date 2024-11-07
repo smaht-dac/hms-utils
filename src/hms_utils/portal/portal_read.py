@@ -48,6 +48,8 @@ def main():
         ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
+        ARGV.OPTIONAL(bool): ["--merge"],
+        ARGV.OPTIONAL(bool): ["--yes"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -120,35 +122,43 @@ def main():
 
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
-            _print_items_inserts(items, argv.output, noformat=argv.noformat)
+            _print_items_inserts(items, argv.output, yes=argv.yes, merge=argv.merge, noformat=argv.noformat)
         else:
             if os.path.isdir(argv.output):
                 _error(f"Specified output file already exists as a directory: {argv.output}")
-            elif os.path.exists(argv.output):
+            elif os.path.exists(argv.output) and not argv.yes:
                 _error(f"Specified output file already exists: {argv.output}")
             with io.open(argv.output, "w") as f:
                 json.dump(items, f, indent=None if argv.noformat else 4)
-            if argv.verbose:
-                _print(f"Output file written: {argv.output}")
+            _verbose(f"Output file written: {argv.output}")
     elif argv.noformat:
         _print(items)
     else:
         _print(json.dumps(items, indent=4))
 
 
-def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False) -> None:
+def _print_items_inserts(items: dict, output_directory: str,
+                         yes: bool = False, merge: bool = False, noformat: bool = False) -> None:
     os.makedirs(output_directory, exist_ok=True)
     for item_type in items:
         item_type_items = items[item_type]
         output_file = os.path.join(output_directory, f"{to_snake_case(item_type)}.json")
-        merge = False
+        merge_into_output_file = False
+        overwriting_output_file = False
         if os.path.exists(output_file):
-            _print(f"Specified output file already exists: {output_file} {chars.dot}")
-            if not yes_or_no("Overwrite this file?"):
-                if not yes_or_no("Merge into this file?"):
-                    continue
-                merge = True
-        if merge:
+            if merge:
+                merge_into_output_file = True
+            elif yes:
+                overwriting_output_file = True
+            else:
+                _print(f"Specified output file already exists: {output_file} {chars.dot}")
+                if not yes_or_no("Overwrite this file?"):
+                    if not yes_or_no("Merge into this file?"):
+                        continue
+                    merge_into_output_file = True
+                else:
+                    overwriting_output_file = True
+        if merge_into_output_file:
             try:
                 with io.open(output_file, "r") as f:
                     if not isinstance(existing_items := json.load(f), list):
@@ -160,7 +170,19 @@ def _print_items_inserts(items: dict, output_directory: str, noformat: bool = Fa
                 _print(f"Cannot load file as JSON: {output_file}")
                 continue
         with io.open(output_file, "w") as f:
+            if overwriting_output_file:
+                _debug(f"Overwriting output file: {output_file}")
+            elif merge_into_output_file:
+                _debug(f"Merging into output file: {output_file}")
+            else:
+                _debug(f"Writing into output file: {output_file}")
             json.dump(item_type_items, f, indent=None if (noformat is True) else 4)
+            if overwriting_output_file:
+                _verbose(f"Output file overwritten: {output_file}")
+            elif merge_into_output_file:
+                _verbose(f"Output file merged: {output_file}")
+            else:
+                _verbose(f"Output file written: {output_file}")
 
 
 def _get_portal_referenced_items(portal: Portal, item: dict, raw: bool = False, inserts: bool = False,
