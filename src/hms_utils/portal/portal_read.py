@@ -44,7 +44,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--all-properties", "--all"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
-        ARGV.OPTIONAL(int, 32): ["--nthreads", "--threads"],
+        ARGV.OPTIONAL(int, 1): ["--nthreads", "--threads"],
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--verbose"],
@@ -61,7 +61,7 @@ def main():
     if not argv.verbose: _verbose = _nofunction  # noqa
 
     if argv.argv:
-        print(json.dumps(argv._dict, indent=4))
+        _print(json.dumps(argv._dict, indent=4))
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
@@ -77,7 +77,9 @@ def main():
             if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
                 argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
 
-    if items := _portal_get_metadata(portal, argv.arg, raw=argv.raw, inserts=argv.inserts):
+    metadata = not argv.arg.startswith("/")
+
+    if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts):
         if graph := items.get("@graph"):
             items = graph
     if isinstance(items, dict):
@@ -97,6 +99,7 @@ def main():
             if not (item_list := items_by_type.get(item_type)):
                 items_by_type[item_type] = (item_list := [])
             item_list.append(item)
+            pass
             del item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME]
         items = items_by_type
 
@@ -138,7 +141,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
     fetch_portal_item_functions = []
     def fetch_portal_item(uuid: str) -> Optional[dict]:  # noqa
         nonlocal portal, raw, database, items
-        if item := _portal_get_metadata(portal, uuid, raw=raw or inserts, inserts=inserts, database=database):
+        if item := _portal_get(portal, uuid, raw=raw or inserts, inserts=inserts, database=database):
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -146,38 +149,51 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str],
 
 
 @lru_cache(maxsize=1024)
-def _portal_get_metadata(portal: Portal, uuid: str,
-                         raw: bool = False, inserts: bool = False, database: bool = False) -> dict:
+def _portal_get(portal: Portal, uuid: str, metadata: bool = False,
+                raw: bool = False, inserts: bool = False, database: bool = False) -> dict:
     try:
         if inserts is True:
-            return _portal_get_metadata_inserts(portal, uuid, database=database)
+            return _portal_get_inserts(portal, uuid, metadata=metadata, database=database)
         else:
-            return _portal_get_metadata_plain(portal, uuid, raw=raw, database=database)
+            return _portal_get_plain(portal, uuid, metadata=metadata, raw=raw, database=database)
     except Exception:
         pass
     return {}
 
 
+# Note that /files?limit=3 with raw=True given non-raw result.
+# but that /files with raw=True given raw result.
+# and that /files?status=released with raw=True gives error
+# Oh actually should use portal.get not portal.get_metadata for search.
+# These FYI are the same results:
+# portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False).json()
+# portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False)
+# And these FYI are the same results:
+# portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True).json()
+# portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
+
 @lru_cache(maxsize=1024)
-def _portal_get_metadata_inserts(portal: Portal, uuid: str, database: bool = False) -> dict:
+def _portal_get_inserts(portal: Portal, uuid: str, metadata: bool = False, database: bool = False) -> dict:
     try:
         item = None ; item_noraw = None  # noqa
         def fetch_portal_item() -> None:  # noqa
             nonlocal portal, uuid, database, item
-            # Note that /files?limit=3 with raw=True given non-raw result.
-            # but that /files with raw=True given raw result.
-            # and that /files?status=released with raw=True gives error
-            # Oh actually should use portal.get not portal.get_metadata for search.
-            # These FYI are the same results:
-            # portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False).json()
-            # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False)
-            # And these FYI are the same results:
-            # portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True).json()
-            # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
-            item = portal.get_metadata(uuid, raw=True, database=database, raise_exception=False)
+            try:
+                if metadata is True:
+                    item = portal.get_metadata(uuid, raw=True, database=database)
+                else:
+                    item = portal.get(uuid, raw=True, database=database).json()
+            except Exception:
+                pass
         def fetch_portal_item_noraw() -> None:  # noqa
-            nonlocal portal, uuid, database, item_noraw
-            item_noraw = portal.get_metadata(uuid, raw=False, database=database, raise_exception=False)
+            nonlocal portal, uuid, metadata, database, item_noraw
+            try:
+                if metadata is True:
+                    item_noraw = portal.get_metadata(uuid, raw=False, database=database)
+                else:
+                    item_noraw = portal.get_metadata(uuid, raw=False, database=database)
+            except Exception:
+                pass
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=2)
         if isinstance(graph := item.get("@graph"), list):
             if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
@@ -200,10 +216,13 @@ def _portal_get_metadata_inserts(portal: Portal, uuid: str, database: bool = Fal
 
 
 @lru_cache(maxsize=1024)
-def _portal_get_metadata_plain(portal: Portal, uuid: str,
-                               raw: bool = False, database: bool = False, concurrent: bool = True) -> dict:
+def _portal_get_plain(portal: Portal, uuid: str, metadata: bool = False,
+                      raw: bool = False, database: bool = False, concurrent: bool = True) -> dict:
     try:
-        item = portal.get_metadata(uuid, raw=raw, database=database, raise_exception=False)
+        if metadata is True:
+            item = portal.get_metadata(uuid, raw=raw, database=database)
+        else:
+            item = portal.get(uuid, raw=raw, database=database).json()
         if isinstance(graph := item.get("@graph"), list):
             for graph_item in graph:
                 if graph_item_type := get_item_type(graph_item):
