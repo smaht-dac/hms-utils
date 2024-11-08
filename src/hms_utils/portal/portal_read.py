@@ -66,20 +66,7 @@ def main():
         ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
 
-    global _verbose, _debug, _nofunction, _exceptions
-    if not argv.verbose: _verbose = _nofunction  # noqa
-    if not argv.debug: _debug = _nofunction  # noqa
-    if argv.exceptions: _exceptions = True  # noqa
-
-    if argv.debug:
-        original_requests_get = requests.get
-        def requests_get(*args, **kwargs):  # noqa
-            _debug(f"requests.get {chars.dot} args: {args} {chars.dot} {kwargs}")
-            return original_requests_get(*args, **kwargs)
-        requests.get = requests_get
-
-    if argv.argv:
-        _print(json.dumps(argv._dict, indent=4))
+    _setup_debugging(argv)
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
@@ -409,6 +396,23 @@ def _error(message: str) -> None:
 
 def _nofunction(*args, **kwargs) -> None:
     pass
+
+
+def _setup_debugging(argv: ARGV) -> None:
+
+    global _verbose, _debug, _nofunction, _exceptions
+    if not argv.verbose: _verbose = _nofunction  # noqa
+    if not argv.debug: _debug = _nofunction  # noqa
+    if argv.exceptions: _exceptions = True  # noqa
+
+    original_requests_get = requests.get
+    def requests_get(*args, **kwargs):  # noqa
+        _debug(f"requests.get {chars.dot} args: {args} {chars.dot} {kwargs}")
+        return original_requests_get(*args, **kwargs)
+    requests.get = requests_get
+
+    if argv.argv:
+        _print(json.dumps(argv._dict, indent=4))
 
 
 _exceptions = False
