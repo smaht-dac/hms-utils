@@ -115,10 +115,15 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
     return data
 
 
-def sort_dictionary(data: dict, reverse: bool = False, sensitive: bool = False) -> dict:
+def sort_dictionary(data: dict, reverse: bool = False, sensitive: bool = False, lists: bool = False) -> dict:
     """
     Sorts the given dictionary and returns the result; does not change the given dictionary.
     """
+    if isinstance(data, list):
+        sorted_list = []
+        for element in data:
+            sorted_list.append(sort_dictionary(element))
+        return sorted_list
     if not isinstance(data, dict):
         return data
     sorted_data = {}

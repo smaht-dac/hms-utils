@@ -12,16 +12,17 @@ from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
+from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import Portal
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
 
 
 _ITEM_IGNORE_PROPERTIES_INSERTS = [
-    "date_created",
-    "last_modified",
-    "principals_allowed",
-    "submitted_by",
+    # "date_created",
+    # "last_modified",
+    # "principals_allowed",
+    # "submitted_by",
     "schema_version"
 ]
 _ITEM_UUID_PROPERTY_NAME = "uuid"
@@ -48,6 +49,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
         ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--all"],
         ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
+        ARGV.OPTIONAL(bool): ["--sort"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(bool): ["--merge"],
@@ -106,6 +108,9 @@ def main():
             item_list.append(item)
             del item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME]
         items = items_by_type
+
+    if argv.sort:
+        items = sort_dictionary(items)
 
     # TODO: Organize by type at least for --inserts ...
     # object_type = portal.get_schema_type(items)
