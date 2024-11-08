@@ -196,9 +196,10 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
     referenced_items = [] ; ignore_uuids = []  # noqa
     while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
-        referenced_items = _get_portal_items_for_uuids(
+        items = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
-        for item in referenced_items:
+        referenced_items.extend(items)
+        for item in items:
             if item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME):
                 if item_uuid not in ignore_uuids:
                     ignore_uuids.append(item_uuid)
@@ -218,6 +219,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str], me
         nonlocal portal, metadata, raw, database, items
         if item := _portal_get(portal, uuid, metadata=True,
                                raw=raw, inserts=inserts, database=database, nthreads=nthreads):
+            # TODO: make thread-safe.
             items.append(item)
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
