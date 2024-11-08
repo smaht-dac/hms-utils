@@ -41,6 +41,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--metadata"],
         ARGV.OPTIONAL(bool): ["--nometadata"],
         ARGV.OPTIONAL(bool): ["--noformat"],
+        ARGV.OPTIONAL(bool): ["--deleted"],
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
@@ -82,6 +83,8 @@ def main():
         if isinstance(argv.offset, int):
             if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
                 argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
+        if argv.deleted:
+            argv.arg += f"&status=deleted" if "?" in argv.arg else f"?status=deleted"
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
