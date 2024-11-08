@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.4.73"
+version = "1.4.74"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -19,6 +19,7 @@ boto3 = "^1.35.22"
 botocore = "^1.35.14"
 dcicutils = "^8.16.2.1b4"
 importlib = "^1.0.4"
+passlib = "^1.7.4"
 requests = "^2.23.2"
 termcolor = "^2.4.0"
 
@@ -52,9 +53,12 @@ hms-portal-add-consortia-to-items = "hms_utils.portal.oneoff.portal_add_consorti
 hms-portal-read = "hms_utils.portal.portal_read:main"
 hms-portal-write = "hms_utils.portal.portal_write:main"
 
-hms-encrypt= "hms_utils.cli.crypt_cli:main_encrypt"
-hms-decrypt= "hms_utils.cli.crypt_cli:main_decrypt"
+hms-encrypt = "hms_utils.cli.crypt_cli:main_encrypt"
+hms-decrypt = "hms_utils.cli.crypt_cli:main_decrypt"
 
+hms-generate-local-access-key = "hms_utils.portal.generate_local_access_key:main"
+
+# obsolete ...
 hmx-config = "hms_utils.hms_config:main"
 hmx-config-script = "hms_utils.hms_config:main_show_script_path"
 hmx-config-export = "hms_utils.hms_config:main_show_script_path"
