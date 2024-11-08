@@ -68,6 +68,7 @@ from dcicutils.captured_output import captured_output, uncaptured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import get_error_message, PRINT, to_snake_case
 from dcicutils.portal_utils import Portal
+from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import is_uuid
 
@@ -124,6 +125,7 @@ def main():
     parser.add_argument("--summary", action="store_true", required=False, default=False,
                         help="Summary output (for schema only).")
     parser.add_argument("--force", action="store_true", required=False, default=False, help="Debugging output.")
+    parser.add_argument("--sort", action="store_true", required=False, default=False, help="Sort output.")
     parser.add_argument("--terse", action="store_true", required=False, default=False, help="Terse output.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--noheader", action="store_true", required=False, default=False, help="Supress header output.")
@@ -258,6 +260,8 @@ def main():
                 run_concurrently(fetch_reference_functions)
                 for referenced_data in fetch_reference_function_results:
                     add_referenced_data_to_data(referenced_data, data)
+        if args.sort:
+            data = sort_dictionary(data)
         if args.indent > 0:
             _print_output(_format_json_with_indent(data, indent=args.indent))
         else:
