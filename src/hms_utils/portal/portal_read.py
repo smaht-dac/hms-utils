@@ -260,7 +260,7 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
 
 @lru_cache(maxsize=1024)
 def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, database: bool = False,
-                        limit: Optional[int] = None, offset: Optional[int] = None, 
+                        limit: Optional[int] = None, offset: Optional[int] = None,
                         deleted: bool = False,
                         nthreads: Optional[int] = None) -> dict:
     global _exceptions
