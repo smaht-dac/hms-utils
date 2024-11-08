@@ -194,7 +194,7 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
                                  raw: bool = False, inserts: bool = False, database: bool = False,
                                  nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = []  # noqa
-    while referenced_uuids := get_referenced_uuids(item, ignore_uuids=ignore_uuids,
+    while referenced_uuids := get_referenced_uuids(referenced_items or item, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
         items = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
