@@ -79,8 +79,8 @@ from snovault.authentication import (
 )
 from snovault.edw_hash import EDWHash
 from snovault.loadxl import load_all
-from ..project_app import app_project
-from .captured_output import captured_output
+# from ..project_app import app_project
+from dcicutils.captured_output import captured_output
 
 _INSERTS_DIR = "src/encoded/tests/data/master-inserts"
 _USER_INSERTS_FILE = f"{_INSERTS_DIR}/user.json"
@@ -269,8 +269,9 @@ def _hash_secret_like_snovault(secret: str, ini_file: str = _DEFAULT_INI_FILE) -
 def _guess_default_app() -> str:
     # This should return one of: smaht-portal, cgap-portal, or fourfront
     # that is, if running within repos: smaht-portal, cgap-portal, or fourfront
-    repository = app_project().REPO_NAME
-    return repository if repository != "cgap-portal" else "cgap"
+    # repository = app_project().REPO_NAME
+    # return repository if repository != "cgap-portal" else "cgap"
+    return "smaht"
 
 
 def _is_local_portal_running(port: int) -> None:
