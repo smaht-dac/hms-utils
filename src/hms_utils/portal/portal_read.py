@@ -35,7 +35,7 @@ def main():
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
-        ARGV.OPTIONAL(str): ["--output", "--out"],
+        ARGV.OPTIONAL(str): ["--output", "--out", "--o"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--metadata"],
@@ -76,23 +76,17 @@ def main():
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
 
-    if argv.arg.startswith("/"):
-        if isinstance(argv.limit, int):
-            if ("?limit=" not in argv.arg) and ("&limit=" not in argv.arg):
-                argv.arg += f"&limit={argv.limit}" if "?" in argv.arg else f"?limit={argv.limit}"
-        if isinstance(argv.offset, int):
-            if ("?from=" not in argv.arg) and ("&from=" not in argv.arg):
-                argv.arg += f"&from={argv.offset}" if "?" in argv.arg else f"?from={argv.offset}"
-        if argv.deleted:
-            argv.arg += f"&status=deleted" if "?" in argv.arg else f"?status=deleted"
+#   if argv.arg.startswith("/"):
+#       if argv.deleted:
+#           argv.arg += f"&status=deleted" if "?" in argv.arg else f"?status=deleted"
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
     # option or override to use portal.get with the --nometadata option.
     metadata = (argv.metadata or (not argv.arg.startswith("/"))) and (not argv.nometadata)
 
-    if items := _portal_get(portal, argv.arg, metadata=metadata,
-                            raw=argv.raw, inserts=argv.inserts, nthreads=argv.nthreads):
+    if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
+                            limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads):
         if graph := items.get("@graph"):
             items = graph
     if isinstance(items, dict):
@@ -233,16 +227,19 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str], me
 
 @lru_cache(maxsize=1024)
 def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = False,
-                inserts: bool = False, database: bool = False, nthreads: Optional[int] = None) -> dict:
+                inserts: bool = False, database: bool = False,
+                limit: Optional[int] = None, offset: Optional[int] = None, deleted: bool = False,
+                nthreads: Optional[int] = None) -> dict:
     try:
         if inserts is True:
-            return _portal_get_inserts(portal, query, metadata=metadata, database=database, nthreads=nthreads)
+            return _portal_get_inserts(portal, query, metadata=metadata, database=database,
+                                       limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
         elif metadata is True:
             _debug(f"portal.get_metadata {chars.dot} raw: {raw} {chars.dot} database: {database}")
-            return portal.get_metadata(query, raw=raw, database=database)
+            return portal.get_metadata(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted)
         else:
             _debug(f"portal.get {chars.dot} raw: {raw} {chars.dot} database: {database}")
-            return portal.get(query, raw=raw, database=database).json()
+            return portal.get(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted).json()
     except Exception:
         global _exceptions
         if _exceptions: raise  # noqa
@@ -262,8 +259,10 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
 # portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
 
 @lru_cache(maxsize=1024)
-def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
-                        database: bool = False, nthreads: Optional[int] = None) -> dict:
+def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, database: bool = False,
+                        limit: Optional[int] = None, offset: Optional[int] = None, 
+                        deleted: bool = False,
+                        nthreads: Optional[int] = None) -> dict:
     global _exceptions
     try:
         item = None ; item_noraw = None  # noqa
@@ -273,27 +272,31 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False,
                 if metadata is True:
                     _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: True {chars.dot} database: {database}")
-                    item = portal.get_metadata(query, raw=True, database=database)
+                    item = portal.get_metadata(query, raw=True, database=database,
+                                               limit=limit, offset=offset, deleted=deleted)
                 else:
                     _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: True {chars.dot} database: {database}")
-                    item = portal.get(query, raw=True, database=database).json()
+                    item = portal.get(query, raw=True, database=database,
+                                      limit=limit, offset=offset, deleted=deleted).json()
             except Exception:
                 if _exceptions: raise  # noqa
         def fetch_portal_item_noraw() -> None:  # noqa
             # This is to get the non-raw frame item format which has the type information (the raw frame does not).
             nonlocal portal, query, metadata, database, item_noraw
             try:
-                query = (f"{query}&field={_ITEM_UUID_PROPERTY_NAME}"
-                         if ("?" in query) else f"{query}?field={_ITEM_UUID_PROPERTY_NAME}")
                 if metadata is True:
                     _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
-                    item_noraw = portal.get_metadata(query, raw=False, database=database)
+                    item_noraw = portal.get_metadata(query, raw=False, database=database,
+                                                     limit=limit, offset=offset, deleted=deleted,
+                                                     field=_ITEM_UUID_PROPERTY_NAME)
                 else:
                     _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
                            f" raw: False {chars.dot} database: {database}")
-                    item_noraw = portal.get(query, raw=False, database=database).json()
+                    item_noraw = portal.get(query, raw=False, database=database,
+                                            limit=limit, offset=offset, deleted=deleted,
+                                            field=_ITEM_UUID_PROPERTY_NAME).json()
             except Exception:
                 if _exceptions: raise  # noqa
         run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
