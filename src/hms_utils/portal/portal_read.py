@@ -4,6 +4,7 @@ from functools import lru_cache
 import io
 import json
 import os
+import requests
 import sys
 from typing import List, Optional, Union
 from dcicutils.captured_output import captured_output
@@ -70,20 +71,26 @@ def main():
     if not argv.debug: _debug = _nofunction  # noqa
     if argv.exceptions: _exceptions = True  # noqa
 
+    if argv.debug:
+        original_requests_get = requests.get
+        def requests_get(*args, **kwargs):  # noqa
+            _debug(f"requests.get {chars.dot} args: {args} {chars.dot} {kwargs}")
+            return original_requests_get(*args, **kwargs)
+        requests.get = requests_get
+
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
 
-#   if argv.arg.startswith("/"):
-#       if argv.deleted:
-#           argv.arg += f"&status=deleted" if "?" in argv.arg else f"?status=deleted"
-
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
     # option or override to use portal.get with the --nometadata option.
     metadata = (argv.metadata or (not argv.arg.startswith("/"))) and (not argv.nometadata)
+
+    if (not metadata) and (not argv.arg.startswith("/")):
+        argv.arg = f"/{argv.arg}"
 
     if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
                             limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads):
