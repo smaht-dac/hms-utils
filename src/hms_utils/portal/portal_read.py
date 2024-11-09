@@ -25,6 +25,7 @@ _ITEM_IGNORE_PROPERTIES_INSERTS = [
     # "submitted_by",
     "schema_version"
 ]
+_ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
@@ -54,7 +55,9 @@ def main():
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(bool): ["--merge"],
         ARGV.OPTIONAL(bool): ["--overwrite"],
+        ARGV.OPTIONAL(bool): ["--sid"],
         ARGV.OPTIONAL(bool): ["--show"],
+        ARGV.OPTIONAL(bool): ["--warnings", "--warn", "--warning"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
@@ -111,6 +114,9 @@ def main():
 
     if argv.sort:
         items = sort_dictionary(items)
+
+    if not argv.sid:
+        _scrub_sids_from_items(items)
 
     # TODO: Organize by type at least for --inserts ...
     # object_type = portal.get_schema_type(items)
@@ -307,13 +313,13 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
                     nonlocal item_noraw, item_noraw_graph
                     for item_element in item_noraw_graph:
                         if item_element.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
-                            return get_item_type(item_element)
+                            return _get_item_type(item_element)
                     return None
                 for graph_item in graph:
                     if graph_item_type := find_item_type(graph_item.get(_ITEM_UUID_PROPERTY_NAME)):
                         graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
         else:
-            if item_type := get_item_type(item_noraw):
+            if item_type := _get_item_type(item_noraw):
                 item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
         return item
     except Exception:
@@ -344,7 +350,21 @@ def _remove_ignored_properties(items: Union[List[dict], dict], ignored_propertie
                 del item[key]
 
 
-def get_item_type(item: dict) -> Optional[str]:
+def _scrub_sids_from_items(items: dict) -> None:
+    if isinstance(items, list):
+        for element in items:
+            _scrub_sids_from_items(element)
+    elif isinstance(items, dict):
+        for key in list(items.keys()):
+            if key == _ITEM_SID_PROPERTY_NAME:
+                _warning(f"Deleting sid from item:"
+                         f" {uuid if (uuid := items.get(_ITEM_UUID_PROPERTY_NAME)) else 'unknown'}")
+                del items[key]
+            else:
+                _scrub_sids_from_items(items[key])
+
+
+def _get_item_type(item: dict) -> Optional[str]:
     if isinstance(item, dict):
         if isinstance(item_types := item.get("@type"), list):
             return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
@@ -396,6 +416,10 @@ def _debug(message: str) -> None:
     _print(f"DEBUG: {message}", file=sys.stderr, flush=True)
 
 
+def _warning(message: str) -> None:
+    _print(f"WARNING: {message}", file=sys.stderr, flush=True)
+
+
 def _error(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr, flush=True)
     sys.exit(1)
@@ -408,6 +432,7 @@ def _nofunction(*args, **kwargs) -> None:
 def _setup_debugging(argv: ARGV) -> None:
 
     global _verbose, _debug, _nofunction, _exceptions
+    if not argv.warnings: _warning = _nofunction  # noqa
     if not argv.verbose: _verbose = _nofunction  # noqa
     if not argv.debug: _debug = _nofunction  # noqa
     if argv.exceptions: _exceptions = True  # noqa
