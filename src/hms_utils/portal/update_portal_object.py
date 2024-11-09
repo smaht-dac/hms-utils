@@ -145,7 +145,7 @@ def main():
     parser.add_argument("--unresolved-output", "--unresolved", type=str,
                         help="Output file to write unresolved references to for --load only.")
     parser.add_argument("--confirm", action="store_true", required=False, default=False, help="Confirm before action.")
-    parser.add_argument("--skip-links", action="store_true", required=False, default=False,
+    parser.add_argument("--skip-links", "--skiplinks", action="store_true", required=False, default=False,
                         help="Use skip_links=true for --load.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--quiet", action="store_true", required=False, default=False, help="Quiet output.")
