@@ -145,6 +145,8 @@ def main():
     parser.add_argument("--unresolved-output", "--unresolved", type=str,
                         help="Output file to write unresolved references to for --load only.")
     parser.add_argument("--confirm", action="store_true", required=False, default=False, help="Confirm before action.")
+    parser.add_argument("--skip-links", action="store_true", required=False, default=False,
+                        help="Use skip_links=true for --load.")
     parser.add_argument("--verbose", action="store_true", required=False, default=False, help="Verbose output.")
     parser.add_argument("--quiet", action="store_true", required=False, default=False, help="Quiet output.")
     parser.add_argument("--noprogress", action="store_true", required=False, default=False,
@@ -167,7 +169,7 @@ def main():
 
     if args.load:
         _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
-                   unresolved_output=args.unresolved_output,
+                   unresolved_output=args.unresolved_output, skip_links=args.skip_links,
                    verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
 
     if explicit_schema_name := args.schema:
@@ -406,7 +408,7 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
 
 def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
                unresolved_output: Optional[str] = False,
-               verbose: bool = False, debug: bool = False, noprogress: bool = False,
+               skip_links: bool = False, verbose: bool = False, debug: bool = False, noprogress: bool = False,
                _single_insert_file: Optional[str] = None) -> bool:
 
     import snovault.loadxl
@@ -450,6 +452,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
 
         for item in LoadGenWrapper(load_all_gen(testapp=portal.vapp, inserts=inserts_directory,
                                                 docsdir=None, overwrite=True, verbose=True,
+                                                skip_links=skip_links,
                                                 continue_on_exception=True)):
             loadxl_total_item_count += 1
             item = decode_bytes(item)
@@ -555,7 +558,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                         json.dump(data, f)
                     return _load_data(portal=portal, load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
                                       unresolved_output=unresolved_output,
-                                      verbose=verbose, debug=debug, noprogress=noprogress,
+                                      skip_links=skip_links, verbose=verbose, debug=debug, noprogress=noprogress,
                                       _single_insert_file=inserts_file)
             elif isinstance(data, dict):
                 if schema_name := explicit_schema_name:
@@ -586,7 +589,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                     if nfiles > 0:
                         return _load_data(portal=portal, load=tmpdir, ini_file=ini_file,
                                           unresolved_output=unresolved_output,
-                                          verbose=verbose, debug=debug, noprogress=noprogress,
+                                          skip_links=skip_links, verbose=verbose, debug=debug, noprogress=noprogress,
                                           _single_insert_file=inserts_file)
                 return True
             else:
