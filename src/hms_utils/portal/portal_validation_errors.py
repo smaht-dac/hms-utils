@@ -8,6 +8,7 @@ def main():
 
     argv = ARGV({
         ARGV.REQUIRED(str): "--env",
+        ARGV.OPTIONAL(bool): ["--details", "--detail", "--verbose"],
         ARGV.OPTIONAL(bool): "--sid",
         ARGV.OPTIONAL(bool): "--sid-reindex",
         ARGV.OPTIONAL([str]): "uuids"
@@ -32,11 +33,12 @@ def main():
             if isinstance(item, dict) and (item_uuid := item.get("uuid")):
                 if (item_type := portal.get_schema_type(item)) not in ignored_types:
                     print(f"{item_uuid}: {item_type}")
-                    if item := portal.get_metadata(item_uuid):
-                        if _check_for_validation_errors(item, sid=argv.sid):
-                            if argv.sid and argv.sid_reindex:
-                                uuids_with_sid_error.append(item.get("uuid"))
-                            status = 1
+                    status = 1
+                    if argv.sid or argv.sid_reindex or argv.details:
+                        if item := portal.get_metadata(item_uuid):
+                            if _check_for_validation_errors(item, sid=argv.sid):
+                                if argv.sid and argv.sid_reindex:
+                                    uuids_with_sid_error.append(item.get("uuid"))
 
     if uuids_with_sid_error:
         for uuid_with_sid_error in uuids_with_sid_error:
