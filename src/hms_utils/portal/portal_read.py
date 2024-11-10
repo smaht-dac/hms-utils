@@ -41,12 +41,13 @@ class Portal(PortalFromUtils):
         "submitted_by"
     ]
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, exceptions: bool = False, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._get_call_count = 0
         self._get_metadata_call_count = 0
         self._get_call_duration = 0
         self._get_metadata_call_duration = 0
+        self._exceptions = exceptions is True
         self._ignored_properties = Portal._ITEM_IGNORED_PROPERTIES_INSERTS
 
     @property
@@ -98,8 +99,7 @@ class Portal(PortalFromUtils):
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
                 self._get_call_duration += time.time() - started
         except Exception:
-            global _exceptions
-            if _exceptions:
+            if self._exceptions:
                 raise
         if self._ignored_properties:
             Portal._remove_properties_from_items(items, self._ignored_properties)
@@ -470,10 +470,14 @@ def _contains_uuid(data: Union[dict, list], uuid: str) -> bool:
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
                    ping: bool = True, show: bool = False, verbose: bool = False, debug: bool = False) -> Portal:
+    global _exceptions
     portal = None ; error = None  # noqa
     with captured_output(not debug):
         try:
-            portal = Portal(env, app=app) if env or app else Portal(ini)
+            if env or app:
+                portal = Portal(env, app=app, exceptions=_exceptions)
+            else:
+                portal = Portal(ini, exceptions=_exceptions)
         except Exception as e:
             error = e
     if error:
