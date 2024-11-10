@@ -62,7 +62,8 @@ def main():
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
-        ARGV.OPTIONAL(int, 32): ["--nthreads", "--threads"],
+        ARGV.OPTIONAL(int, 50): ["--nthreads", "--threads"],
+        ARGV.OPTIONAL(bool): ["--sanity-check", "--sanity"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
@@ -147,6 +148,12 @@ def main():
     else:
         _print(json.dumps(items, indent=4))
 
+    if argv.refs and argv.sanity_check:
+        if missing_items_referenced := _sanity_check_missing_items_referenced(items):
+            _print("Missing items for referenced items found: {len(missing_items_referenced)}")
+            if argv.verbose:
+                _print(missing_items_referenced)
+
 
 def _print_items_inserts(items: dict, output_directory: str,
                          overwrite: bool = False, merge: bool = False, noformat: bool = False) -> None:
@@ -199,13 +206,13 @@ def _print_items_inserts(items: dict, output_directory: str,
 def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = False,
                                  raw: bool = False, inserts: bool = False, database: bool = False,
                                  nthreads: Optional[int] = None) -> List[dict]:
-    referenced_items = [] ; ignore_uuids = []  # noqa
-    while referenced_uuids := get_referenced_uuids(referenced_items or item, ignore_uuids=ignore_uuids,
+    referenced_items = [] ; ignore_uuids = [] ; referenced_items_batch = item  # noqa
+    while referenced_uuids := get_referenced_uuids(referenced_items_batch, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
-        items = _get_portal_items_for_uuids(
+        referenced_items_batch = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
-        referenced_items.extend(items)
-        for item in items:
+        referenced_items.extend(referenced_items_batch)
+        for item in referenced_items_batch:
             if item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME):
                 if item_uuid not in ignore_uuids:
                     ignore_uuids.append(item_uuid)
@@ -242,10 +249,16 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
             return _portal_get_inserts(portal, query, metadata=metadata, database=database,
                                        limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
         elif metadata is True:
-            _debug(f"portal.get_metadata {chars.dot} raw: {raw} {chars.dot} database: {database}")
+            _debug(f"portal.get_metadata: {query}{f' {chars.dot} raw' if raw else ''}"
+                   f"{f' {chars.dot} database' if database else ''}"
+                   f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                   f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
             return portal.get_metadata(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted)
         else:
-            _debug(f"portal.get {chars.dot} raw: {raw} {chars.dot} database: {database}")
+            _debug(f"portal.get: {query}{f' {chars.dot} raw' if raw else ''}"
+                   f"{f' {chars.dot} database' if database else ''}"
+                   f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                   f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
             return portal.get(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted).json()
     except Exception:
         global _exceptions
@@ -277,13 +290,17 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
             nonlocal portal, query, database, item
             try:
                 if metadata is True:
-                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
-                           f" raw: True {chars.dot} database: {database}")
+                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts/raw"
+                           f"{f' {chars.dot} database' if database else ''}"
+                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
                     item = portal.get_metadata(query, raw=True, database=database,
                                                limit=limit, offset=offset, deleted=deleted)
                 else:
-                    _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
-                           f" raw: True {chars.dot} database: {database}")
+                    _debug(f"portal.get : {query} {chars.dot} inserts/raw"
+                           f"{f' {chars.dot} database' if database else ''}"
+                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
                     item = portal.get(query, raw=True, database=database,
                                       limit=limit, offset=offset, deleted=deleted).json()
             except Exception:
@@ -293,14 +310,18 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
             nonlocal portal, query, metadata, database, item_noraw
             try:
                 if metadata is True:
-                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts: True {chars.dot}"
-                           f" raw: False {chars.dot} database: {database}")
+                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts"
+                           f"{f' {chars.dot} database' if database else ''}"
+                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
                     item_noraw = portal.get_metadata(query, raw=False, database=database,
                                                      limit=limit, offset=offset, deleted=deleted,
                                                      field=_ITEM_UUID_PROPERTY_NAME)
                 else:
-                    _debug(f"portal.get: {query} {chars.dot} inserts: True {chars.dot}"
-                           f" raw: False {chars.dot} database: {database}")
+                    _debug(f"portal.get: {query} {chars.dot} inserts"
+                           f"{f' {chars.dot} database' if database else ''}"
+                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
                     item_noraw = portal.get(query, raw=False, database=database,
                                             limit=limit, offset=offset, deleted=deleted,
                                             field=_ITEM_UUID_PROPERTY_NAME).json()
@@ -370,6 +391,31 @@ def _get_item_type(item: dict) -> Optional[str]:
             return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
         return item_types if isinstance(item_types, str) and item_types else None
     return None
+
+
+def _sanity_check_missing_items_referenced(data: Union[dict, list]) -> List[str]:
+    missing_items_referenced = []
+    for referenced_uuid in get_referenced_uuids(data):
+        if not _contains_uuid(data, referenced_uuid):
+            missing_items_referenced.append(referenced_uuid)
+    return missing_items_referenced
+
+
+def _contains_uuid(data: Union[dict, list], uuid: str) -> bool:
+    def contains_uuid(data: Union[dict, list]) -> bool:
+        nonlocal uuid
+        if isinstance(data, list):
+            for element in data:
+                if contains_uuid(element):
+                    return True
+        elif isinstance(data, dict):
+            if data.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
+                return True
+            for value in data.values():
+                if isinstance(value, (dict, list)):
+                    if contains_uuid(value):
+                        return True
+    return contains_uuid(data) if is_uuid(uuid) else False
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
