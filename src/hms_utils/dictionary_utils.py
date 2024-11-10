@@ -4,6 +4,7 @@ import io
 import json
 import os
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
+from hms_utils.type_utils import to_non_empty_string_list
 
 
 def print_dictionary_tree(data: dict,
@@ -113,6 +114,23 @@ def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = 
         keys = path.split('/')
         delete(data, keys)
     return data
+
+
+def delete_properties_from_dictionaries(data: Union[List[dict], dict], properties: List[str]) -> None:
+    """
+    Deletes, in place, from the given dictionary or list, recursively, and/all properties
+    within dictionaries with a name which is in the list of given properties.
+    """
+    if properties := to_non_empty_string_list(properties):
+        if isinstance(data, list):
+            for element in data:
+                delete_properties_from_dictionaries(element, properties)
+        elif isinstance(data, dict):
+            for key in list(data.keys()):
+                if key in properties:
+                    del data[key]
+                else:
+                    delete_properties_from_dictionaries(data[key], properties)
 
 
 def sort_dictionary(data: dict, reverse: bool = False, sensitive: bool = False, lists: bool = False) -> dict:

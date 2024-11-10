@@ -14,10 +14,11 @@ from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import format_duration
-from hms_utils.dictionary_utils import sort_dictionary
+from hms_utils.dictionary_utils import delete_properties_from_dictionaries, sort_dictionary
 from hms_utils.portal.portal_utils import PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
+from hms_utils.type_utils import contains_uuid, get_referenced_uuids, get_uuids, is_uuid, to_non_empty_string_list
+from hms_utils.version_utils import get_version
 
 _ITEM_IGNORED_PROPERTIES_INSERTS = [
     "date_created",
@@ -100,20 +101,16 @@ class Portal(PortalFromUtils):
             if self._exceptions:
                 raise
         if self._ignored_properties:
-            Portal._remove_properties_from_items(items, self._ignored_properties)
+            delete_properties_from_dictionaries(items, self._ignored_properties)
         return items
 
     @staticmethod
-    def _remove_properties_from_items(items: Union[List[dict], dict], properties: List[str]) -> None:
-        if isinstance(items, list):
-            for element in items:
-                Portal._remove_properties_from_items(element, properties)
-        elif isinstance(items, dict):
-            for key in list(items.keys()):
-                if key in properties:
-                    del items[key]
-                else:
-                    Portal._remove_properties_from_items(items[key], properties)
+    def get_item_type(item: dict) -> Optional[str]:
+        if isinstance(item, dict):
+            if isinstance(item_types := item.get("@type"), list):
+                return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
+            return item_types if isinstance(item_types, str) and item_types else None
+        return None
 
 
 def main():
@@ -158,6 +155,9 @@ def main():
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
     })
+
+    if argv.version:
+        print(f"hms-portal-read: {get_version()}")
 
     _setup_debugging(argv)
 
@@ -242,7 +242,7 @@ def main():
             _verbose(f" OK {chars.check}")
 
     _verbose(f"Total fetched Portal items:"
-             f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
+             f" {len(get_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
     if argv.timing or argv.debug:
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
               f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
@@ -381,27 +381,15 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
                 nonlocal item_noraw, item_noraw_graph
                 for item_element in item_noraw_graph:
                     if item_element.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
-                        return _get_item_type(item_element)
+                        return Portal.get_item_type(item_element)
                 return None
             for graph_item in graph:
                 if graph_item_type := find_item_type(graph_item.get(_ITEM_UUID_PROPERTY_NAME)):
                     graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
     else:
-        if item_type := _get_item_type(item_noraw):
+        if item_type := Portal.get_item_type(item_noraw):
             item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
     return item
-
-
-def _get_uuids_from_value(value: str) -> List[str]:
-    uuids = []
-    if isinstance(value, str):
-        if is_uuid(value):
-            uuids.append(value)
-        else:
-            for component in value.split("/"):
-                if is_uuid(component := component.strip()):
-                    uuids.append(component)
-    return uuids
 
 
 def _scrub_sids_from_items(items: dict) -> None:
@@ -418,56 +406,12 @@ def _scrub_sids_from_items(items: dict) -> None:
                 _scrub_sids_from_items(items[key])
 
 
-def _get_item_type(item: dict) -> Optional[str]:
-    if isinstance(item, dict):
-        if isinstance(item_types := item.get("@type"), list):
-            return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
-        return item_types if isinstance(item_types, str) and item_types else None
-    return None
-
-
 def _sanity_check_missing_items_referenced(data: Union[dict, list]) -> List[str]:
     missing_items_referenced = []
     for referenced_uuid in get_referenced_uuids(data):
-        if not _contains_uuid(data, referenced_uuid):
+        if not contains_uuid(data, referenced_uuid):
             missing_items_referenced.append(referenced_uuid)
     return missing_items_referenced
-
-
-def _get_item_uuids(data: Union[dict, list]) -> List[str]:
-    item_uuids = []
-    def get_item_uuids(data: Union[dict, list]) -> None:  # noqa
-        nonlocal item_uuids
-        if isinstance(data, list):
-            for element in data:
-                get_item_uuids(element)
-        elif isinstance(data, dict):
-            if uuid := data.get(_ITEM_UUID_PROPERTY_NAME):
-                if is_uuid(uuid) and (uuid not in item_uuids):
-                    item_uuids.append(uuid)
-            else:
-                for value in data.values():
-                    if isinstance(value, (dict, list)):
-                        get_item_uuids(value)
-    get_item_uuids(data)
-    return item_uuids
-
-
-def _contains_uuid(data: Union[dict, list], uuid: str) -> bool:
-    def contains_uuid(data: Union[dict, list]) -> bool:
-        nonlocal uuid
-        if isinstance(data, list):
-            for element in data:
-                if contains_uuid(element):
-                    return True
-        elif isinstance(data, dict):
-            if data.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
-                return True
-            for value in data.values():
-                if isinstance(value, (dict, list)):
-                    if contains_uuid(value):
-                        return True
-    return contains_uuid(data) if is_uuid(uuid) else False
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
