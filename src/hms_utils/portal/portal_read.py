@@ -29,6 +29,8 @@ _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
+_exceptions = False
+
 
 class Portal(PortalFromUtils):
 
@@ -150,6 +152,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
         ARGV.OPTIONAL(int, 50): ["--nthreads", "--threads"],
         ARGV.OPTIONAL(bool): ["--sanity-check", "--sanity"],
+        ARGV.OPTIONAL(bool): ["--timing", "--time", "--times"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
@@ -238,9 +241,10 @@ def main():
 
     _verbose(f"Total fetched Portal items:"
              f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
-    _debug(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
-           f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
-    _debug(f"Calls to portal.get: {portal.get_call_count} {chars.dot} {format_duration(portal.get_call_duration)}")
+    if argv.timing or argv.debug:
+        _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
+              f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
+        _info(f"Calls to portal.get: {portal.get_call_count} {chars.dot} {format_duration(portal.get_call_duration)}")
 
 
 def _print_items_inserts(items: dict, output_directory: str,
@@ -338,8 +342,6 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
     else:
         items = portal.GET(query, metadata=metadata, raw=raw,
                            database=database, limit=limit, offset=offset, deleted=deleted)
-#   if isinstance(_portal_ignore_properties, list):
-#       _remove_properties_from_items(items, _portal_ignore_properties)
     return items
 
 
@@ -502,6 +504,10 @@ def _print(*args, **kwargs) -> None:
     print(*args, **kwargs)
 
 
+def _info(*args, **kwargs) -> None:
+    _print(*args, **kwargs, file=sys.stderr, flush=True)
+
+
 def _verbose(*args, **kwargs) -> None:
     _print(*args, **kwargs, file=sys.stderr, flush=True)
 
@@ -550,9 +556,6 @@ def _setup_debugging(argv: ARGV) -> None:
 
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
-
-
-_exceptions = False
 
 
 if __name__ == "__main__":
