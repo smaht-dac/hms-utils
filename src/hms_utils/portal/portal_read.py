@@ -6,16 +6,17 @@ import os
 import requests
 import sys
 import time
-from typing import Any, List, Optional, Set, Tuple, Union
+from typing import List, Optional, Set, Tuple, Union
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import format_duration
-from hms_utils.dictionary_utils import delete_properties_from_dictionaries, sort_dictionary
+from hms_utils.dictionary_utils import contains_uuid, delete_properties_from_dictionaries, find_dictionary_item
+from hms_utils.dictionary_utils import get_uuids, get_referenced_uuids, sort_dictionary
 from hms_utils.portal.portal_utils import Portal as PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.type_utils import contains_uuid, get_referenced_uuids, get_uuids, is_uuid
+from hms_utils.type_utils import is_uuid
 from hms_utils.version_utils import get_version
 
 _ITEM_SID_PROPERTY_NAME = "sid"
@@ -231,7 +232,7 @@ def main():
         else:
             _verbose(f" OK {chars.check}")
 
-    _verbose(f"Total fetched Portal items:"
+    _verbose(f"Total items fetched:"
              f" {len(get_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
     if argv.timing or argv.debug:
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
@@ -279,9 +280,9 @@ def _print_items_inserts(items: dict, output_directory: str, noformat: bool = Fa
                     if merge_into_output_file:
                         merge_identifying_property_name = "uuid"
                         for item in item_type_items:
-                            if (i := _find_item(existing_items,
-                                                property_value=item.get(merge_identifying_property_name),
-                                                property_name=merge_identifying_property_name)) is not None:
+                            if (i := find_dictionary_item(existing_items,
+                                                          property_value=item.get(merge_identifying_property_name),
+                                                          property_name=merge_identifying_property_name)) is not None:
                                 existing_items[i] = item
                             else:
                                 existing_items.append(item)
@@ -392,22 +393,6 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
         if item_type := Portal.get_item_type(item_noraw):
             item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
     return item
-
-
-def _find_item(items: List[dict], property_value: Any, property_name: Optional[str] = None) -> Optional[int]:
-    """
-    Finds the (first) dictionary in the given list whose "uuid" property (or the property named
-    by the given property_name) value matches the given property_value and returns its list index,
-    if found; if not found then returns None.
-    """
-    if isinstance(items, list) and (property_value is not None):
-        if not (isinstance(property_name, str) and property_name):
-            property_name = _ITEM_UUID_PROPERTY_NAME
-        for i in range(len(items)):
-            if isinstance(item := items[i], dict):
-                if item.get(property_name) == property_value:
-                    return i
-    return None
 
 
 def _scrub_sids_from_items(items: dict) -> None:

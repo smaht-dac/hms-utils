@@ -1,10 +1,11 @@
 from __future__ import annotations
 from copy import deepcopy
+import glob
 import io
 import json
 import os
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
-from hms_utils.type_utils import to_non_empty_string_list
+from hms_utils.type_utils import is_uuid, to_non_empty_string_list
 
 
 def print_dictionary_tree(data: dict,
@@ -159,6 +160,142 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
             if raise_exception is True:
                 raise e
         return None
+
+
+def get_referenced_uuids(item: Union[dict, List[dict]],
+                         ignore_uuids: Optional[List[str]] = None,
+                         exclude_uuid: bool = False, uuid_property_name: Optional[str] = None,
+                         include_paths: bool = False) -> List[str]:
+    """
+    Returns a list of uuids which appear as a value anywhere, recursively, within the given
+    dictionary or list. But ignores any which are in the given ignore_uuids list. If the
+    given exclude_uuid flag is set then ignores values of dictionary properties whose key
+    is named "uuid" (or named for the give uuid_property_name). If the given included_paths
+    flag is set then also looks for uuid values as a part of slash-separated path values.
+    """
+    referenced_uuids = []
+    def find_referenced_uuids(item: Any) -> None:  # noqa
+        nonlocal referenced_uuids, ignore_uuids
+        if isinstance(item, dict):
+            for value in item.values():
+                find_referenced_uuids(value)
+        elif isinstance(item, (list, tuple)):
+            for element in item:
+                find_referenced_uuids(element)
+        elif uuids := get_uuids_from_value(item):
+            for uuid in uuids:
+                if (uuid not in ignore_uuids) and (uuid not in referenced_uuids):
+                    referenced_uuids.append(uuid)
+    def get_uuids_from_value(value: str) -> List[str]:  # noqa
+        uuids = []
+        if isinstance(value, str):
+            if is_uuid(value):
+                uuids.append(value)
+            elif include_paths is True:
+                for component in value.split("/"):
+                    if is_uuid(component := component.strip()):
+                        uuids.append(component)
+        return uuids
+    if not isinstance(ignore_uuids, list):
+        ignore_uuids = []
+    if not (isinstance(uuid_property_name, str) and uuid_property_name):
+        uuid_property_name = "uuid"
+    if isinstance(item, dict):
+        if (exclude_uuid is True) and (uuid := item.get(uuid_property_name)) and (uuid not in ignore_uuids):
+            ignore_uuids.append(uuid)
+    elif isinstance(item, list):
+        for element in item:
+            if (exclude_uuid is True) and (uuid := element.get(uuid_property_name)) and (uuid not in ignore_uuids):
+                ignore_uuids.append(uuid)
+    find_referenced_uuids(item)
+    return referenced_uuids
+
+
+def get_referenced_uuids_from_file(file: str,
+                                   ignore_uuids: Optional[List[str]] = None, exclude_uuid: bool = False) -> List[str]:
+    try:
+        with io.open(file, "r") as f:
+            return get_referenced_uuids(json.load(f), ignore_uuids=ignore_uuids, exclude_uuid=exclude_uuid)
+    except Exception:
+        return []
+
+
+def get_referenced_uuids_from_files(directory: str,
+                                    ignore_uuids: Optional[List[str]] = None, exclude_uuid: bool = False) -> List[str]:
+    referenced_uuids = []
+    try:
+        for file in glob.glob(os.path.join(directory, '*.json')):
+            for uuid in get_referenced_uuids_from_file(file, ignore_uuids=ignore_uuids, exclude_uuid=exclude_uuid):
+                if uuid not in referenced_uuids:
+                    referenced_uuids.append(uuid)
+    except Exception:
+        pass
+    return referenced_uuids
+
+
+def get_uuids(data: Union[dict, list], uuid_property_name: Optional[str] = None) -> List[str]:
+    """
+    Returns a list of uuids which appear as a values of properties with a key named "uuid" (or
+    name for the given uuid_property_name), recursively, within the given dictionary or list.
+    """
+    uuids = []
+    def get_uuids(data: Union[dict, list]) -> None:  # noqa
+        nonlocal uuids, uuid_property_name
+        if isinstance(data, list):
+            for element in data:
+                get_uuids(element)
+        elif isinstance(data, dict):
+            if uuid := data.get(uuid_property_name):
+                if is_uuid(uuid) and (uuid not in uuids):
+                    uuids.append(uuid)
+            else:
+                for value in data.values():
+                    if isinstance(value, (dict, list)):
+                        get_uuids(value)
+    if not (isinstance(uuid_property_name, str) and uuid_property_name):
+        uuid_property_name = "uuid"
+    get_uuids(data)
+    return uuids
+
+
+def contains_uuid(data: Union[dict, list], uuid: str, uuid_property_name: Optional[str] = None) -> bool:
+    """
+    Returns true iff the given dictionary or list contains, recursively, a dictionary
+    property named "uuid" (or named for the given uuid_property_name) which has a
+    value which is equal to the given uuid value; otherwise returns false.
+    """
+    def contains_uuid(data: Union[dict, list]) -> bool:
+        nonlocal uuid
+        if isinstance(data, list):
+            for element in data:
+                if contains_uuid(element):
+                    return True
+        elif isinstance(data, dict):
+            if data.get(uuid_property_name) == uuid:
+                return True
+            for value in data.values():
+                if isinstance(value, (dict, list)):
+                    if contains_uuid(value):
+                        return True
+    if not (isinstance(uuid_property_name, str) and uuid_property_name):
+        uuid_property_name = "uuid"
+    return contains_uuid(data) if is_uuid(uuid) else False
+
+
+def find_dictionary_item(items: List[dict], property_value: Any, property_name: Optional[str] = None) -> Optional[int]:
+    """
+    Finds the (first) dictionary in the given list whose "uuid" property (or the property named
+    by the given property_name) value matches the given property_value and returns its list index,
+    if found; if not found then returns None.
+    """
+    if isinstance(items, list) and (property_value is not None):
+        if not (isinstance(property_name, str) and property_name):
+            property_name = "uuid"
+        for i in range(len(items)):
+            if isinstance(item := items[i], dict):
+                if item.get(property_name) == property_value:
+                    return i
+    return None
 
 
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
