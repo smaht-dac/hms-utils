@@ -122,11 +122,6 @@ def main():
     if not argv.sid:
         _scrub_sids_from_items(items)
 
-    # TODO: Organize by type at least for --inserts ...
-    # object_type = portal.get_schema_type(items)
-    # if argv.debug:
-    #     _print(f"OBJECT TYPE: {object_type}")
-
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
             _print_items_inserts(items, argv.output, overwrite=argv.overwrite, merge=argv.merge, noformat=argv.noformat)
@@ -152,21 +147,20 @@ def main():
         _print(json.dumps(items, indent=4))
 
     if argv.refs and argv.sanity_check:
-        if argv.verbose:
-            _print("Sanity checking for missing referenced items.")
+        _verbose("Sanity checking for missing referenced items ...", end="")
         if missing_items_referenced := _sanity_check_missing_items_referenced(items):
-            _print("Missing items for referenced items found: {len(missing_items_referenced)}")
+            _verbose("")
+            _error("Missing items for referenced items found: {len(missing_items_referenced)}", exit=False)
             if argv.verbose:
-                _print(missing_items_referenced)
-        elif argv.verbose:
-            _print(f"No missing referenced items {chars.check}")
+                _verbose(missing_items_referenced)
+        else:
+            _verbose(f" OK {chars.check}")
 
-    if argv.verbose:
-        global _portal_get_count, _portal_get_metadata_count
-        _print(f"Total items: {len(_get_item_uuids(items))}")
-        _print(f"Total referenced items: {len(get_referenced_uuids(items))}")
-        _print(f"Calls to portal.get_metadata: {_portal_get_metadata_count}")
-        _print(f"Calls to portal.get: {_portal_get_count}")
+    global _portal_get_count, _portal_get_metadata_count
+    _verbose(f"Total fetched Portal items:"
+             f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
+    _debug(f"Calls to portal.get_metadata: {_portal_get_metadata_count}")
+    _debug(f"Calls to portal.get: {_portal_get_count}")
 
 
 def _print_items_inserts(items: dict, output_directory: str,
@@ -508,9 +502,10 @@ def _warning(message: str) -> None:
     _print(f"WARNING: {message}", file=sys.stderr, flush=True)
 
 
-def _error(message: str) -> None:
+def _error(message: str, exit: bool = True) -> None:
     print(f"ERROR: {message}", file=sys.stderr, flush=True)
-    sys.exit(1)
+    if exit is not False:
+        sys.exit(1)
 
 
 def _nofunction(*args, **kwargs) -> None:
