@@ -527,7 +527,17 @@ def _setup_debugging(argv: ARGV) -> None:
 
     original_requests_get = requests.get
     def requests_get(*args, **kwargs):  # noqa
-        _debug(f"requests.get {chars.dot} args: {args} {chars.dot} {kwargs}")
+        if isinstance(args, tuple) and (len(args) > 0):
+            message = f"{args[0]}"
+        else:
+            message = str(args)
+        if ((kwargs.get("headers", {}).get("Content-type") == "application/json") and
+            (kwargs.get("headers", {}).get("Accept") == "application/json") and
+            isinstance(auth := kwargs.get("auth"), tuple) and (len(auth) > 0) and (auth := auth[0])):  # noqa
+            message += f" {chars.dot} stanard headers {chars.dot} key: {auth[0:2] + '******'}"
+        else:
+            message += f" {chars.dot} {str(kwargs)}"
+        _debug(f"request.get: {message}")
         return original_requests_get(*args, **kwargs)
     requests.get = requests_get
 
