@@ -7,7 +7,7 @@ import os
 import requests
 import sys
 import time
-from typing import List, Optional, Union
+from typing import List, Optional, Set, Tuple, Union
 from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
@@ -116,7 +116,7 @@ class Portal(PortalFromUtils):
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["arg"],
+        ARGV.REQUIRED(str): ["query"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
@@ -174,12 +174,12 @@ def main():
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
     # option or override to use portal.get with the --nometadata option.
-    metadata = (argv.metadata or (not argv.arg.startswith("/"))) and (not argv.nometadata)
+    metadata = (argv.metadata or (not argv.query.startswith("/"))) and (not argv.nometadata)
 
-    if (not metadata) and (not argv.arg.startswith("/")):
-        argv.arg = f"/{argv.arg}"
+    if (not metadata) and (not argv.query.startswith("/")):
+        argv.query = f"/{argv.query}"
 
-    if items := _portal_get(portal, argv.arg, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
+    if items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
                             limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads):
         if graph := items.get("@graph"):
             items = graph
@@ -198,7 +198,7 @@ def main():
             if not (item_list := items_by_type.get(item_type)):
                 items_by_type[item_type] = (item_list := [])
             item_list.append(item)
-            del item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME]
+            item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
         items = items_by_type
 
     if argv.sort:
@@ -235,7 +235,7 @@ def main():
         _verbose("Sanity checking for missing referenced items ...", end="")
         if missing_items_referenced := _sanity_check_missing_items_referenced(items):
             _verbose("")
-            _error("Missing items for referenced items found: {len(missing_items_referenced)}", exit=False)
+            _error(f"Missing items for referenced items found: {len(missing_items_referenced)}", exit=False)
             if argv.verbose:
                 _verbose(missing_items_referenced)
         else:
@@ -300,9 +300,12 @@ def _print_items_inserts(items: dict, output_directory: str,
 def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = False,
                                  raw: bool = False, inserts: bool = False, database: bool = False,
                                  nthreads: Optional[int] = None) -> List[dict]:
-    referenced_items = [] ; ignore_uuids = [] ; referenced_items_batch = item  # noqa
+    referenced_items = [] ; ignore_uuids = [] ; referenced_items_batch = item ; referenced_uuids_last = None  # noqa
     while referenced_uuids := get_referenced_uuids(referenced_items_batch, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True):
+        if (referenced_uuids := set(referenced_uuids)) == referenced_uuids_last:
+            break
+        referenced_uuids_last = referenced_uuids
         referenced_items_batch = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
         referenced_items.extend(referenced_items_batch)
@@ -313,11 +316,11 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
     return referenced_items
 
 
-def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], str], metadata: bool = False,
-                                raw: bool = False, inserts: bool = False, database: bool = False,
-                                nthreads: Optional[int] = None) -> List[dict]:
+def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], Set[str], Tuple[str], str],
+                                metadata: bool = False, raw: bool = False, inserts: bool = False,
+                                database: bool = False, nthreads: Optional[int] = None) -> List[dict]:
     items = []
-    if not isinstance(uuids, list):
+    if not isinstance(uuids, (list, set, tuple)):
         if not is_uuid(uuids):
             return []
         uuids = [uuids]
