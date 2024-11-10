@@ -7,7 +7,7 @@ import os
 import requests
 import sys
 import time
-from typing import List, Optional, Set, Tuple, Union
+from typing import Any, List, Optional, Set, Tuple, Union
 from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
@@ -130,6 +130,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--sort"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
+        ARGV.OPTIONAL(bool): ["--append"],
         ARGV.OPTIONAL(bool): ["--merge"],
         ARGV.OPTIONAL(bool): ["--overwrite"],
         ARGV.OPTIONAL(bool): ["--sid"],
@@ -204,7 +205,8 @@ def main():
 
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
-            _print_items_inserts(items, argv.output, overwrite=argv.overwrite, merge=argv.merge, noformat=argv.noformat)
+            _print_items_inserts(items, argv.output, noformat=argv.noformat,
+                                 append=argv.append, overwrite=argv.overwrite, merge=argv.merge)
         else:
             overwriting_output_file = False
             if os.path.isdir(argv.output):
@@ -244,37 +246,54 @@ def main():
         _info(f"Calls to portal.get: {portal.get_call_count} {chars.dot} {format_duration(portal.get_call_duration)}")
 
 
-def _print_items_inserts(items: dict, output_directory: str,
-                         overwrite: bool = False, merge: bool = False, noformat: bool = False) -> None:
+def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False,
+                         append: bool = False, merge: bool = False, overwrite: bool = False) -> None:
     os.makedirs(output_directory, exist_ok=True)
     for item_type in items:
         item_type_items = items[item_type]
         output_file = os.path.join(output_directory, f"{to_snake_case(item_type)}.json")
+        append_to_output_file = False
         merge_into_output_file = False
         overwriting_output_file = False
         if os.path.exists(output_file):
-            if merge:
+            if append:
+                append_to_output_file = True
+            elif merge:
                 merge_into_output_file = True
             elif overwrite:
                 overwriting_output_file = True
             else:
                 _print(f"Specified output file already exists: {output_file} {chars.dot}")
-                if not yes_or_no("Overwrite this file?"):
-                    if not yes_or_no("Merge into this file?"):
-                        continue
-                    merge_into_output_file = True
+                if not yes_or_no("Merge into this file?"):
+                    if not yes_or_no("Overwrite this file?"):
+                        if not yes_or_no("Append to this file?"):
+                            continue
+                        else:
+                            append_to_output_file = True
+                    else:
+                        overwriting_output_file = True
                 else:
-                    overwriting_output_file = True
-        if merge_into_output_file:
+                    merge_into_output_file = True
+        if merge_into_output_file or append_to_output_file:
             try:
                 with io.open(output_file, "r") as f:
                     if not isinstance(existing_items := json.load(f), list):
                         _warning(f"JSON file does not contain a list: {output_file}")
                         continue
-                    existing_items.append(item_type_items)
+                    if merge_into_output_file:
+                        merge_identifying_property_name = "uuid"
+                        for item in item_type_items:
+                            if (i := _find_item(existing_items,
+                                                property_value=item.get(merge_identifying_property_name),
+                                                property_name=merge_identifying_property_name)) is not None:
+                                existing_items[i] = item
+                            else:
+                                existing_items.append(item)
+                    elif append_to_output_file:
+                        existing_items.extend(item_type_items)
                     item_type_items = existing_items
             except Exception:
-                _print(f"Cannot load file as JSON: {output_file}")
+                _warning(f"Cannot load file as JSON: {output_file}")
                 continue
         with io.open(output_file, "w") as f:
             if overwriting_output_file:
@@ -377,6 +396,22 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
         if item_type := Portal.get_item_type(item_noraw):
             item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
     return item
+
+
+def _find_item(items: List[dict], property_value: Any, property_name: Optional[str] = None) -> Optional[int]:
+    """
+    Finds the (first) dictionary in the given list whose "uuid" property (or the property named
+    by the given property_name) value matches the given property_value and returns its list index,
+    if found; if not found then returns None.
+    """
+    if isinstance(items, list) and (property_value is not None):
+        if not (isinstance(property_name, str) and property_name):
+            property_name = _ITEM_UUID_PROPERTY_NAME
+        for i in range(len(items)):
+            if isinstance(item := items[i], dict):
+                if item.get(property_name) == property_value:
+                    return i
+    return None
 
 
 def _scrub_sids_from_items(items: dict) -> None:
