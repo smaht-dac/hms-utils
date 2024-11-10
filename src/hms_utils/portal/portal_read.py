@@ -29,8 +29,6 @@ _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
-_exceptions = False
-
 
 class Portal(PortalFromUtils):
 
@@ -164,7 +162,8 @@ def main():
     _setup_debugging(argv)
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
-                            show=argv.show, verbose=argv.verbose, debug=argv.debug)
+                            exceptions=argv.exceptions, show=argv.show,
+                            verbose=argv.verbose, debug=argv.debug)
 
     if argv.noignore_properties:
         portal.ignored_properties = []
@@ -469,15 +468,15 @@ def _contains_uuid(data: Union[dict, list], uuid: str) -> bool:
 
 
 def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
-                   ping: bool = True, show: bool = False, verbose: bool = False, debug: bool = False) -> Portal:
-    global _exceptions
+                   exceptions: bool = False, ping: bool = True, show: bool = False,
+                   verbose: bool = False, debug: bool = False) -> Portal:
     portal = None ; error = None  # noqa
     with captured_output(not debug):
         try:
             if env or app:
-                portal = Portal(env, app=app, exceptions=_exceptions)
+                portal = Portal(env, app=app, exceptions=exceptions)
             else:
-                portal = Portal(ini, exceptions=_exceptions)
+                portal = Portal(ini, exceptions=exceptions)
         except Exception as e:
             error = e
     if error:
@@ -536,11 +535,10 @@ def _nofunction(*args, **kwargs) -> None:
 
 def _setup_debugging(argv: ARGV) -> None:
 
-    global _verbose, _debug, _nofunction, _exceptions
+    global _verbose, _debug, _nofunction
     if not argv.warnings: _warning = _nofunction  # noqa
     if not argv.verbose: _verbose = _nofunction  # noqa
     if not argv.debug: _debug = _nofunction  # noqa
-    if argv.exceptions: _exceptions = True  # noqa
 
     original_requests_get = requests.get
     def requests_get(*args, **kwargs):  # noqa
