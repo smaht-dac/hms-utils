@@ -250,29 +250,12 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
                 inserts: bool = False, database: bool = False,
                 limit: Optional[int] = None, offset: Optional[int] = None, deleted: bool = False,
                 nthreads: Optional[int] = None) -> dict:
-    global _portal_get_count, _portal_get_metadata_count, _portal_ignore_properties
-    try:
-        if inserts is True:
-            items = _portal_get_inserts(portal, query, metadata=metadata, database=database,
-                                        limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
-        elif metadata is True:
-            _debug(f"portal.get_metadata: {query}{f' {chars.dot} raw' if raw else ''}"
-                   f"{f' {chars.dot} database' if database else ''}"
-                   f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                   f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
-            _portal_get_metadata_count += 1
-            items = portal.get_metadata(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted)
-        else:
-            _debug(f"portal.get: {query}{f' {chars.dot} raw' if raw else ''}"
-                   f"{f' {chars.dot} database' if database else ''}"
-                   f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                   f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
-            _portal_get_count += 1
-            items = portal.get(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted).json()
-    except Exception:
-        global _exceptions
-        if _exceptions: raise  # noqa
-        pass
+    if inserts is True:
+        items = _portal_get_inserts(portal, query, metadata=metadata, database=database,
+                                    limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
+    else:
+        items = _portal_get_action(portal, query, metadata=metadata, raw=raw,
+                                   database=database, limit=limit, offset=offset, deleted=deleted)
     if isinstance(_portal_ignore_properties, list):
         _remove_properties_from_items(items, _portal_ignore_properties)
     return items
@@ -294,75 +277,60 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
                         limit: Optional[int] = None, offset: Optional[int] = None,
                         deleted: bool = False,
                         nthreads: Optional[int] = None) -> dict:
-    global _exceptions
+    item = None ; item_noraw = None  # noqa
+    def fetch_portal_item() -> None:  # noqa
+        nonlocal portal, query, database, item
+        item = _portal_get_action(portal, query, metadata=metadata, raw=True,
+                                  database=database, limit=limit, offset=offset, deleted=deleted)
+    def fetch_portal_item_noraw() -> None:  # noqa
+        # This is to get the non-raw frame item format which has the type information (the raw frame does not).
+        nonlocal portal, query, metadata, database, item_noraw
+        item_noraw = _portal_get_action(portal, query, metadata=metadata, raw=False,
+                                        database=database, limit=limit, offset=offset, deleted=deleted,
+                                        field=_ITEM_UUID_PROPERTY_NAME)
+    run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
+    if isinstance(graph := item.get("@graph"), list):
+        if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
+            def find_item_type(uuid: str) -> Optional[str]:
+                nonlocal item_noraw, item_noraw_graph
+                for item_element in item_noraw_graph:
+                    if item_element.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
+                        return _get_item_type(item_element)
+                return None
+            for graph_item in graph:
+                if graph_item_type := find_item_type(graph_item.get(_ITEM_UUID_PROPERTY_NAME)):
+                    graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
+    else:
+        if item_type := _get_item_type(item_noraw):
+            item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
+    return item
+
+
+def _portal_get_action(portal: Portal, query: str, metadata: bool = False,
+                       raw: bool = False, inserts: bool = False, database: bool = False,
+                       limit: Optional[int] = None, offset: Optional[int] = None,
+                       field: Optional[str] = None, deleted: bool = False) -> Optional[Union[List[dict], dict]]:
+    global _exceptions, _portal_get_count, _portal_get_metadata_count
     try:
-        item = None ; item_noraw = None  # noqa
-        def fetch_portal_item() -> None:  # noqa
-            nonlocal portal, query, database, item
-            global _portal_get_count, _portal_get_metadata_count
-            try:
-                if metadata is True:
-                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts/raw"
-                           f"{f' {chars.dot} database' if database else ''}"
-                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
-                    _portal_get_metadata_count += 1
-                    item = portal.get_metadata(query, raw=True, database=database,
-                                               limit=limit, offset=offset, deleted=deleted)
-                else:
-                    _debug(f"portal.get : {query} {chars.dot} inserts/raw"
-                           f"{f' {chars.dot} database' if database else ''}"
-                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
-                    _portal_get_count += 1
-                    item = portal.get(query, raw=True, database=database,
-                                      limit=limit, offset=offset, deleted=deleted).json()
-            except Exception:
-                if _exceptions: raise  # noqa
-        def fetch_portal_item_noraw() -> None:  # noqa
-            # This is to get the non-raw frame item format which has the type information (the raw frame does not).
-            nonlocal portal, query, metadata, database, item_noraw
-            global _portal_get_count, _portal_get_metadata_count
-            try:
-                if metadata is True:
-                    _debug(f"portal.get_metadata: {query} {chars.dot} inserts"
-                           f"{f' {chars.dot} database' if database else ''}"
-                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
-                    _portal_get_metadata_count += 1
-                    item_noraw = portal.get_metadata(query, raw=False, database=database,
-                                                     limit=limit, offset=offset, deleted=deleted,
-                                                     field=_ITEM_UUID_PROPERTY_NAME)
-                else:
-                    _debug(f"portal.get: {query} {chars.dot} inserts"
-                           f"{f' {chars.dot} database' if database else ''}"
-                           f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-                           f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}")
-                    _portal_get_count += 1
-                    item_noraw = portal.get(query, raw=False, database=database,
-                                            limit=limit, offset=offset, deleted=deleted,
-                                            field=_ITEM_UUID_PROPERTY_NAME).json()
-            except Exception:
-                if _exceptions: raise  # noqa
-        run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
-        if isinstance(graph := item.get("@graph"), list):
-            if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
-                def find_item_type(uuid: str) -> Optional[str]:
-                    nonlocal item_noraw, item_noraw_graph
-                    for item_element in item_noraw_graph:
-                        if item_element.get(_ITEM_UUID_PROPERTY_NAME) == uuid:
-                            return _get_item_type(item_element)
-                    return None
-                for graph_item in graph:
-                    if graph_item_type := find_item_type(graph_item.get(_ITEM_UUID_PROPERTY_NAME)):
-                        graph_item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = graph_item_type
+        _debug(f"portal.get{'_metadata' if metadata else ''}: {query}"
+               f"{f' {chars.dot} raw' if raw else ''}"
+               f"{f' {chars.dot} database' if database else ''}"
+               f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+               f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}"
+               f"{f' {chars.dot} field: {field}' if field else ''}"
+               f"{f' {chars.dot} deleted' if deleted else ''}")
+        if metadata:
+            _portal_get_metadata_count += 1
+            items = portal.get_metadata(query, raw=raw, database=database,
+                                        limit=limit, offset=offset, deleted=deleted, field=field)
         else:
-            if item_type := _get_item_type(item_noraw):
-                item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
-        return item
+            _portal_get_count += 1
+            items = portal.get(query, raw=raw, database=database,
+                               limit=limit, offset=offset, deleted=deleted, field=field).json()
+        return items
     except Exception:
-        if _exceptions: raise  # noqa
-    return {}
+        if _exceptions:
+            raise
 
 
 def _get_uuids_from_value(value: str) -> List[str]:
