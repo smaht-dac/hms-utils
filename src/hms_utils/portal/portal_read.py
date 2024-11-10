@@ -6,6 +6,7 @@ import json
 import os
 import requests
 import sys
+# import time
 from typing import List, Optional, Union
 from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
@@ -13,12 +14,11 @@ from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
-from hms_utils.portal.portal_utils import Portal
+from hms_utils.portal.portal_utils import PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_string_list
 
-
-_ITEM_IGNORE_PROPERTIES_INSERTS = [
+_ITEM_IGNORED_PROPERTIES_INSERTS = [
     "date_created",
     "last_modified",
     "schema_version",
@@ -28,14 +28,80 @@ _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
-_portal_get_count = 0
-_portal_get_metadata_count = 0
-_portal_ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
+
+class Portal(PortalFromUtils):
+
+    _ITEM_IGNORED_PROPERTIES_INSERTS = [
+        "date_created",
+        "last_modified",
+        "schema_version",
+        "submitted_by"
+    ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._get_count = 0
+        self._get_metadata_count = 0
+        self._ignored_properties = Portal._ITEM_IGNORED_PROPERTIES_INSERTS
+
+    @property
+    def get_call_count(self) -> int:
+        return self._get_count
+
+    @property
+    def get_metadata_call_count(self) -> int:
+        return self._get_metadata_count
+
+    @property
+    def ignored_properties(self) -> List[str]:
+        return self._ignored_properties
+
+    @ignored_properties.setter
+    def ignored_properties(self, value: List[str]) -> None:
+        self._ignored_properties = value if isinstance(value, list) else []
+
+    def GET(self, query: str, metadata: bool = False,
+            raw: bool = False, inserts: bool = False, database: bool = False,
+            limit: Optional[int] = None, offset: Optional[int] = None,
+            field: Optional[str] = None, deleted: bool = False) -> Optional[Union[List[dict], dict]]:
+        try:
+            _debug(f"portal.get{'_metadata' if metadata else ''}: {query}"
+                   f"{f' {chars.dot} raw' if raw else ''}"
+                   f"{f' {chars.dot} database' if database else ''}"
+                   f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
+                   f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}"
+                   f"{f' {chars.dot} field: {field}' if field else ''}"
+                   f"{f' {chars.dot} deleted' if deleted else ''}")
+            if metadata:
+                self._get_metadata_count += 1
+                items = self.get_metadata(query, raw=raw, database=database,
+                                          limit=limit, offset=offset, deleted=deleted, field=field)
+            else:
+                self._get_count += 1
+                items = self.get(query, raw=raw, database=database,
+                                 limit=limit, offset=offset, deleted=deleted, field=field).json()
+        except Exception:
+            global _exceptions
+            if _exceptions:
+                raise
+        if self._ignored_properties:
+            Portal._remove_properties_from_items(items, self._ignored_properties)
+        return items
+
+    @staticmethod
+    def _remove_properties_from_items(items: Union[List[dict], dict], properties: List[str]) -> None:
+        if isinstance(items, list):
+            for element in items:
+                Portal._remove_properties_from_items(element, properties)
+        elif isinstance(items, dict):
+            for key in list(items.keys()):
+                if key in properties:
+                    del items[key]
+                else:
+                    Portal._remove_properties_from_items(items[key], properties)
 
 
 def main():
-
-    global _portal_get_count, _portal_get_metadata_count, _portal_ignore_properties
 
     argv = ARGV({
         ARGV.REQUIRED(str): ["arg"],
@@ -79,11 +145,11 @@ def main():
 
     _setup_debugging(argv)
 
-    if argv.noignore_properties:
-        _portal_ignore_properties = []
-
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
+
+    if argv.noignore_properties:
+        portal.ignored_properties = []
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
@@ -157,8 +223,8 @@ def main():
 
     _verbose(f"Total fetched Portal items:"
              f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
-    _debug(f"Calls to portal.get_metadata: {_portal_get_metadata_count}")
-    _debug(f"Calls to portal.get: {_portal_get_count}")
+    _debug(f"Calls to portal.get_metadata: {portal._get_metadata_count}")
+    _debug(f"Calls to portal.get: {portal._get_count}")
 
 
 def _print_items_inserts(items: dict, output_directory: str,
@@ -254,10 +320,10 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
         items = _portal_get_inserts(portal, query, metadata=metadata, database=database,
                                     limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
     else:
-        items = _portal_get_action(portal, query, metadata=metadata, raw=raw,
-                                   database=database, limit=limit, offset=offset, deleted=deleted)
-    if isinstance(_portal_ignore_properties, list):
-        _remove_properties_from_items(items, _portal_ignore_properties)
+        items = portal.GET(query, metadata=metadata, raw=raw,
+                           database=database, limit=limit, offset=offset, deleted=deleted)
+#   if isinstance(_portal_ignore_properties, list):
+#       _remove_properties_from_items(items, _portal_ignore_properties)
     return items
 
 
@@ -280,14 +346,14 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
     item = None ; item_noraw = None  # noqa
     def fetch_portal_item() -> None:  # noqa
         nonlocal portal, query, database, item
-        item = _portal_get_action(portal, query, metadata=metadata, raw=True,
-                                  database=database, limit=limit, offset=offset, deleted=deleted)
+        item = portal.GET(query, metadata=metadata, raw=True,
+                          database=database, limit=limit, offset=offset, deleted=deleted)
     def fetch_portal_item_noraw() -> None:  # noqa
         # This is to get the non-raw frame item format which has the type information (the raw frame does not).
         nonlocal portal, query, metadata, database, item_noraw
-        item_noraw = _portal_get_action(portal, query, metadata=metadata, raw=False,
-                                        database=database, limit=limit, offset=offset, deleted=deleted,
-                                        field=_ITEM_UUID_PROPERTY_NAME)
+        item_noraw = portal.GET(query, metadata=metadata, raw=False,
+                                database=database, limit=limit, offset=offset, deleted=deleted,
+                                field=_ITEM_UUID_PROPERTY_NAME)
     run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
     if isinstance(graph := item.get("@graph"), list):
         if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
@@ -306,33 +372,6 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
     return item
 
 
-def _portal_get_action(portal: Portal, query: str, metadata: bool = False,
-                       raw: bool = False, inserts: bool = False, database: bool = False,
-                       limit: Optional[int] = None, offset: Optional[int] = None,
-                       field: Optional[str] = None, deleted: bool = False) -> Optional[Union[List[dict], dict]]:
-    global _exceptions, _portal_get_count, _portal_get_metadata_count
-    try:
-        _debug(f"portal.get{'_metadata' if metadata else ''}: {query}"
-               f"{f' {chars.dot} raw' if raw else ''}"
-               f"{f' {chars.dot} database' if database else ''}"
-               f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
-               f"{f' {chars.dot} offset: {offset}' if isinstance(offset, int) else ''}"
-               f"{f' {chars.dot} field: {field}' if field else ''}"
-               f"{f' {chars.dot} deleted' if deleted else ''}")
-        if metadata:
-            _portal_get_metadata_count += 1
-            items = portal.get_metadata(query, raw=raw, database=database,
-                                        limit=limit, offset=offset, deleted=deleted, field=field)
-        else:
-            _portal_get_count += 1
-            items = portal.get(query, raw=raw, database=database,
-                               limit=limit, offset=offset, deleted=deleted, field=field).json()
-        return items
-    except Exception:
-        if _exceptions:
-            raise
-
-
 def _get_uuids_from_value(value: str) -> List[str]:
     uuids = []
     if isinstance(value, str):
@@ -343,18 +382,6 @@ def _get_uuids_from_value(value: str) -> List[str]:
                 if is_uuid(component := component.strip()):
                     uuids.append(component)
     return uuids
-
-
-def _remove_properties_from_items(items: Union[List[dict], dict], properties: List[str]) -> None:
-    if isinstance(items, list):
-        for element in items:
-            _remove_properties_from_items(element, properties)
-    elif isinstance(items, dict):
-        for key in list(items.keys()):
-            if key in properties:
-                del items[key]
-            else:
-                _remove_properties_from_items(items[key], properties)
 
 
 def _scrub_sids_from_items(items: dict) -> None:
