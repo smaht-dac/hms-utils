@@ -1,5 +1,4 @@
-# TODO: Rewrite/refactor view_portal_object.py
-
+from __future__ import annotations
 from functools import lru_cache
 import io
 import json
@@ -8,16 +7,15 @@ import requests
 import sys
 import time
 from typing import Any, List, Optional, Set, Tuple, Union
-from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import format_duration
 from hms_utils.dictionary_utils import delete_properties_from_dictionaries, sort_dictionary
-from hms_utils.portal.portal_utils import PortalFromUtils
+from hms_utils.portal.portal_utils import Portal as PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.type_utils import contains_uuid, get_referenced_uuids, get_uuids, is_uuid, to_non_empty_string_list
+from hms_utils.type_utils import contains_uuid, get_referenced_uuids, get_uuids, is_uuid
 from hms_utils.version_utils import get_version
 
 _ITEM_SID_PROPERTY_NAME = "sid"
@@ -98,14 +96,6 @@ class Portal(PortalFromUtils):
             delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
 
-    @staticmethod
-    def get_item_type(item: dict) -> Optional[str]:
-        if isinstance(item, dict):
-            if isinstance(item_types := item.get("@type"), list):
-                return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
-            return item_types if isinstance(item_types, str) and item_types else None
-        return None
-
 
 def main():
 
@@ -150,17 +140,19 @@ def main():
         ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]],
-        ARGV.ALLOW_ONLY: ["--version"]
+        ARGV.ALLOW_ONLY: ["--version"]  # TODO
     })
+
+    started = time.time()
 
     if argv.version:
         print(f"hms-portal-read: {get_version()}")
 
     _setup_debugging(argv)
 
-    portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
-                            exceptions=argv.exceptions, show=argv.show,
-                            verbose=argv.verbose and not argv.noheader, debug=argv.debug)
+    portal = Portal.create(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show,
+                           verbose=argv.verbose and not argv.noheader, debug=argv.debug,
+                           raise_exception=argv.exceptions, printf=_info)
 
     if argv.noignore_properties:
         portal.ignore_properties = []
@@ -245,6 +237,9 @@ def main():
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
               f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
         _info(f"Calls to portal.get: {portal.get_call_count} {chars.dot} {format_duration(portal.get_call_duration)}")
+    if argv.verbose or argv.timing or argv.debug:
+        duration = time.time() - started
+        _info(f"Duration: {format_duration(duration)}")
 
 
 def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False,
@@ -435,44 +430,6 @@ def _sanity_check_missing_items_referenced(data: Union[dict, list]) -> List[str]
         if not contains_uuid(data, referenced_uuid):
             missing_items_referenced.append(referenced_uuid)
     return missing_items_referenced
-
-
-def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
-                   exceptions: bool = False, ping: bool = True, show: bool = False,
-                   verbose: bool = False, debug: bool = False) -> Portal:
-    portal = None ; error = None  # noqa
-    with captured_output(not debug):
-        try:
-            if env or app:
-                portal = Portal(env, app=app, exceptions=exceptions)
-            else:
-                portal = Portal(ini, exceptions=exceptions)
-        except Exception as e:
-            error = e
-    if error:
-        _error(str(error))
-    if portal:
-        if verbose:
-            if portal.env:
-                _info(f"Portal environment: {portal.env}")
-            if portal.keys_file:
-                _info(f"Portal keys file: {portal.keys_file}")
-            if portal.key_id:
-                if show:
-                    _info(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
-                else:
-                    _info(f"Portal key prefix: {portal.key_id[0:2]}******")
-            if portal.ini_file:
-                _info(f"Portal ini file: {portal.ini_file}")
-            if portal.server:
-                _info(f"Portal server: {portal.server}")
-    if ping:
-        if portal.ping():
-            if verbose:
-                _info(f"Portal connectivity: OK {chars.check}")
-        else:
-            _error(f"Portal connectivity: ERROR {chars.xmark}")
-    return portal
 
 
 def _print(*args, **kwargs) -> None:

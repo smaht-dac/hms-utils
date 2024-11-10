@@ -1,7 +1,10 @@
-from typing import List, Optional, Union
+from __future__ import annotations
+from typing import Callable, List, Optional, Union
+from dcicutils.captured_output import captured_output
+from hms_utils.chars import chars
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.ff_utils import delete_field, delete_metadata, purge_metadata
-from hms_utils.type_utils import is_uuid
+from hms_utils.type_utils import is_uuid, to_non_empty_string_list
 
 
 class Portal(PortalFromUtils):
@@ -39,3 +42,56 @@ class Portal(PortalFromUtils):
             if raise_exception is True:
                 raise e
             return False
+
+    @staticmethod
+    def get_item_type(item: dict) -> Optional[str]:
+        if isinstance(item, dict):
+            if isinstance(item_types := item.get("@type"), list):
+                return item_types[0] if (item_types := to_non_empty_string_list(item_types)) else None
+            return item_types if isinstance(item_types, str) and item_types else None
+        return None
+
+    @classmethod
+    def create(cls, env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
+               raise_exception: bool = False, ping: bool = True, show: bool = False,
+               verbose: bool = False, debug: bool = False,
+               printf: Optional[Callable] = None) -> Portal:
+
+        if not callable(printf):
+            printf = print
+
+        with captured_output(debug is not True):
+            try:
+                if env or app:
+                    portal = cls(env, app=app, exceptions=raise_exception)
+                else:
+                    portal = cls(ini, exceptions=raise_exception)
+            except Exception as e:
+                if raise_exception is True:
+                    raise
+                if verbose is True:
+                    printf(f"ERROR: {str(e)}")
+                return None
+
+        if verbose is True:
+            if portal.env:
+                printf(f"Portal environment: {portal.env}")
+            if portal.keys_file:
+                printf(f"Portal keys file: {portal.keys_file}")
+            if portal.key_id:
+                if show is True:
+                    printf(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
+                else:
+                    printf(f"Portal key prefix: {portal.key_id[0:2]}******")
+            if portal.ini_file:
+                printf(f"Portal ini file: {portal.ini_file}")
+            if portal.server:
+                printf(f"Portal server: {portal.server}")
+        if ping is not False:
+            if portal.ping():
+                if verbose:
+                    printf(f"Portal connectivity: OK {chars.check}")
+            else:
+                printf(f"Portal connectivity: {portal.server} is unreachable {chars.xmark}")
+
+        return portal
