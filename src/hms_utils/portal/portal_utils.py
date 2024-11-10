@@ -90,7 +90,19 @@ class Portal(PortalFromUtils):
         if ping is not False:
             if portal.ping():
                 if verbose:
-                    printf(f"Portal connectivity: OK {chars.check}")
+                    version = None
+                    bluegreen = None
+                    try:
+                        health = portal.get_health().json()
+                        version = health.get("project_version")
+                        if (beanstalk_env := health.get("beanstalk_env")) == "smaht-production-green":
+                            bluegreen = "blue"
+                        elif beanstalk_env == "smaht-production-blue":
+                            bluegreen = "green"
+                    except Exception:
+                        pass
+                    printf(f"Portal connectivity: OK {chars.dot}{f' {version}' if version else ''}"
+                           f"{f' {chars.dot} {bluegreen}' if bluegreen else ''} {chars.check}")
             else:
                 printf(f"Portal connectivity: {portal.server} is unreachable {chars.xmark}")
 

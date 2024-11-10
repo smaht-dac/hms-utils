@@ -7,6 +7,7 @@ import requests
 import sys
 import time
 from typing import List, Optional, Set, Tuple, Union
+# import yaml
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
@@ -130,6 +131,7 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
         ARGV.OPTIONAL(int, 50): ["--nthreads", "--threads"],
@@ -141,6 +143,7 @@ def main() -> int:
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
+        ARGV.AT_LEAST_ONE_OF: ["query", "--ping"],
         ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]],
         ARGV.ALLOW_ONLY: ["--version"]  # TODO
     })
@@ -149,6 +152,8 @@ def main() -> int:
 
     if argv.version:
         print(f"hms-portal-read: {get_version()}")
+    if argv.ping:
+        argv.verbose = True
 
     _setup_debugging(argv)
 
