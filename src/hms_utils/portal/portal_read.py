@@ -30,9 +30,12 @@ _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
 _portal_get_count = 0
 _portal_get_metadata_count = 0
+_portal_ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
 
 
 def main():
+
+    global _portal_get_count, _portal_get_metadata_count, _portal_ignore_properties
 
     argv = ARGV({
         ARGV.REQUIRED(str): ["arg"],
@@ -76,6 +79,9 @@ def main():
 
     _setup_debugging(argv)
 
+    if argv.noignore_properties:
+        _portal_ignore_properties = []
+
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             show=argv.show, verbose=argv.verbose, debug=argv.debug)
 
@@ -98,12 +104,6 @@ def main():
         items.extend(_get_portal_referenced_items(
             portal, items, raw=argv.raw, metadata=argv.metadata,
             inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
-
-    if not argv.noignore_properties:
-        if not (argv.ignore_properties and
-                (ignore_properties := to_non_empty_string_list(argv.ignore_properties.split(",")))):
-            ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
-        _remove_ignored_properties(items, ignore_properties)
 
     if argv.inserts:
         items_by_type = {}
@@ -155,7 +155,6 @@ def main():
         else:
             _verbose(f" OK {chars.check}")
 
-    global _portal_get_count, _portal_get_metadata_count
     _verbose(f"Total fetched Portal items:"
              f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
     _debug(f"Calls to portal.get_metadata: {_portal_get_metadata_count}")
@@ -251,30 +250,32 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
                 inserts: bool = False, database: bool = False,
                 limit: Optional[int] = None, offset: Optional[int] = None, deleted: bool = False,
                 nthreads: Optional[int] = None) -> dict:
-    global _portal_get_count, _portal_get_metadata_count
+    global _portal_get_count, _portal_get_metadata_count, _portal_ignore_properties
     try:
         if inserts is True:
-            return _portal_get_inserts(portal, query, metadata=metadata, database=database,
-                                       limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
+            items = _portal_get_inserts(portal, query, metadata=metadata, database=database,
+                                        limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
         elif metadata is True:
             _debug(f"portal.get_metadata: {query}{f' {chars.dot} raw' if raw else ''}"
                    f"{f' {chars.dot} database' if database else ''}"
                    f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
                    f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
             _portal_get_metadata_count += 1
-            return portal.get_metadata(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted)
+            items = portal.get_metadata(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted)
         else:
             _debug(f"portal.get: {query}{f' {chars.dot} raw' if raw else ''}"
                    f"{f' {chars.dot} database' if database else ''}"
                    f"{f' {chars.dot} limit: {limit}' if isinstance(limit, int) else ''}"
                    f"{f' {chars.dot} limit: {offset}' if isinstance(offset, int) else ''}")
             _portal_get_count += 1
-            return portal.get(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted).json()
+            items = portal.get(query, raw=raw, database=database, limit=limit, offset=offset, deleted=deleted).json()
     except Exception:
         global _exceptions
         if _exceptions: raise  # noqa
         pass
-    return {}
+    if isinstance(_portal_ignore_properties, list):
+        _remove_properties_from_items(items, _portal_ignore_properties)
+    return items
 
 
 # Note that /files?limit=3 with raw=True given non-raw result.
@@ -376,15 +377,16 @@ def _get_uuids_from_value(value: str) -> List[str]:
     return uuids
 
 
-def _remove_ignored_properties(items: Union[List[dict], dict], ignored_properties: List[str]) -> None:
-    if isinstance(items, dict):
-        items = [items]
-    elif not isinstance(items, list):
-        return
-    for item in items:
-        for key in list(item.keys()):
-            if key in ignored_properties:
-                del item[key]
+def _remove_properties_from_items(items: Union[List[dict], dict], properties: List[str]) -> None:
+    if isinstance(items, list):
+        for element in items:
+            _remove_properties_from_items(element, properties)
+    elif isinstance(items, dict):
+        for key in list(items.keys()):
+            if key in properties:
+                del items[key]
+            else:
+                _remove_properties_from_items(items[key], properties)
 
 
 def _scrub_sids_from_items(items: dict) -> None:
