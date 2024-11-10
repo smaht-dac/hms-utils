@@ -19,11 +19,10 @@ from hms_utils.type_utils import get_referenced_uuids, is_uuid, to_non_empty_str
 
 
 _ITEM_IGNORE_PROPERTIES_INSERTS = [
-    # "date_created",
-    # "last_modified",
-    # "principals_allowed",
-    # "submitted_by",
-    "schema_version"
+    "date_created",
+    "last_modified",
+    "schema_version",
+    "submitted_by"
 ]
 _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
