@@ -134,8 +134,8 @@ def main():
         ARGV.OPTIONAL(bool): ["--json"],
         ARGV.OPTIONAL(bool): ["--yaml", "--yml"],
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
-        ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--all"],
-        ARGV.OPTIONAL(str): ["--ignore-properties", "--ignore"],
+        ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--no-ignore" "--all"],
+        ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--sort"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
@@ -167,6 +167,9 @@ def main():
 
     if argv.noignore_properties:
         portal.ignored_properties = []
+
+    if argv.ignore_properties:
+        portal.ignored_properties = argv.ignore_properties
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata

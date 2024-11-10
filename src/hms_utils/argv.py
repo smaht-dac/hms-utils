@@ -4,7 +4,8 @@ from typing import Any, Callable, List, Optional, Type, Union
 from uuid import uuid4 as uuid
 from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
-from hms_utils.type_utils import to_bool, to_float, to_integer, to_non_empty_string_list, to_string_list
+from hms_utils.type_utils import (
+    to_bool, to_float, to_integer, to_flattened_list, to_non_empty_string_list, to_string_list)
 
 
 class Argv:
@@ -274,14 +275,16 @@ class Argv:
 
         def add_rule_depends_on(self, options: List[str]) -> None:
             dependent_options = [] ; required_options = []  # noqa
-            if options := to_non_empty_string_list(options):
+            if options := to_flattened_list(options):
                 for optioni in range(len(options)):
-                    if options[optioni].startswith(f"{Argv._RULE_PREFIX}depends_on"):
-                        if dependent_options := options[:optioni]:
-                            if (optioni + 1) < len(options):
-                                if required_options := options[optioni + 1:]:
-                                    self._rule_depends_on.append({"depends": dependent_options, "on": required_options})
-                                    return
+                    if isinstance(option := options[optioni], str) and (option := option.strip()):
+                        if option.startswith(f"{Argv._RULE_PREFIX}depends_on"):
+                            if dependent_options := options[:optioni]:
+                                if (optioni + 1) < len(options):
+                                    if required_options := options[optioni + 1:]:
+                                        self._rule_depends_on.append({"depends": dependent_options,
+                                                                      "on": required_options})
+                                        return
 
     class _Option:
         def __init__(self,
@@ -418,10 +421,10 @@ class Argv:
             if not hasattr(self._values, option._property_name) and (option._default is not None):
                 setattr(self._values, option._property_name, option._default)
 
-        # Enfoce various auxiliary rules.
+        # Enforce various auxiliary rules.
         defined_value_options = set(self._defined_value_options())
 
-        # Enfoce exactly-one-of rule.
+        # Enforce exactly-one-of rule.
         for rule_options in self._option_definitions._rule_exactly_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 if len(intersection_options := rule_options & defined_value_options) == 0:
@@ -433,7 +436,7 @@ class Argv:
                     rule_violations_exactly_one_of_toomany.append(
                         [option._option_name for option in rule_options])
 
-        # Enfoce at-least-one-of rule.
+        # Enforce at-least-one-of rule.
         for rule_options in self._option_definitions._rule_at_least_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
@@ -442,7 +445,7 @@ class Argv:
                     rule_violations_at_least_one_of_missing.append(
                         [option._option_name for option in rule_options])
 
-        # Enfoce at-most-one-of rule.
+        # Enforce at-most-one-of rule.
         for rule_options in self._option_definitions._rule_at_most_one_of:
             if rule_options := set(self._find_options(rule_options)):
                 intersection_options = rule_options & defined_value_options
@@ -451,18 +454,23 @@ class Argv:
                     rule_violations_at_most_one_of_toomany.append(
                         [option._option_name for option in rule_options])
 
-        # Enfoce dependency rules.
+        # Enforce dependency rules.
         for rule in self._option_definitions._rule_depends_on:
             rule_dependent_options = to_non_empty_string_list(rule.get("depends"))
-            rule_required_options = to_non_empty_string_list(rule.get("on"))
+            rule_required_options = rule.get("on")
             rule_dependent_options = self._find_options(rule_dependent_options)
             rule_required_options = self._find_options(rule_required_options)
             for rule_dependent_option in rule_dependent_options:
                 if hasattr(self._values, rule_dependent_option._property_name):
+                    found = False
                     for rule_required_option in rule_required_options:
-                        if not hasattr(self._values, rule_required_option._property_name):
-                            rule_violations_depends_on.append([rule_dependent_option._option_name,
-                                                               rule_required_option._option_name])
+                        if hasattr(self._values, rule_required_option._property_name):
+                            found = True
+                            break
+                    if not found:
+                        rule_violations_depends_on.append(
+                            [rule_dependent_option._option_name,
+                             ", ".join([item._option_name for item in rule_required_options])])
 
         # Set properties to None or an appropriate default (e.g. False for boolean)
         # for any/all options/properties not specified at all; must be after above.
@@ -501,7 +509,7 @@ class Argv:
         for violation in rule_violations_at_most_one_of_toomany:
             errors.append(f"At most one of these options must be specified: {', '.join(violation)}")
         for violation in rule_violations_depends_on:
-            errors.append(f"Option {violation[0]} depends on option: {violation[1]}")
+            errors.append(f"Option {violation[0]} depends on one of option(s): {violation[1]}")
 
         # Report any errors if desired.
         if (report is not False) and errors:

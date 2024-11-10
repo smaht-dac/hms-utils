@@ -86,6 +86,18 @@ def is_uuid(value: str) -> bool:
     return uuid_pattern.match(value) if isinstance(value, str) else False
 
 
+def to_flattened_list(*args) -> List[Any]:
+    flattened_list = []
+    def flatten(arg):  # noqa
+        if isinstance(arg, (list, tuple)):
+            for item in arg:
+                flatten(item)
+        else:
+            flattened_list.append(arg)
+    flatten(args)
+    return flattened_list
+
+
 def get_referenced_uuids(item: Union[dict, List[dict]],
                          ignore_uuids: Optional[List[str]] = None,
                          exclude_uuid: bool = False, include_paths: bool = False) -> List[str]:
