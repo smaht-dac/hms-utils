@@ -20,12 +20,6 @@ from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import contains_uuid, get_referenced_uuids, get_uuids, is_uuid, to_non_empty_string_list
 from hms_utils.version_utils import get_version
 
-_ITEM_IGNORED_PROPERTIES_INSERTS = [
-    "date_created",
-    "last_modified",
-    "schema_version",
-    "submitted_by"
-]
 _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
@@ -33,7 +27,7 @@ _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 
 class Portal(PortalFromUtils):
 
-    _ITEM_IGNORED_PROPERTIES_INSERTS = [
+    _ITEM_IGNORE_PROPERTIES_INSERTS = [
         "date_created",
         "last_modified",
         "schema_version",
@@ -47,7 +41,7 @@ class Portal(PortalFromUtils):
         self._get_call_duration = 0
         self._get_metadata_call_duration = 0
         self._exceptions = exceptions is True
-        self._ignored_properties = Portal._ITEM_IGNORED_PROPERTIES_INSERTS
+        self._ignore_properties = Portal._ITEM_IGNORE_PROPERTIES_INSERTS
 
     @property
     def get_call_count(self) -> int:
@@ -66,12 +60,12 @@ class Portal(PortalFromUtils):
         return self._get_metadata_call_duration
 
     @property
-    def ignored_properties(self) -> List[str]:
-        return self._ignored_properties
+    def ignore_properties(self) -> List[str]:
+        return self._ignore_properties
 
-    @ignored_properties.setter
-    def ignored_properties(self, value: List[str]) -> None:
-        self._ignored_properties = value if isinstance(value, list) else []
+    @ignore_properties.setter
+    def ignore_properties(self, value: List[str]) -> None:
+        self._ignore_properties = value if isinstance(value, list) else []
 
     def GET(self, query: str, metadata: bool = False,
             raw: bool = False, inserts: bool = False, database: bool = False,
@@ -100,8 +94,8 @@ class Portal(PortalFromUtils):
         except Exception:
             if self._exceptions:
                 raise
-        if self._ignored_properties:
-            delete_properties_from_dictionaries(items, self._ignored_properties)
+        if self._ignore_properties:
+            delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
 
     @staticmethod
@@ -153,7 +147,8 @@ def main():
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
-        ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]]
+        ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]],
+        ARGV.ALLOW_ONLY: ["--version"]
     })
 
     if argv.version:
@@ -166,10 +161,10 @@ def main():
                             verbose=argv.verbose, debug=argv.debug)
 
     if argv.noignore_properties:
-        portal.ignored_properties = []
+        portal.ignore_properties = []
 
     if argv.ignore_properties:
-        portal.ignored_properties = argv.ignore_properties
+        portal.ignore_properties = argv.ignore_properties
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata

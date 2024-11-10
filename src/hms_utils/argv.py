@@ -798,6 +798,11 @@ class ARGV(Argv):
     def DEPENDS_ON(cls, *args):
         return f"{Argv._RULE_PREFIX}depends_on:{str(uuid())}"
 
+    @classmethod
+    @property
+    def ALLOW_ONLY(cls, *args):  # TODO
+        return f"{Argv._RULE_PREFIX}allow_only:{str(uuid())}"
+
 
 DEFAULT = ARGV.DEFAULT
 OPTIONAL = ARGV.OPTIONAL
@@ -807,3 +812,4 @@ AT_LEAST_ONE_OF = ARGV.AT_LEAST_ONE_OF
 EXACTLY_ONE_OF = ARGV.EXACTLY_ONE_OF
 DEPENDENCY = ARGV.DEPENDENCY
 DEPENDS_ON = ARGV.DEPENDS_ON
+ALLOW_ONLY = ARGV.ALLOW_ONLY
