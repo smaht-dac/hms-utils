@@ -70,6 +70,7 @@ class Portal(PortalFromUtils):
             raw: bool = False, inserts: bool = False, database: bool = False,
             limit: Optional[int] = None, offset: Optional[int] = None,
             field: Optional[str] = None, deleted: bool = False) -> Optional[Union[List[dict], dict]]:
+        items = None
         try:
             _debug(f"portal.get{'_metadata' if metadata else ''}: {query}"
                    f"{f' {chars.dot} raw' if raw else ''}"
@@ -93,12 +94,12 @@ class Portal(PortalFromUtils):
         except Exception:
             if self._exceptions:
                 raise
-        if self._ignore_properties:
+        if self._ignore_properties and items:
             delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
 
 
-def main():
+def main() -> int:
 
     argv = ARGV({
         ARGV.REQUIRED(str): ["query"],
@@ -151,9 +152,17 @@ def main():
 
     _setup_debugging(argv)
 
-    portal = Portal.create(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show,
-                           verbose=argv.verbose and not argv.noheader, debug=argv.debug,
-                           raise_exception=argv.exceptions, printf=_info)
+    if not (portal := Portal.create(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show,
+                                    verbose=argv.verbose and not argv.noheader, debug=argv.debug,
+                                    raise_exception=argv.exceptions, printf=_info)):
+        return 1
+
+    if schema := portal.get_schema(argv.query):
+        if argv.noformat:
+            _print(schema)
+        else:
+            _print(json.dumps(schema, indent=4))
+        return 0
 
     if argv.noignore_properties:
         portal.ignore_properties = []
@@ -169,10 +178,15 @@ def main():
     if (not metadata) and (not argv.query.startswith("/")):
         argv.query = f"/{argv.query}"
 
-    if items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
-                            limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads):
-        if graph := items.get("@graph"):
-            items = graph
+    _verbose(f"Querying Portal for item(s): {argv.query}")
+
+    if not (items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
+                                 limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads)):
+        _info(f"Portal item(s) not found: {argv.query}")
+        return 1
+
+    if graph := items.get("@graph"):
+        items = graph
     if isinstance(items, dict):
         items = [items]
 
@@ -209,7 +223,7 @@ def main():
                 if not argv.overwrite:
                     _print(f"Specified output file already exists: {argv.output}")
                     if not yes_or_no("Overwrite this file?"):
-                        return
+                        return 1
                 overwriting_output_file = True
             with io.open(argv.output, "w") as f:
                 json.dump(items, f, indent=None if argv.noformat else 4)
@@ -241,6 +255,8 @@ def main():
     if argv.verbose or argv.timing or argv.debug:
         duration = time.time() - started
         _info(f"Duration: {format_duration(duration)}")
+
+    return 0
 
 
 def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False,
@@ -475,4 +491,4 @@ def _setup_debugging(argv: ARGV) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
