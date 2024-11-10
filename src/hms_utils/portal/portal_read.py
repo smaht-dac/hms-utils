@@ -6,13 +6,14 @@ import json
 import os
 import requests
 import sys
-# import time
+import time
 from typing import List, Optional, Union
 from dcicutils.captured_output import captured_output
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
+from hms_utils.datetime_utils import format_duration
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
@@ -40,17 +41,27 @@ class Portal(PortalFromUtils):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._get_count = 0
-        self._get_metadata_count = 0
+        self._get_call_count = 0
+        self._get_metadata_call_count = 0
+        self._get_call_duration = 0
+        self._get_metadata_call_duration = 0
         self._ignored_properties = Portal._ITEM_IGNORED_PROPERTIES_INSERTS
 
     @property
     def get_call_count(self) -> int:
-        return self._get_count
+        return self._get_call_count
 
     @property
     def get_metadata_call_count(self) -> int:
-        return self._get_metadata_count
+        return self._get_metadata_call_count
+
+    @property
+    def get_call_duration(self) -> float:
+        return self._get_call_duration
+
+    @property
+    def get_metadata_call_duration(self) -> float:
+        return self._get_metadata_call_duration
 
     @property
     def ignored_properties(self) -> List[str]:
@@ -73,13 +84,17 @@ class Portal(PortalFromUtils):
                    f"{f' {chars.dot} field: {field}' if field else ''}"
                    f"{f' {chars.dot} deleted' if deleted else ''}")
             if metadata:
-                self._get_metadata_count += 1
+                self._get_metadata_call_count += 1
+                started = time.time()
                 items = self.get_metadata(query, raw=raw, database=database,
                                           limit=limit, offset=offset, deleted=deleted, field=field)
+                self._get_metadata_call_duration += time.time() - started
             else:
-                self._get_count += 1
+                self._get_call_count += 1
+                started = time.time()
                 items = self.get(query, raw=raw, database=database,
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
+                self._get_call_duration += time.time() - started
         except Exception:
             global _exceptions
             if _exceptions:
@@ -223,8 +238,9 @@ def main():
 
     _verbose(f"Total fetched Portal items:"
              f" {len(_get_item_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
-    _debug(f"Calls to portal.get_metadata: {portal._get_metadata_count}")
-    _debug(f"Calls to portal.get: {portal._get_count}")
+    _debug(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
+           f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
+    _debug(f"Calls to portal.get: {portal.get_call_count} {chars.dot} {format_duration(portal.get_call_duration)}")
 
 
 def _print_items_inserts(items: dict, output_directory: str,
