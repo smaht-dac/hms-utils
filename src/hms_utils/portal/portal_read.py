@@ -143,6 +143,7 @@ def main():
         ARGV.OPTIONAL(int, 50): ["--nthreads", "--threads"],
         ARGV.OPTIONAL(bool): ["--sanity-check", "--sanity"],
         ARGV.OPTIONAL(bool): ["--timing", "--time", "--times"],
+        ARGV.OPTIONAL(bool): ["--noheader"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
@@ -159,7 +160,7 @@ def main():
 
     portal = _create_portal(env=argv.env, ini=argv.ini, app=argv.app,
                             exceptions=argv.exceptions, show=argv.show,
-                            verbose=argv.verbose, debug=argv.debug)
+                            verbose=argv.verbose and not argv.noheader, debug=argv.debug)
 
     if argv.noignore_properties:
         portal.ignore_properties = []
@@ -451,22 +452,24 @@ def _create_portal(env: Optional[str] = None, ini: Optional[str] = None, app: Op
     if error:
         _error(str(error))
     if portal:
-        if portal.env:
-            _verbose(f"Portal environment: {portal.env}")
-        if portal.keys_file:
-            _verbose(f"Portal keys file: {portal.keys_file}")
-        if portal.key_id:
-            if show:
-                _verbose(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
-            else:
-                _verbose(f"Portal key prefix: {portal.key_id[0:2]}******")
-        if portal.ini_file:
-            _verbose(f"Portal ini file: {portal.ini_file}")
-        if portal.server:
-            _verbose(f"Portal server: {portal.server}")
+        if verbose:
+            if portal.env:
+                _info(f"Portal environment: {portal.env}")
+            if portal.keys_file:
+                _info(f"Portal keys file: {portal.keys_file}")
+            if portal.key_id:
+                if show:
+                    _info(f"Portal key: {portal.key_id} {chars.dot} {portal.secret}")
+                else:
+                    _info(f"Portal key prefix: {portal.key_id[0:2]}******")
+            if portal.ini_file:
+                _info(f"Portal ini file: {portal.ini_file}")
+            if portal.server:
+                _info(f"Portal server: {portal.server}")
     if ping:
         if portal.ping():
-            _verbose(f"Portal connectivity: OK {chars.check}")
+            if verbose:
+                _info(f"Portal connectivity: OK {chars.check}")
         else:
             _error(f"Portal connectivity: ERROR {chars.xmark}")
     return portal
