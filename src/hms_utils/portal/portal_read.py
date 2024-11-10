@@ -140,7 +140,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--overwrite"],
         ARGV.OPTIONAL(bool): ["--sid"],
         ARGV.OPTIONAL(bool): ["--show"],
-        ARGV.OPTIONAL(bool): ["--warnings", "--warn", "--warning"],
+        ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"],
@@ -274,7 +274,7 @@ def _print_items_inserts(items: dict, output_directory: str,
             try:
                 with io.open(output_file, "r") as f:
                     if not isinstance(existing_items := json.load(f), list):
-                        _print(f"JSON file does not contain a list: {output_file}")
+                        _warning(f"JSON file does not contain a list: {output_file}")
                         continue
                     existing_items.append(item_type_items)
                     item_type_items = existing_items
@@ -346,17 +346,6 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
                            database=database, limit=limit, offset=offset, deleted=deleted)
     return items
 
-
-# Note that /files?limit=3 with raw=True given non-raw result.
-# but that /files with raw=True given raw result.
-# and that /files?status=released with raw=True gives error
-# Oh actually should use portal.get not portal.get_metadata for search.
-# These FYI are the same results:
-# portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False).json()
-# portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=False)
-# And these FYI are the same results:
-# portal.get("/f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True).json()
-# portal.get_metadata("f8da20ff-1b39-4a8f-af46-1c82ee601374", raw=True)
 
 @lru_cache(maxsize=1024)
 def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, database: bool = False,
@@ -483,7 +472,7 @@ def _nofunction(*args, **kwargs) -> None:
 def _setup_debugging(argv: ARGV) -> None:
 
     global _verbose, _debug, _nofunction
-    if not argv.warnings: _warning = _nofunction  # noqa
+    if argv.nowarnings: _warning = _nofunction  # noqa
     if not argv.verbose: _verbose = _nofunction  # noqa
     if not argv.debug: _debug = _nofunction  # noqa
 
