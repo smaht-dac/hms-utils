@@ -257,6 +257,9 @@ def main() -> int:
         _verbose(f"Total items fetched:"
                  f" {uuids_count}"
                  f"{f' {chars.dot} refs: {referenced_uuids_count}' if referenced_uuids_count != uuids_count else ''}")
+        if argv.verbose and argv.inserts and isinstance(items, dict):
+            type_count = len(set(items.keys()))
+            _verbose(f"Total item types fetched: {type_count}")
         # f" {len(get_uuids(items))} {chars.dot} references: {len(referenced_uuids)}")
     if argv.timing or argv.debug:
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
