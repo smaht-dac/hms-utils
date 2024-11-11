@@ -96,9 +96,9 @@ class Portal(PortalFromUtils):
                         health = portal.get_health().json()
                         version = health.get("project_version")
                         if (beanstalk_env := health.get("beanstalk_env")) == "smaht-production-green":
-                            bluegreen = "blue"
-                        elif beanstalk_env == "smaht-production-blue":
                             bluegreen = "green"
+                        elif beanstalk_env == "smaht-production-blue":
+                            bluegreen = "blue"
                     except Exception:
                         pass
                     printf(f"Portal connectivity: OK {chars.dot}{f' {version}' if version else ''}"
