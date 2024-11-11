@@ -247,8 +247,9 @@ def main() -> int:
                     try:
                         with io.open(argv.output, "r") as f:
                             existing_items = json.load(f)
-                            if argv.inserts and (not isinstance(existing_items, dict)):
-                                _error(f"JSON file does not contain a dictionary: {argv.output}")
+                            if argv.inserts:
+                                if not isinstance(existing_items, dict):
+                                    _error(f"JSON file does not contain a dictionary: {argv.output}")
                             elif not isinstance(existing_items, list):
                                 _error(f"JSON file does not contain a list: {argv.output}")
                     except Exception:
