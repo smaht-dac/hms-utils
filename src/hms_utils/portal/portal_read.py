@@ -367,6 +367,8 @@ def _write_output_file(items: dict, output_file: str, inserts: bool = False, nof
                                         property_name=merge_identifying_property_name)
                                     if index is not None:
                                         existing_item_type_items[index] = item
+                                    else:
+                                        existing_item_type_items.append(item)
                         else:
                             existing_items[item_type] = items[item_type]
                 else:
