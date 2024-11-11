@@ -217,22 +217,86 @@ def main() -> int:
 
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
-            _print_items_inserts(items, argv.output, noformat=argv.noformat,
-                                 append=argv.append, overwrite=argv.overwrite, merge=argv.merge)
+            _print_inserts_files(items, argv.output, noformat=argv.noformat,
+                                 overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
         else:
-            overwriting_output_file = False
+            overwrite_output_file = False
+            merge_into_output_file = False
+            append_to_output_file = False
             if os.path.isdir(argv.output):
                 _error(f"Specified output file already exists as a directory: {argv.output}")
-            elif os.path.exists(argv.output):
-                if not argv.overwrite:
+            if os.path.exists(argv.output):
+                if argv.overwrite:
+                    overwrite_output_file = True
+                elif argv.merge:
+                    merge_into_output_file = True
+                elif argv.append:
+                    append_to_output_file = True
+                else:
                     _print(f"Specified output file already exists: {argv.output}")
-                    if not yes_or_no("Overwrite this file?"):
-                        return 1
-                overwriting_output_file = True
+                    if not yes_or_no("Merge into this file?"):
+                        if not yes_or_no("Overwrite this file?"):
+                            if not yes_or_no("Append to this file?"):
+                                return 1
+                            append_to_output_file = True
+                        else:
+                            overwrite_output_file = True
+                    else:
+                        merge_into_output_file = True
+                if merge_into_output_file or append_to_output_file:
+                    try:
+                        with io.open(argv.output, "r") as f:
+                            existing_items = json.load(f)
+                            if argv.inserts and (not isinstance(existing_items, dict)):
+                                _error(f"JSON file does not contain a dictionary: {argv.output}")
+                            elif not isinstance(existing_items, list):
+                                _error(f"JSON file does not contain a list: {argv.output}")
+                    except Exception:
+                        _error(f"Cannot load file as JSON: {argv.output}")
+                    if merge_into_output_file:
+                        merge_identifying_property_name = _ITEM_UUID_PROPERTY_NAME
+                        if argv.inserts:
+                            for item_type in items:
+                                if existing_item_type_items := existing_items.get(item_type):
+                                    if isinstance(existing_item_type_items, list):
+                                        for item in items[item_type]:
+                                            index = find_dictionary_item(
+                                                existing_item_type_items,
+                                                property_value=item.get(merge_identifying_property_name),
+                                                property_name=merge_identifying_property_name)
+                                            if index is not None:
+                                                existing_item_type_items[index] = item
+                                else:
+                                    existing_items[item_type] = items[item_type]
+                        else:
+                            for item in items:
+                                index = find_dictionary_item(
+                                    existing_items,
+                                    property_value=item.get(merge_identifying_property_name),
+                                    property_name=merge_identifying_property_name)
+                                if index is not None:
+                                    existing_items[index] = item
+                                else:
+                                    existing_items.append(item)
+                    elif append_to_output_file:
+                        if argv.inserts:
+                            for item_type in items:
+                                if existing_item_type_items := existing_items.get(item_type):
+                                    if isinstance(existing_item_type_items, list):
+                                        existing_item_type_items.append(items[item_type])
+                                else:
+                                    existing_items[item_type] = items[item_type]
+                        else:
+                            existing_items.extend(items)
+                    items = existing_items
             with io.open(argv.output, "w") as f:
                 json.dump(items, f, indent=None if argv.noformat else 4)
-            if overwriting_output_file:
+            if overwrite_output_file:
                 _verbose(f"Output file overwritten: {argv.output}")
+            elif merge_into_output_file:
+                _verbose(f"Output file merged into: {argv.output}")
+            elif append_to_output_file:
+                _verbose(f"Output file appended to: {argv.output}")
             else:
                 _verbose(f"Output file written: {argv.output}")
     else:
@@ -260,7 +324,6 @@ def main() -> int:
         if argv.verbose and argv.inserts and isinstance(items, dict):
             type_count = len(set(items.keys()))
             _verbose(f"Total item types fetched: {type_count}")
-        # f" {len(get_uuids(items))} {chars.dot} references: {len(referenced_uuids)}")
     if argv.timing or argv.debug:
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
               f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
@@ -272,67 +335,69 @@ def main() -> int:
     return 0
 
 
-def _print_items_inserts(items: dict, output_directory: str, noformat: bool = False,
-                         append: bool = False, merge: bool = False, overwrite: bool = False) -> None:
+def _print_inserts_files(items: dict, output_directory: str, noformat: bool = False,
+                         overwrite: bool = False, merge: bool = False, append: bool = False) -> None:
     os.makedirs(output_directory, exist_ok=True)
     for item_type in items:
         item_type_items = items[item_type]
         output_file = os.path.join(output_directory, f"{to_snake_case(item_type)}.json")
-        append_to_output_file = False
+        overwrite_output_file = False
         merge_into_output_file = False
-        overwriting_output_file = False
+        append_to_output_file = False
         if os.path.exists(output_file):
-            if append:
-                append_to_output_file = True
+            if overwrite:
+                overwrite_output_file = True
             elif merge:
                 merge_into_output_file = True
-            elif overwrite:
-                overwriting_output_file = True
+            elif append:
+                append_to_output_file = True
             else:
                 _print(f"Specified output file already exists: {output_file} {chars.dot}")
                 if not yes_or_no("Merge into this file?"):
                     if not yes_or_no("Overwrite this file?"):
                         if not yes_or_no("Append to this file?"):
                             continue
-                        else:
-                            append_to_output_file = True
+                        append_to_output_file = True
                     else:
-                        overwriting_output_file = True
+                        overwrite_output_file = True
                 else:
                     merge_into_output_file = True
-        if merge_into_output_file or append_to_output_file:
-            try:
-                with io.open(output_file, "r") as f:
-                    if not isinstance(existing_items := json.load(f), list):
-                        _warning(f"JSON file does not contain a list: {output_file}")
-                        continue
-                    if merge_into_output_file:
-                        merge_identifying_property_name = "uuid"
-                        for item in item_type_items:
-                            if (i := find_dictionary_item(existing_items,
-                                                          property_value=item.get(merge_identifying_property_name),
-                                                          property_name=merge_identifying_property_name)) is not None:
-                                existing_items[i] = item
-                            else:
-                                existing_items.append(item)
-                    elif append_to_output_file:
-                        existing_items.extend(item_type_items)
-                    item_type_items = existing_items
-            except Exception:
-                _warning(f"Cannot load file as JSON: {output_file}")
-                continue
+            if merge_into_output_file or append_to_output_file:
+                try:
+                    with io.open(output_file, "r") as f:
+                        if not isinstance(existing_items := json.load(f), list):
+                            _warning(f"JSON file does not contain a list: {output_file}")
+                            continue
+                except Exception:
+                    _warning(f"Cannot load file as JSON: {output_file}")
+                    continue
+                if merge_into_output_file:
+                    merge_identifying_property_name = _ITEM_UUID_PROPERTY_NAME
+                    for item in item_type_items:
+                        index = find_dictionary_item(existing_items,
+                                                     property_value=item.get(merge_identifying_property_name),
+                                                     property_name=merge_identifying_property_name)
+                        if index is not None:
+                            existing_items[index] = item
+                        else:
+                            existing_items.append(item)
+                elif append_to_output_file:
+                    existing_items.extend(item_type_items)
+                item_type_items = existing_items
         with io.open(output_file, "w") as f:
-            if overwriting_output_file:
+            if overwrite_output_file:
                 _debug(f"Overwriting output file: {output_file}")
             elif merge_into_output_file:
                 _debug(f"Merging into output file: {output_file}")
             else:
-                _debug(f"Writing into output file: {output_file}")
+                _debug(f"Writing output file: {output_file}")
             json.dump(item_type_items, f, indent=None if (noformat is True) else 4)
-            if overwriting_output_file:
+            if overwrite_output_file:
                 _verbose(f"Output file overwritten: {output_file}")
             elif merge_into_output_file:
-                _verbose(f"Output file merged: {output_file}")
+                _verbose(f"Output file merged into: {output_file}")
+            elif append_to_output_file:
+                _verbose(f"Output file appended to: {output_file}")
             else:
                 _verbose(f"Output file written: {output_file}")
 
@@ -378,8 +443,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], Set[str]
         nonlocal portal, metadata, raw, database, items
         if item := _portal_get(portal, uuid, metadata=True,
                                raw=raw, inserts=inserts, database=database, nthreads=nthreads):
-            # TODO: make thread-safe.
-            items.append(item)
+            items.append(item)  # TODO: make thread-safe.
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
     return items
@@ -391,12 +455,10 @@ def _portal_get(portal: Portal, query: str, metadata: bool = False, raw: bool = 
                 limit: Optional[int] = None, offset: Optional[int] = None, deleted: bool = False,
                 nthreads: Optional[int] = None) -> dict:
     if inserts is True:
-        items = _portal_get_inserts(portal, query, metadata=metadata, database=database,
-                                    limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
-    else:
-        items = portal.GET(query, metadata=metadata, raw=raw,
-                           database=database, limit=limit, offset=offset, deleted=deleted)
-    return items
+        return _portal_get_inserts(portal, query, metadata=metadata, database=database,
+                                   limit=limit, offset=offset, deleted=deleted, nthreads=nthreads)
+    return portal.GET(query, metadata=metadata, raw=raw,
+                      database=database, limit=limit, offset=offset, deleted=deleted)
 
 
 @lru_cache(maxsize=1024)
