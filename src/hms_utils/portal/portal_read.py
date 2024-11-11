@@ -6,8 +6,8 @@ import os
 import requests
 import sys
 import time
-from typing import List, Optional, Set, Tuple, Union
-# import yaml
+from typing import Any, List, Optional, Set, Tuple, Union
+import yaml
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
 from hms_utils.argv import ARGV
@@ -165,10 +165,7 @@ def main() -> int:
         return 0
 
     if schema := portal.get_schema(argv.query):
-        if argv.noformat:
-            _print(schema)
-        else:
-            _print(json.dumps(schema, indent=4))
+        _print_data(schema, argv)
         return 0
 
     if argv.noignore_properties:
@@ -238,20 +235,21 @@ def main() -> int:
                 _verbose(f"Output file overwritten: {argv.output}")
             else:
                 _verbose(f"Output file written: {argv.output}")
-    elif argv.noformat:
-        _print(items)
     else:
-        _print(json.dumps(items, indent=4))
+        _print_data(items, argv)
 
     if argv.refs and argv.sanity_check:
         _verbose("Sanity checking for missing referenced items ...", end="")
-        if missing_items_referenced := _sanity_check_missing_items_referenced(items):
-            _verbose("")
+        started_sanity_check = time.time()
+        missing_items_referenced = _sanity_check_missing_items_referenced(items)
+        duration_sanity_check = format_duration(time.time() - started_sanity_check)
+        if missing_items_referenced:
+            _verbose(f" {duration_sanity_check}" if duration_sanity_check != "00:0000" else "")
             _error(f"Missing items for referenced items found: {len(missing_items_referenced)}", exit=False)
             if argv.verbose:
                 _verbose(missing_items_referenced)
         else:
-            _verbose(f" OK {chars.check}")
+            _verbose(f" OK {chars.check}{f' {duration_sanity_check}' if duration_sanity_check != '00:00:00' else ''}")
 
     if argv.verbose:
         uuids_count = len(get_uuids(items))
@@ -334,6 +332,15 @@ def _print_items_inserts(items: dict, output_directory: str, noformat: bool = Fa
                 _verbose(f"Output file merged: {output_file}")
             else:
                 _verbose(f"Output file written: {output_file}")
+
+
+def _print_data(data: Any, argv: ARGV) -> None:
+    if argv.yaml is True:
+        _print(yaml.dump(data).strip())
+    elif argv.noformat is True:
+        _print(data)
+    else:
+        _print(json.dumps(data, indent=4))
 
 
 def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = False,
