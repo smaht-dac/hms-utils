@@ -486,7 +486,7 @@ def _setup_debugging(argv: ARGV) -> None:
         if ((kwargs.get("headers", {}).get("Content-type") == "application/json") and
             (kwargs.get("headers", {}).get("Accept") == "application/json") and
             isinstance(auth := kwargs.get("auth"), tuple) and (len(auth) > 0) and (auth := auth[0])):  # noqa
-            message += f" {chars.dot} stanard headers {chars.dot} key: {auth[0:2] + '******'}"
+            message += f" {chars.dot} standard headers {chars.dot} key: {auth[0:2] + '******'}"
         else:
             message += f" {chars.dot} {str(kwargs)}"
         _debug(f"request.get: {message}")
