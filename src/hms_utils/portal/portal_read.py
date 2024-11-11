@@ -200,14 +200,7 @@ def main() -> int:
             inserts=argv.inserts, database=argv.database, nthreads=argv.nthreads))
 
     if argv.inserts:
-        items_by_type = {}
-        for item in items:
-            item_type = item.get(_ITEM_TYPE_PSEUDO_PROPERTY_NAME)
-            if not (item_list := items_by_type.get(item_type)):
-                items_by_type[item_type] = (item_list := [])
-            item_list.append(item)
-            item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
-        items = items_by_type
+        items = _insertize_items(items)
 
     if argv.sort:
         items = sort_dictionary(items)
@@ -217,89 +210,11 @@ def main() -> int:
 
     if argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
-            _print_inserts_files(items, argv.output, noformat=argv.noformat,
-                                 overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
+            _write_inserts_output_files(items, argv.output, noformat=argv.noformat,
+                                        overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
         else:
-            overwrite_output_file = False
-            merge_into_output_file = False
-            append_to_output_file = False
-            if os.path.isdir(argv.output):
-                _error(f"Specified output file already exists as a directory: {argv.output}")
-            if os.path.exists(argv.output):
-                if argv.overwrite:
-                    overwrite_output_file = True
-                elif argv.merge:
-                    merge_into_output_file = True
-                elif argv.append:
-                    append_to_output_file = True
-                else:
-                    _print(f"Specified output file already exists: {argv.output}")
-                    if not yes_or_no("Merge into this file?"):
-                        if not yes_or_no("Overwrite this file?"):
-                            if not yes_or_no("Append to this file?"):
-                                return 1
-                            append_to_output_file = True
-                        else:
-                            overwrite_output_file = True
-                    else:
-                        merge_into_output_file = True
-                if merge_into_output_file or append_to_output_file:
-                    try:
-                        with io.open(argv.output, "r") as f:
-                            existing_items = json.load(f)
-                            if argv.inserts:
-                                if not isinstance(existing_items, dict):
-                                    _error(f"JSON file does not contain a dictionary: {argv.output}")
-                            elif not isinstance(existing_items, list):
-                                _error(f"JSON file does not contain a list: {argv.output}")
-                    except Exception:
-                        _error(f"Cannot load file as JSON: {argv.output}")
-                    if merge_into_output_file:
-                        merge_identifying_property_name = _ITEM_UUID_PROPERTY_NAME
-                        if argv.inserts:
-                            for item_type in items:
-                                if existing_item_type_items := existing_items.get(item_type):
-                                    if isinstance(existing_item_type_items, list):
-                                        for item in items[item_type]:
-                                            index = find_dictionary_item(
-                                                existing_item_type_items,
-                                                property_value=item.get(merge_identifying_property_name),
-                                                property_name=merge_identifying_property_name)
-                                            if index is not None:
-                                                existing_item_type_items[index] = item
-                                else:
-                                    existing_items[item_type] = items[item_type]
-                        else:
-                            for item in items:
-                                index = find_dictionary_item(
-                                    existing_items,
-                                    property_value=item.get(merge_identifying_property_name),
-                                    property_name=merge_identifying_property_name)
-                                if index is not None:
-                                    existing_items[index] = item
-                                else:
-                                    existing_items.append(item)
-                    elif append_to_output_file:
-                        if argv.inserts:
-                            for item_type in items:
-                                if existing_item_type_items := existing_items.get(item_type):
-                                    if isinstance(existing_item_type_items, list):
-                                        existing_item_type_items.append(items[item_type])
-                                else:
-                                    existing_items[item_type] = items[item_type]
-                        else:
-                            existing_items.extend(items)
-                    items = existing_items
-            with io.open(argv.output, "w") as f:
-                json.dump(items, f, indent=None if argv.noformat else 4)
-            if overwrite_output_file:
-                _verbose(f"Output file overwritten: {argv.output}")
-            elif merge_into_output_file:
-                _verbose(f"Output file merged into: {argv.output}")
-            elif append_to_output_file:
-                _verbose(f"Output file appended to: {argv.output}")
-            else:
-                _verbose(f"Output file written: {argv.output}")
+            _write_output_file(items, argv.output, inserts=argv.inserts, noformat=argv.noformat,
+                               overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
     else:
         _print_data(items, argv)
 
@@ -336,8 +251,8 @@ def main() -> int:
     return 0
 
 
-def _print_inserts_files(items: dict, output_directory: str, noformat: bool = False,
-                         overwrite: bool = False, merge: bool = False, append: bool = False) -> None:
+def _write_inserts_output_files(items: dict, output_directory: str, noformat: bool = False,
+                                overwrite: bool = False, merge: bool = False, append: bool = False) -> None:
     os.makedirs(output_directory, exist_ok=True)
     for item_type in items:
         item_type_items = items[item_type]
@@ -401,6 +316,90 @@ def _print_inserts_files(items: dict, output_directory: str, noformat: bool = Fa
                 _verbose(f"Output file appended to: {output_file}")
             else:
                 _verbose(f"Output file written: {output_file}")
+
+
+def _write_output_file(items: dict, output_file: str, inserts: bool = False, noformat: bool = False,
+                       overwrite: bool = False, merge: bool = False, append: bool = False) -> None:
+    overwrite_output_file = False
+    merge_into_output_file = False
+    append_to_output_file = False
+    if os.path.isdir(output_file):
+        _error(f"Specified output file already exists as a directory: {output_file}")
+    if os.path.exists(output_file):
+        if overwrite:
+            overwrite_output_file = True
+        elif merge:
+            merge_into_output_file = True
+        elif append:
+            append_to_output_file = True
+        else:
+            _print(f"Specified output file already exists: {output_file}")
+            if not yes_or_no("Merge into this file?"):
+                if not yes_or_no("Overwrite this file?"):
+                    if not yes_or_no("Append to this file?"):
+                        return 1
+                    append_to_output_file = True
+                else:
+                    overwrite_output_file = True
+            else:
+                merge_into_output_file = True
+        if merge_into_output_file or append_to_output_file:
+            try:
+                with io.open(output_file, "r") as f:
+                    existing_items = json.load(f)
+                    if inserts:
+                        if not isinstance(existing_items, dict):
+                            _error(f"JSON file does not contain a dictionary: {output_file}")
+                    elif not isinstance(existing_items, list):
+                        _error(f"JSON file does not contain a list: {output_file}")
+            except Exception:
+                _error(f"Cannot load file as JSON: {output_file}")
+            if merge_into_output_file:
+                merge_identifying_property_name = _ITEM_UUID_PROPERTY_NAME
+                if inserts:
+                    for item_type in items:
+                        if existing_item_type_items := existing_items.get(item_type):
+                            if isinstance(existing_item_type_items, list):
+                                for item in items[item_type]:
+                                    index = find_dictionary_item(
+                                        existing_item_type_items,
+                                        property_value=item.get(merge_identifying_property_name),
+                                        property_name=merge_identifying_property_name)
+                                    if index is not None:
+                                        existing_item_type_items[index] = item
+                        else:
+                            existing_items[item_type] = items[item_type]
+                else:
+                    for item in items:
+                        index = find_dictionary_item(
+                            existing_items,
+                            property_value=item.get(merge_identifying_property_name),
+                            property_name=merge_identifying_property_name)
+                        if index is not None:
+                            existing_items[index] = item
+                        else:
+                            existing_items.append(item)
+            elif append_to_output_file:
+                if inserts:
+                    for item_type in items:
+                        if existing_item_type_items := existing_items.get(item_type):
+                            if isinstance(existing_item_type_items, list):
+                                existing_item_type_items.append(items[item_type])
+                        else:
+                            existing_items[item_type] = items[item_type]
+                else:
+                    existing_items.extend(items)
+            items = existing_items
+    with io.open(output_file, "w") as f:
+        json.dump(items, f, indent=None if noformat else 4)
+    if overwrite_output_file:
+        _verbose(f"Output file overwritten: {output_file}")
+    elif merge_into_output_file:
+        _verbose(f"Output file merged into: {output_file}")
+    elif append_to_output_file:
+        _verbose(f"Output file appended to: {output_file}")
+    else:
+        _verbose(f"Output file written: {output_file}")
 
 
 def _print_data(data: Any, argv: ARGV) -> None:
@@ -494,6 +493,17 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
         if item_type := Portal.get_item_type(item_noraw):
             item[_ITEM_TYPE_PSEUDO_PROPERTY_NAME] = item_type
     return item
+
+
+def _insertize_items(items: dict) -> dict:
+    items_by_type = {}
+    for item in items:
+        item_type = item.get(_ITEM_TYPE_PSEUDO_PROPERTY_NAME)
+        if not (item_list := items_by_type.get(item_type)):
+            items_by_type[item_type] = (item_list := [])
+        item_list.append(item)
+        item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
+    return items_by_type
 
 
 def _scrub_sids_from_items(items: dict) -> None:
