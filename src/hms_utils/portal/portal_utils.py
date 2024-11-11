@@ -52,20 +52,23 @@ class Portal(PortalFromUtils):
         return None
 
     @classmethod
-    def create(cls, env: Optional[str] = None, ini: Optional[str] = None, app: Optional[str] = None,
-               raise_exception: bool = False, ping: bool = True, show: bool = False,
-               verbose: bool = False, debug: bool = False,
-               printf: Optional[Callable] = None) -> Portal:
+    def create(cls,
+               env: Optional[str] = None,
+               ini: Optional[str] = None,
+               app: Optional[str] = None,
+               raise_exception: bool = False,
+               ping: bool = True,
+               verbose: bool = False,
+               debug: bool = False,
+               show: bool = False,
+               printf: Optional[Callable] = None, **kwargs) -> Portal:
 
         if not callable(printf):
             printf = print
 
         with captured_output(debug is not True):
             try:
-                if env or app:
-                    portal = cls(env, app=app, exceptions=raise_exception)
-                else:
-                    portal = cls(ini, exceptions=raise_exception)
+                portal = cls(ini or env, env=env, app=app, raise_exception=raise_exception, **kwargs)
             except Exception as e:
                 if raise_exception is True:
                     raise

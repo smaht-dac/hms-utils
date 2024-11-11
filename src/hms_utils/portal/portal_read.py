@@ -34,13 +34,13 @@ class Portal(PortalFromUtils):
         "submitted_by"
     ]
 
-    def __init__(self, *args, exceptions: bool = False, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._get_call_count = 0
         self._get_metadata_call_count = 0
         self._get_call_duration = 0
         self._get_metadata_call_duration = 0
-        self._exceptions = exceptions is True
+        self._raise_exception = kwargs.get("raise_exception") is True
         self._ignore_properties = Portal._ITEM_IGNORE_PROPERTIES_INSERTS
 
     @property
@@ -93,7 +93,7 @@ class Portal(PortalFromUtils):
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
                 self._get_call_duration += time.time() - started
         except Exception:
-            if self._exceptions:
+            if self._raise_exception:
                 raise
         if self._ignore_properties and items:
             delete_properties_from_dictionaries(items, self._ignore_properties)
