@@ -1,4 +1,5 @@
 from __future__ import annotations
+from prettytable import PrettyTable
 from typing import Callable, Optional
 from hms_utils.chars import chars
 from hms_utils.dictionary_parented import JSON
@@ -128,3 +129,16 @@ def print_dictionary_list(data: dict,
                     value = value_modification
                 print(f"{prefix}{key}: {value}{f' {value_annotation}' if value_annotation else ''}")
     traverse(data)
+
+
+def print_dictionary_as_table(header_name: str, header_value: str,
+                              dictionary: dict, display_value: Callable, sort: bool = True) -> None:
+    table = PrettyTable()
+    table.field_names = [header_name, header_value]
+    table.align[header_name] = "l"
+    table.align[header_value] = "l"
+    if not callable(display_value):
+        display_value = lambda _, value: value  # noqa
+    for key_name, key_value in sorted(dictionary.items(), key=lambda item: item[0]) if sort else dictionary.items():
+        table.add_row([key_name, display_value(key_name, key_value)])
+    print(table)
