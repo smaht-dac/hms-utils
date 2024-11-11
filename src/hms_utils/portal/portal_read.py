@@ -102,11 +102,17 @@ class Portal(PortalFromUtils):
 
 def main() -> int:
 
+    started = time.time()
+
     argv = ARGV({
-        ARGV.REQUIRED(str): ["query"],
+        ARGV.OPTIONAL(str): ["query"],
+        ARGV.OPTIONAL(bool): ["--ping"],
+        ARGV.OPTIONAL(bool): ["--version"],
+        ARGV.AT_LEAST_ONE_OF: ["query", "--ping", "--version"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
+        ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
         ARGV.OPTIONAL(str): ["--output", "--out", "--o"],
         ARGV.OPTIONAL(bool): ["--raw"],
@@ -131,9 +137,6 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(bool): ["--ping"],
-        ARGV.OPTIONAL(bool): ["--version"],
-        ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
         ARGV.OPTIONAL(int, 50): ["--nthreads", "--threads"],
         ARGV.OPTIONAL(bool): ["--sanity-check", "--sanity"],
         ARGV.OPTIONAL(bool): ["--timing", "--time", "--times"],
@@ -142,25 +145,24 @@ def main() -> int:
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--metadata", "--nometadata"],
-        ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
-        ARGV.AT_LEAST_ONE_OF: ["query", "--ping"],
+        ARGV.OPTIONAL(bool): ["--exceptions", "--exception", "--except"],
         ARGV.DEPENDENCY: ["--no-ignore-properties", ARGV.DEPENDS_ON, ["--raw", "--inserts"]],
-        ARGV.ALLOW_ONLY: ["--version"]  # TODO
     })
 
-    started = time.time()
+    _setup_debugging(argv)
 
     if argv.version:
         print(f"hms-portal-read: {get_version()}")
     if argv.ping:
         argv.verbose = True
 
-    _setup_debugging(argv)
-
     if not (portal := Portal.create(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show,
                                     verbose=argv.verbose and not argv.noheader, debug=argv.debug,
                                     raise_exception=argv.exceptions, printf=_info)):
         return 1
+
+    if not argv.query:
+        return 0
 
     if schema := portal.get_schema(argv.query):
         if argv.noformat:
