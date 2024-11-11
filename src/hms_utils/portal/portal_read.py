@@ -253,8 +253,13 @@ def main() -> int:
         else:
             _verbose(f" OK {chars.check}")
 
-    _verbose(f"Total items fetched:"
-             f" {len(get_uuids(items))} {chars.dot} references: {len(get_referenced_uuids(items))}")
+    if argv.verbose:
+        uuids_count = len(get_uuids(items))
+        referenced_uuids_count = len(get_referenced_uuids(items))
+        _verbose(f"Total items fetched:"
+                 f" {uuids_count}"
+                 f"{f' {chars.dot} refs: {referenced_uuids_count}' if referenced_uuids_count != uuids_count else ''}")
+        # f" {len(get_uuids(items))} {chars.dot} references: {len(referenced_uuids)}")
     if argv.timing or argv.debug:
         _info(f"Calls to portal.get_metadata: {portal.get_metadata_call_count}"
               f" {chars.dot} {format_duration(portal.get_metadata_call_duration)}")
