@@ -68,7 +68,7 @@ class Portal(PortalFromUtils):
 
         with captured_output(debug is not True):
             try:
-                portal = cls(ini or env, env=env, app=app, raise_exception=raise_exception, **kwargs)
+                portal = cls(ini or env, app=app, raise_exception=raise_exception, **kwargs)
             except Exception as e:
                 if raise_exception is True:
                     raise

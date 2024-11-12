@@ -11,6 +11,8 @@ from hms_utils.portal.portal_utils import Portal as Portal
 from hms_utils.type_utils import is_uuid
 
 _ACCESS_KEY_TYPE_NAME = "AccessKey"
+_DEFAULT_APP = "smaht"
+_DEFAULT_SERVER = "http://localhost:8000"
 
 
 def main():
@@ -20,47 +22,61 @@ def main():
         ARGV.OPTIONAL(str): ["--ini"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str): ["--user"],
+        ARGV.REQUIRED(str): ["--user"],
         ARGV.OPTIONAL(str): ["--access-keys-file-property-name", "--name"],
         ARGV.OPTIONAL(bool): ["--update"],
         ARGV.OPTIONAL(bool): ["--update-database"],
         ARGV.OPTIONAL(bool): ["--update-keys", "--update-keys-file"],
+        ARGV.OPTIONAL(str): ["--server"],
+        ARGV.OPTIONAL(bool): ["--quiet"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--ping"],
+        ARGV.OPTIONAL(bool): ["--noping"],
         ARGV.OPTIONAL(bool): ["--version"]
     })
 
-    portal = Portal.create(argv.ini or argv.env, app=argv.app, verbose=argv.verbose, debug=argv.debug)
+    portal = Portal.create(argv.ini or argv.env, app=argv.app,
+                           verbose=argv.verbose, debug=argv.debug, ping=not argv.noping)
 
     if not (isinstance(user := portal.get_metadata(f"/users/{argv.user}", raise_exception=False), dict) and
             is_uuid(user_uuid := user.get("uuid"))):
         print(f"Cannot find user: {argv.user}")
         exit(0)
 
+    access_keys_file = portal.keys_file
+    access_keys_file_property_name = argv.access_keys_file_property_name or portal.env
+    access_keys_server = portal.server or argv.server or _DEFAULT_SERVER
+    access_keys_app = portal.app or argv.app or _DEFAULT_APP
+
+    if not access_keys_file:
+        access_keys_file = os.path.expanduser(f"~/.{access_keys_app}-keys.json")
+    if not access_keys_file_property_name:
+        access_keys_file_property_name = f"{access_keys_app}-local"
+
+    access_key_id, access_key_secret, access_key_secret_hash = _generate_access_key_elements()
+    access_keys_file_item = _generate_access_keys_file_item(access_key_id, access_key_secret, access_keys_server)
+    access_key_portal_inserts_item = _generate_access_key_portal_inserts_item(access_key_id,
+                                                                              access_key_secret_hash, user_uuid)
+    if not argv.quiet:
+        print(f"Newly generated portal access-key record suitable for: {access_keys_file} ...")
+        print(json.dumps(access_keys_file_item, indent=4))
+        print(f"Newly generated portal access-key record suitable for insert ...")
+        print(json.dumps(access_key_portal_inserts_item, indent=4))
+
     if argv.update:
         argv.update_database = True
         argv.update_keys = True
 
-    access_key_id, access_key_secret, access_key_secret_hash = _generate_access_key_elements()
-    access_keys_file_item = _generate_access_keys_file_item(access_key_id, access_key_secret, portal.server)
-    access_key_portal_inserts_item = _generate_access_key_portal_inserts_item(access_key_id,
-                                                                              access_key_secret_hash, user_uuid)
-
-    print(json.dumps(access_keys_file_item, indent=4))
-    print(json.dumps(access_key_portal_inserts_item, indent=4))
-
     if argv.update_database:
-        if argv.verbose:
-            print(f"Updating portal database with newly generated access-key item: {portal.server}")
+        if (not argv.quiet) or argv.verbose:
+            print(f"Updating portal database with newly generated access-key item:"
+                  f" {access_keys_server} {chars.dot} {access_key_id}")
         _update_portal_with_access_key(portal, access_key_portal_inserts_item)
 
-    access_keys_file = portal.keys_file
-    access_keys_file_property_name = argv.access_keys_file_property_name or portal.env
-
     if argv.update_keys:
-        if argv.verbose:
+        if (not argv.quiet) or argv.verbose:
             print(f"Updating access-keys file with newly generated access-key item:"
                   f" {access_keys_file} {chars.dot} {access_keys_file_property_name}")
         if os.path.exists(access_keys_file):
