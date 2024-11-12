@@ -95,7 +95,7 @@ def main():
                 elif argv.verbose:
                     print(f"Overwriting existing item for access-key ({access_keys_file_property_name})"
                           f" in access-keys file: {access_keys_file}")
-                access_keys_file_json[access_keys_file_property_name] = access_keys_file_item
+            access_keys_file_json[access_keys_file_property_name] = access_keys_file_item
         else:
             access_keys_file_json = access_keys_file_item
         try:
