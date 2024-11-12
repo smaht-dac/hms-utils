@@ -480,6 +480,8 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
                                 database=database, limit=limit, offset=offset, deleted=deleted,
                                 field=_ITEM_UUID_PROPERTY_NAME)
     run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
+    if not item:
+        return {}
     if isinstance(graph := item.get("@graph"), list):
         if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
             def find_item_type(uuid: str) -> Optional[str]:
