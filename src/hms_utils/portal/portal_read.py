@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum, auto as enum_auto
 from functools import lru_cache
 import io
 import json
@@ -33,6 +34,12 @@ class Portal(PortalFromUtils):
         "schema_version",
         "submitted_by"
     ]
+
+    class Access(Enum):
+        OK = enum_auto()
+        NOT_FOUND = enum_auto()
+        NO_ACCESS = enum_auto()
+        ERROR = enum_auto()
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -70,7 +77,8 @@ class Portal(PortalFromUtils):
     def GET(self, query: str, metadata: bool = False,
             raw: bool = False, inserts: bool = False, database: bool = False,
             limit: Optional[int] = None, offset: Optional[int] = None,
-            field: Optional[str] = None, deleted: bool = False) -> Optional[Union[List[dict], dict]]:
+            field: Optional[str] = None, deleted: bool = False,
+            raise_exception: bool = False) -> Optional[Union[List[dict], dict]]:
         items = None
         try:
             _debug(f"portal.get{'_metadata' if metadata else ''}: {query}"
@@ -93,6 +101,8 @@ class Portal(PortalFromUtils):
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
                 self._get_call_duration += time.time() - started
         except Exception:
+            if raise_exception is True:
+                raise
             #
             # TODO
             #
@@ -121,6 +131,18 @@ class Portal(PortalFromUtils):
             delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
 
+    def access(self, query: str, metadata: bool = False) -> bool:
+        try:
+            self.GET(query, metadata=metadata, raise_exception=True)
+            return Portal.Access.OK
+        except Exception as e:
+            if "404" in (estr := str(e)):
+                return Portal.Access.NOT_FOUND
+            elif "403" in estr:
+                return Portal.Access.NO_ACCESS
+            else:
+                return Portal.Access.ERROR
+
 
 def main() -> int:
 
@@ -137,6 +159,7 @@ def main() -> int:
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
         ARGV.OPTIONAL(str): ["--output", "--out", "--o"],
+        ARGV.OPTIONAL(bool): ["--check-access-only", "--check", "--accessible"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--metadata"],
@@ -205,6 +228,24 @@ def main() -> int:
         argv.query = f"/{argv.query}"
 
     _verbose(f"Querying Portal for item(s): {argv.query}")
+
+    if argv.check_access_only:
+        access = portal.access(argv.query, metadata=metadata)
+        if access == Portal.Access.NOT_FOUND:
+            _print(f"{argv.query}: Not found")
+            return 1
+        elif access == Portal.Access.NO_ACCESS:
+            _print(f"{argv.query}: Not accessible")
+            return 1
+        elif access == Portal.Access.ERROR:
+            _print(f"{argv.query}: Error")
+            return 1
+        elif access == Portal.Access.OK:
+            _print(f"{argv.query}: OK")
+            return 0
+        else:
+            _print(f"{argv.query}: Unknown error")
+            return 1
 
     if not (items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
                                  limit=argv.limit, offset=argv.offset, database=argv.database,
