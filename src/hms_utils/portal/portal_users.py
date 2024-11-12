@@ -108,15 +108,15 @@ def main():
                     continue
             if (argv.submission_center.strip().lower() in ["none", "null"]) and submission_centers:
                 continue
-        user_uuid = user.get("email")
-        user_email = user.get("email")
-        user_first_name = user.get("first_name")
-        user_last_name = user.get("last_name")
+        user_uuid = user.get("uuid", "")
+        user_email = user.get("email", "")
+        user_first_name = user.get("first_name", "")
+        user_last_name = user.get("last_name", "")
         if argv.query:
-            if not ((argv.query in user_uuid) or
-                    (argv.query in user_email) or
-                    (argv.query in user_first_name) or
-                    (argv.query in user_last_name)):
+            if not ((argv.query in user_uuid.lower()) or
+                    (argv.query in user_email.lower()) or
+                    (argv.query in user_first_name.lower()) or
+                    (argv.query in user_last_name.lower())):
                 continue
         table.add_row([
             ordinal,
