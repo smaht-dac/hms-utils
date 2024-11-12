@@ -167,6 +167,8 @@ def main():
         exit(1)
 
     if args.load:
+        if args.load == "-":
+            args.load = "/dev/stdin"
         _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
                    unresolved_output=args.unresolved_output, skip_links=args.skip_links,
                    verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
