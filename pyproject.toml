@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.4.114"
+version = "1.4.115"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -58,7 +58,7 @@ hms-portal-users = "hms_utils.portal.portal_users:main"
 hms-encrypt = "hms_utils.cli.crypt_cli:main_encrypt"
 hms-decrypt = "hms_utils.cli.crypt_cli:main_decrypt"
 
-hms-generate-local-access-key = "hms_utils.portal.generate_local_access_key:main"
+hms-portal-generate-access-key = "hms_utils.portal.portal_generate_access_key:main"
 
 # obsolete ...
 hmx-config = "hms_utils.hms_config:main"
