@@ -185,7 +185,8 @@ def main() -> int:
     _verbose(f"Querying Portal for item(s): {argv.query}")
 
     if not (items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
-                                 limit=argv.limit, offset=argv.offset, deleted=argv.deleted, nthreads=argv.nthreads)):
+                                 limit=argv.limit, offset=argv.offset, database=argv.database,
+                                 deleted=argv.deleted, nthreads=argv.nthreads)):
         _info(f"Portal item(s) not found: {argv.query}")
         return 1
 
