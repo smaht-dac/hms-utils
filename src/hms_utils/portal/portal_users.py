@@ -55,6 +55,7 @@ def main():
 
     argv = ARGV({
         ARGV.REQUIRED(str): ["--env"],
+        ARGV.OPTIONAL(str): ["query"],
         ARGV.OPTIONAL(bool): ["--current"],
         ARGV.OPTIONAL(bool): ["--deleted"],
         ARGV.OPTIONAL(bool): ["--inactive"],
@@ -65,6 +66,9 @@ def main():
     })
 
     portal = Portal.create(argv.env, debug=True)
+
+    if argv.query:
+        argv.query = argv.query.lower()
     if argv.current:
         status_query = "status=current"
     elif argv.deleted:
@@ -94,7 +98,8 @@ def main():
     for user in users:
         group = get_group_display_value(user)
         if argv.admin and ("admin" not in group):
-            continue
+            if "admin" not in group:
+                continue
         submission_centers = get_submission_centers_display_value(user)
         if argv.submission_center:
             if (argv.submission_center.strip().lower() and
@@ -103,17 +108,28 @@ def main():
                     continue
             if (argv.submission_center.strip().lower() in ["none", "null"]) and submission_centers:
                 continue
+        user_uuid = user.get("email")
+        user_email = user.get("email")
+        user_first_name = user.get("first_name")
+        user_last_name = user.get("last_name")
+        if argv.query:
+            if not ((argv.query in user_uuid) or
+                    (argv.query in user_email) or
+                    (argv.query in user_first_name) or
+                    (argv.query in user_last_name)):
+                continue
         table.add_row([
             ordinal,
-            user.get("email") + ("\n" + user.get("uuid") if argv.verbose else ""),
-            user.get("first_name") + " " + user.get("last_name"),
+            user_email + ("\n" + user_uuid if argv.verbose else ""),
+            user_first_name + " " + user_last_name,
             get_consortia_display_value(user) or chars.null,
             submission_centers or chars.null,
             get_group_display_value(user) or chars.null,
             user.get("status"),
         ])
         ordinal += 1
-    print(table)
+    if ordinal > 1:
+        print(table)
 
 
 if __name__ == "__main__":
