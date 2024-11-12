@@ -93,6 +93,28 @@ class Portal(PortalFromUtils):
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
                 self._get_call_duration += time.time() - started
         except Exception:
+            #
+            # TODO
+            #
+            # Support just querying whether or not the given target/path//object/whatever if accessible ...
+            #
+            # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830a:
+            # 403. Reason: {'@type': ['HTTPForbidden', 'Error'], 'status': 'error',
+            # 'code': 403, 'title': 'Forbidden', 'description': 'Access was denied to this resource.',
+            # 'detail': 'Unauthorized: item_view failed permission check'}
+            #
+            # VS.
+            #
+            # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd:
+            # 404. Reason: {\'@type\': [\'HTTPNotFound\', \'Error\'], \'status\': \'error\',
+            # \'code\': 404, \'title\': \'Not Found\', \'description\':
+            # \'The resource could not be found.\', \'detail\':
+            # "debug_notfound of url http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd; path_info:
+            # \'/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', context: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
+            # view_name: \'a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', subpath: (), traversed: (),
+            # root: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
+            # vroot: <encoded.root.SMAHTRoot object at 0x1371d39b0>, vroot_path: ()"}'
+            #
             if self._raise_exception:
                 raise
         if self._ignore_properties and items:
