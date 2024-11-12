@@ -4,10 +4,11 @@ from functools import lru_cache
 import io
 import json
 import os
+import re
 import requests
 import sys
 import time
-from typing import Any, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, List, Optional, Set, Tuple, Union
 import yaml
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
@@ -103,18 +104,24 @@ class Portal(PortalFromUtils):
         except Exception:
             if raise_exception is True:
                 raise
-            #
+            if self._raise_exception:
+                raise
+        if self._ignore_properties and items:
+            delete_properties_from_dictionaries(items, self._ignore_properties)
+        return items
+
+    def access(self, query: str, metadata: bool = False,
+               report: bool = False, printf: Optional[Callable] = None) -> Portal.Access:
+        access = Portal.Access.OK
+        try:
+            self.GET(query, metadata=metadata, raise_exception=True)
+        except Exception as e:
             # TODO
-            #
-            # Support just querying whether or not the given target/path//object/whatever if accessible ...
-            #
             # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830a:
             # 403. Reason: {'@type': ['HTTPForbidden', 'Error'], 'status': 'error',
             # 'code': 403, 'title': 'Forbidden', 'description': 'Access was denied to this resource.',
             # 'detail': 'Unauthorized: item_view failed permission check'}
-            #
             # VS.
-            #
             # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd:
             # 404. Reason: {\'@type\': [\'HTTPNotFound\', \'Error\'], \'status\': \'error\',
             # \'code\': 404, \'title\': \'Not Found\', \'description\':
@@ -124,24 +131,30 @@ class Portal(PortalFromUtils):
             # view_name: \'a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', subpath: (), traversed: (),
             # root: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
             # vroot: <encoded.root.SMAHTRoot object at 0x1371d39b0>, vroot_path: ()"}'
-            #
-            if self._raise_exception:
-                raise
-        if self._ignore_properties and items:
-            delete_properties_from_dictionaries(items, self._ignore_properties)
-        return items
-
-    def access(self, query: str, metadata: bool = False) -> bool:
-        try:
-            self.GET(query, metadata=metadata, raise_exception=True)
-            return Portal.Access.OK
-        except Exception as e:
-            if "404" in (estr := str(e)):
-                return Portal.Access.NOT_FOUND
-            elif "403" in estr:
-                return Portal.Access.NO_ACCESS
+            def contains_word(text: str, word: str) -> bool:  # noqa
+                return bool(re.search(rf"\b{word}\b", text, re.IGNORECASE))
+            if (contains_word(e := str(e), "HTTPForbidden") or
+                contains_word(e, "forbidden") or contains_word(e, "unauthorized")):  # noqa
+                access = Portal.Access.NO_ACCESS
+            elif contains_word(e, "HTTPNotFound") or (contains_word(e, "found") and
+                                                      contains_word(e, "not") and contains_word(e, "404")):
+                access = Portal.Access.NOT_FOUND
             else:
-                return Portal.Access.ERROR
+                access = Portal.Access.ERROR
+        if report is True:
+            if not callable(printf):
+                printf = print
+            if access == Portal.Access.NOT_FOUND:
+                printf(f"{query}: Not found")
+            elif access == Portal.Access.NO_ACCESS:
+                printf(f"{query}: Forbidden")
+            elif access == Portal.Access.ERROR:
+                printf(f"{query}: Error")
+            elif access == Portal.Access.OK:
+                printf(f"{query}: OK")
+            else:
+                _print(f"{query}: Unknown error")
+        return access
 
 
 def main() -> int:
@@ -159,7 +172,7 @@ def main() -> int:
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
         ARGV.OPTIONAL(str): ["--output", "--out", "--o"],
-        ARGV.OPTIONAL(bool): ["--check-access-only", "--check", "--accessible"],
+        ARGV.OPTIONAL(bool): ["--check-access-only", "--check-access", "--check", "--access"],
         ARGV.OPTIONAL(bool): ["--raw"],
         ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--metadata"],
@@ -230,22 +243,7 @@ def main() -> int:
     _verbose(f"Querying Portal for item(s): {argv.query}")
 
     if argv.check_access_only:
-        access = portal.access(argv.query, metadata=metadata)
-        if access == Portal.Access.NOT_FOUND:
-            _print(f"{argv.query}: Not found")
-            return 1
-        elif access == Portal.Access.NO_ACCESS:
-            _print(f"{argv.query}: Not accessible")
-            return 1
-        elif access == Portal.Access.ERROR:
-            _print(f"{argv.query}: Error")
-            return 1
-        elif access == Portal.Access.OK:
-            _print(f"{argv.query}: OK")
-            return 0
-        else:
-            _print(f"{argv.query}: Unknown error")
-            return 1
+        return 0 if portal.access(argv.query, metadata=metadata, report=True, printf=_print) == Portal.Access.OK else 1
 
     if not (items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
                                  limit=argv.limit, offset=argv.offset, database=argv.database,
