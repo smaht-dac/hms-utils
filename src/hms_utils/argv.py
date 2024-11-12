@@ -28,7 +28,7 @@ class Argv:
     _OPTION_PREFIX = "--"
     _OPTION_PREFIX_LEN = len(_OPTION_PREFIX)
     _DEFAULT_VALUE_DELIMITER = ":__default__:"
-    _RULE_DELIMITER = ":"
+    _RULE_DELIMITER = "__@@@:@@@__"
     _RULE_PREFIX = f"__rule__{_RULE_DELIMITER}"
     _RULE_PREFIX_LEN = len(_RULE_PREFIX)
     _NO_VALUE = object()

@@ -74,8 +74,8 @@ import uuid
 from dcicutils.common import AnyJsonData
 from dcicutils.portal_utils import Portal
 from snovault.authentication import (
-    generate_password as generate_access_key_secret,
-    generate_user as generate_access_key
+    generate_password as snovault_generate_access_key_secret,
+    generate_user as snovault_generate_access_key
 )
 from snovault.edw_hash import EDWHash
 from snovault.loadxl import load_all
@@ -226,8 +226,8 @@ def _generate_access_keys_file_item(access_key_id: str, access_key_secret: str, 
 
 
 def _generate_access_key(ini_file: str = _DEFAULT_INI_FILE) -> Tuple[str, str, str]:
-    access_key_secret = generate_access_key_secret()
-    return generate_access_key(), access_key_secret, _hash_secret_like_snovault(access_key_secret, ini_file)
+    access_key_secret = snovault_generate_access_key_secret()
+    return snovault_generate_access_key(), access_key_secret, _hash_secret_like_snovault(access_key_secret, ini_file)
 
 
 def _hash_secret_like_snovault(secret: str, ini_file: str = _DEFAULT_INI_FILE) -> str:
