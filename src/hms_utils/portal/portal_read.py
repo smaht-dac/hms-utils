@@ -164,7 +164,7 @@ def main() -> int:
     if not argv.query:
         return 0
 
-    if schema := portal.get_schema(argv.query):
+    if ("/" not in argv.query) and ("-" not in argv.query) and (schema := portal.get_schema(argv.query)):
         _print_data(schema, argv)
         return 0
 
