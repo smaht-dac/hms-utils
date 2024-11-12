@@ -16,17 +16,17 @@ _ACCESS_KEY_TYPE_NAME = "AccessKey"
 def main():
 
     argv = ARGV({
-        ARGV.OPTIONAL(str, "smaht-local"): ["--env"],
+        ARGV.OPTIONAL(str): ["--env"],
         ARGV.OPTIONAL(str): ["--ini"],
         ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, "david_michaels@hms.harvard.edu"): ["--user"],
+        ARGV.OPTIONAL(str): ["--user"],
         ARGV.OPTIONAL(str): ["--access-keys-file-property-name", "--name"],
         ARGV.OPTIONAL(bool): ["--update"],
         ARGV.OPTIONAL(bool): ["--update-database"],
         ARGV.OPTIONAL(bool): ["--update-keys", "--update-keys-file"],
-        ARGV.OPTIONAL(bool, True): ["--verbose"],
-        ARGV.OPTIONAL(bool, True): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--version"]
