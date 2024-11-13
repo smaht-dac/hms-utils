@@ -55,7 +55,7 @@ def main():
         if argv.admin and ("admin" not in group):
             if "admin" not in group:
                 continue
-        submission_centers = _get_submission_centers_display_value(user)
+        submission_centers = _get_submission_centers_display_value(user, verbose=argv.verbose)
         if argv.submission_center:
             if (argv.submission_center.strip().lower() and
                 (argv.submission_center.strip().lower() not in ["none", "null"])):  # noqa
@@ -77,7 +77,7 @@ def main():
             ordinal,
             user_email + ("\n" + user_uuid if argv.verbose else ""),
             user_first_name + " " + user_last_name,
-            _get_consortia_display_value(user) or chars.null,
+            _get_consortia_display_value(user, verbose=argv.verbose) or chars.null,
             submission_centers or chars.null,
             _get_group_display_value(user) or chars.null,
             user.get("status"),
@@ -87,22 +87,32 @@ def main():
         print(table)
 
 
-def _get_consortia_display_value(user: dict) -> str:
-    values = []
+def _get_consortia_display_value(user: dict, verbose: bool = False) -> str:
+    values = [] ; values_verbose = ""  # noqa
     if isinstance(consortia := user.get("consortia"), list):
         for consortium in consortia:
             if isinstance(value := consortium.get("identifier"), str):
                 values.append(value)
-    return ", ".join(values)
+                if (verbose is True) and (value_uuid := consortium.get("uuid")):
+                    values_verbose += "\n" + value_uuid
+    values = ", ".join(values)
+    if values_verbose:
+        values += values_verbose
+    return values
 
 
-def _get_submission_centers_display_value(user: dict) -> str:
-    values = []
+def _get_submission_centers_display_value(user: dict, verbose: bool = False) -> str:
+    values = [] ; values_verbose = ""  # noqa
     if isinstance(submission_centers := user.get("submission_centers"), list):
         for submission_center in submission_centers:
             if isinstance(value := submission_center.get("identifier"), str):
                 values.append(value)
-    return ", ".join(values)
+                if (verbose is True) and (value_uuid := submission_center.get("uuid")):
+                    values_verbose += "\n" + value_uuid
+    values = ", ".join(values)
+    if values_verbose:
+        values += values_verbose
+    return values
 
 
 def _get_group_display_value(user: dict) -> str:
