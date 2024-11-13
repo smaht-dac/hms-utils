@@ -66,12 +66,11 @@ def print_roles(roles: dict, message: Optional[str] = None):
     print_principals(list(roles.keys()), value_callback=role_value, value_header="ROLE VALUE")
 
 
-def print_acl(acl: List[tuple], message: Optional[str] = None):
-    if isinstance(acl, list):
+def print_acls(acls: List[tuple], message: Optional[str] = None):
+    if isinstance(acls, list):
         rows = []
-        for ace in acl:
-            ace_action, ace_principal, ace_permissions = ace
-            # rows.append([ace_principal, ", ".join(ace_permissions), ace_action])
+        for acl_item in acls:
+            ace_action, ace_principal, ace_permissions = acl_item
             rows.append([ace_principal, f"{ace_action} {chars.dot} {'/'.join(ace_permissions)}"])
         table = PrettyTable()
         table.header = False
@@ -82,16 +81,16 @@ def print_acl(acl: List[tuple], message: Optional[str] = None):
         print(table)
 
 
-def print_acl_and_principals(acl: List[tuple], principals: List[str], message: Optional[str] = None):
+def print_acls_and_principals(acls: List[tuple], principals: List[str], message: Optional[str] = None):
     def acl_value(principal, uuid):  # noqa
-        nonlocal acl, principals
-        for acl_item in acl:
+        nonlocal acls, principals
+        for acl_item in acls:
             if acl_item[1] == principal:
                 return f"{acl_item[0]} {chars.dot} {'/'.join(acl_item[2])}"
         return chars.null
     output = print_principals(principals, value_callback=acl_value, value_header="PERMISSION", return_value=True)
     acls_not_in_principals = []
-    for acl_item in acl:
+    for acl_item in acls:
         if acl_item[1] not in principals:
             acls_not_in_principals.append(acl_item)
     if acls_not_in_principals:
@@ -108,14 +107,14 @@ def print_acl_and_principals(acl: List[tuple], principals: List[str], message: O
     print("EOF")
 
 
-if False:
+if True:
 
-    acl = [('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
-    print_acl(acl)
+    acls = [('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
+    print_acls(acls)
     principals = ['system.Everyone', 'group.admin', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.consortium_member_rw', 'system.Authenticated', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'role.consortium_member_create', 'accesskey.Z4WJPLBI', 'group.submitter', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff']  # noqa
     print_principals(principals)
 
-    print_acl_and_principals(acl, principals)
+    print_acls_and_principals(acls, principals)
 
     roles = {'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff': 'role.submission_center_member_rw', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff': 'role.submission_center_member_create', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b': 'role.consortium_member_rw', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68': 'role.owner'}  # noqa
     print_roles(roles)
