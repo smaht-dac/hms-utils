@@ -103,7 +103,6 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
             output += ((len(separator) - len(acl_item_output) - 1) * " ") + "|"
         output += "\n" + separator
     print(output)
-    print("EOF")
 
 
 if False:
