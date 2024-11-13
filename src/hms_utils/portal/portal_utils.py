@@ -59,9 +59,10 @@ class Portal(PortalFromUtils):
                arg: Optional[str] = None,
                app: Optional[str] = None,
                raise_exception: bool = False,
-               ping: bool = True,
                verbose: bool = False,
                debug: bool = False,
+               ping: bool = False,
+               noping: bool = False,
                show: bool = False,
                printf: Optional[Callable] = None, **kwargs) -> Portal:
 
@@ -77,6 +78,9 @@ class Portal(PortalFromUtils):
 
         if not callable(printf):
             printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
+
+        if ping:
+            verbose = True
 
         with captured_output(debug is not True):
             try:
@@ -106,7 +110,8 @@ class Portal(PortalFromUtils):
                 printf(f"Portal ini file: {portal.ini_file}")
             if portal.server:
                 printf(f"Portal server: {portal.server}")
-        if ping is not False:
+        if noping is not True:
+            status = 0
             if portal.ping():
                 if verbose:
                     version = None
@@ -124,5 +129,8 @@ class Portal(PortalFromUtils):
                            f"{f' {chars.dot} {bluegreen}' if bluegreen else ''} {chars.check}")
             else:
                 printf(f"Portal connectivity: {portal.server} is unreachable {chars.xmark}")
+                status = 1
+            if ping is True:
+                exit(status)
 
         return portal

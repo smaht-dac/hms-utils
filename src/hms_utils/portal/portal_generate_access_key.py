@@ -32,12 +32,10 @@ def main():
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--yes", "--force"],
         ARGV.OPTIONAL(bool): ["--ping"],
-        ARGV.OPTIONAL(bool): ["--noping"],
         ARGV.OPTIONAL(bool): ["--version"]
     })
 
-    portal = Portal.create(argv.ini or argv.env, app=argv.app,
-                           verbose=argv.verbose, debug=argv.debug, ping=not argv.noping)
+    portal = Portal.create(argv.ini or argv.env, app=argv.app, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)
 
     if not (isinstance(user := portal.get_metadata(f"/users/{argv.user}", raise_exception=False), dict) and
             is_uuid(user_uuid := user.get("uuid"))):

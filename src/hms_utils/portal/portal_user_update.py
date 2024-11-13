@@ -14,10 +14,11 @@ def main():
         ARGV.OPTIONAL([str]): ["--consortia", "--consortium", "--c"],
         ARGV.OPTIONAL([str]): ["--submission-centers", "--submission-center", "--sc", "--s"],
         ARGV.OPTIONAL(bool): ["--verbose"],
-        ARGV.OPTIONAL(bool): ["--debug"]
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--ping"]
     })
 
-    portal = Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug)
+    portal = Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)
 
     user_query = f"/users/{argv.user}"
     if not (user := portal.get_metadata(user_query)):

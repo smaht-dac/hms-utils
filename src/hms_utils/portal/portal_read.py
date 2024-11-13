@@ -210,12 +210,10 @@ def main() -> int:
 
     if argv.version:
         print(f"hms-portal-read: {get_version()}")
-    if argv.ping:
-        argv.verbose = True
 
     if not (portal := Portal.create(argv.env or argv.ini, app=argv.app, show=argv.show,
                                     verbose=argv.verbose and not argv.noheader, debug=argv.debug,
-                                    raise_exception=argv.exceptions, printf=_info)):
+                                    ping=argv.ping, raise_exception=argv.exceptions, printf=_info)):
         return 1
 
     if not argv.query:

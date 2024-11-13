@@ -16,10 +16,11 @@ def main():
         ARGV.OPTIONAL(bool): ["--admin"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(str): ["--submission-center", "--submission-centers", "--centers", "--center", "--sc"]
     })
 
-    portal = Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug)
+    portal = Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)
 
     if argv.query:
         argv.query = argv.query.lower()
