@@ -12,6 +12,7 @@ def main():
         ARGV.OPTIONAL(str): ["--env"],
         ARGV.REQUIRED(str): ["user"],
         ARGV.OPTIONAL([str]): ["--consortia", "--consortium", "--c"],
+        ARGV.OPTIONAL([str]): ["--groups", "--group", "--g"],
         ARGV.OPTIONAL([str]): ["--submission-centers", "--submission-center", "--sc", "--s"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
@@ -24,7 +25,6 @@ def main():
     if not (user := portal.get_metadata(user_query)):
         print("Cannot find user: {argv.user")
 
-    consortia = None
     if argv.consortia:
         if (len(argv.consortia) == 1) and (argv.consortia[0].lower() in ["none", "null", "no", "empty"]):
             if argv.verbose:
@@ -36,7 +36,6 @@ def main():
                     print(f"Setting consortia for {argv.user} to: {', '.join(consortia)}")
                 portal.patch_metadata(user_query, {"consortia": consortia})
 
-    submission_centers = None
     if argv.submission_centers:
         if (len(argv.submission_centers) == 1) and (argv.submission_centers[0] in ["none", "null", "no", "empty"]):
             # Deleting submission_centers does not seem to work; set it to empty list instead.
@@ -49,6 +48,14 @@ def main():
                 if argv.verbose:
                     print(f"Setting submission-centers for {argv.user} to: {', '.join(submission_centers)}")
                 portal.patch_metadata(user_query, {"submission_centers": submission_centers})
+
+    if argv.groups:
+        if (len(argv.groups) == 1) and (argv.groups[0] in ["none", "null", "no", "empty"]):
+            portal.delete_metadata_property(user_query, "groups")
+        else:
+            if argv.verbose:
+                print(f"Setting groups for {argv.user} to: {', '.join(argv.groups)}")
+            portal.patch_metadata(user_query, {"groups": argv.groups})
 
     user = portal.get_metadata(user_query, raw=True, database=True)
     print(json.dumps(user, indent=4))
