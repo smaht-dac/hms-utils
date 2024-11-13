@@ -70,7 +70,9 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
     rows = []
     for acl_item in acls:
         ace_action, ace_principal, ace_permissions = acl_item
-        rows.append([ace_principal, f"{ace_action} {chars.dot} {'/'.join(ace_permissions)}"])
+        rows.append([ace_principal,
+                     (f"{ace_action} {chars.dot}"
+                      f" {'/'.join(ace_permissions) if isinstance(ace_permissions, list) else str(ace_permissions)}")])
     table = PrettyTable()
     table.header = False
     rows.sort(key=lambda row: row[0])
@@ -87,7 +89,8 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
         nonlocal acls, principals
         for acl_item in acls:
             if acl_item[1] == principal:
-                return f"{acl_item[0]} {chars.dot} {'/'.join(acl_item[2])}"
+                return (f"{acl_item[0]} {chars.dot}"
+                        f" {'/'.join(acl_item[2] if isinstance(acl_item[2], list) else str(acl_item[2]))}")
         return chars.null
     output = print_principals(principals, value_callback=acl_value, value_header="PERMISSION", return_value=True)
     acls_not_in_principals = []
@@ -100,7 +103,8 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
             separator = "+" + ((len(separator) - 2) * "-") + "+"
         output += "\n| ACLs NOT IN PRINCIPALS ...\n" + separator
         for acl_item in acls_not_in_principals:
-            acl_item_output = f"| {acl_item[1]} {chars.dot} {acl_item[0]} {chars.dot} {'/'.join(acl_item[2])}"
+            acl_item_output = (f"| {acl_item[1]} {chars.dot} {acl_item[0]} {chars.dot}"
+                               f" {'/'.join(acl_item[2]) if isinstance(acl_item[2], list) else str(acl_item[2])}")
             output += f"\n{acl_item_output}"
             output += ((len(separator) - len(acl_item_output) - 1) * " ") + "|"
         output += "\n" + separator
