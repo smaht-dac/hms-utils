@@ -106,7 +106,7 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
     print("EOF")
 
 
-if True:
+if False:
 
     acls = [('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
     print_acls(acls)
