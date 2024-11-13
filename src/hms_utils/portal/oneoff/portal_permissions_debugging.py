@@ -83,11 +83,12 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
     print(table)
 
 
-def print_acls_and_principals(acls: List[tuple], principals: List[str], message: Optional[str] = None):
+def print_acls_and_principals(acls: List[tuple], principals: List[str],
+                              message: Optional[str] = None, permission: Optional[str] = None):
     def acl_value(principal, uuid):  # noqa
+        nonlocal acls, principals, permission
         if uuid:
             principal = f"{principal}.{uuid}"
-        nonlocal acls, principals
         for acl_item in acls:
             if acl_item[1] == principal:
                 return (f"{acl_item[0]} {chars.dot}"
@@ -126,7 +127,7 @@ if False:
     principals = ['system.Everyone', 'group.admin', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.consortium_member_rw', 'system.Authenticated', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'role.consortium_member_create', 'accesskey.Z4WJPLBI', 'group.submitter', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff']  # noqa
     print_principals(principals)
 
-    print_acls_and_principals(acls, principals)
+    print_acls_and_principals(acls, principals, permission="view")
 
     roles = {'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff': 'role.submission_center_member_rw', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff': 'role.submission_center_member_create', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b': 'role.consortium_member_rw', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68': 'role.owner'}  # noqa
     print_roles(roles)
