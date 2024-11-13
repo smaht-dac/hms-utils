@@ -7,7 +7,8 @@ from hms_utils.type_utils import is_uuid
 def print_principals(principals: List[str], message: Optional[str] = None,
                      value_callback: Optional[Callable] = None,
                      value_header: Optional[str] = None,
-                     return_value: bool = False):
+                     return_value: bool = False,
+                     nosort: bool = False):
 
     def uuid_specific_principal(principal):  # noqa
         principal_uuid = ""
@@ -45,10 +46,12 @@ def print_principals(principals: List[str], message: Optional[str] = None,
             rows.append(["userid", header[0], role])
     else:
         table.header = False
-    rows.sort(key=lambda row: f"{row[0]}_{row[1]}")
     for row in rows:
         if value_callback and (role := value_callback(row[0], row[1])):
             row[2] = role
+    if nosort is not True:
+        rows.sort(key=lambda row: f"{row[0]}_{row[1]}")
+    for row in rows:
         table.add_row([item or chars.null for item in row])
     table.align = "l"
     output = f"{message}\n" if message else ""
@@ -58,14 +61,15 @@ def print_principals(principals: List[str], message: Optional[str] = None,
     print(output)
 
 
-def print_roles(roles: dict, message: Optional[str] = None):
+def print_roles(roles: dict, message: Optional[str] = None, nosort: bool = False):
     def role_value(principal, uuid):
         nonlocal roles
         return roles.get(f"{principal}.{uuid}") if uuid else roles.get(principal)
-    print_principals(list(roles.keys()), message=message, value_callback=role_value, value_header="ROLE VALUE")
+    print_principals(list(roles.keys()), message=message,
+                     value_callback=role_value, value_header="ROLE VALUE", nosort=nosort)
 
 
-def print_acls(acls: List[tuple], message: Optional[str] = None):
+def print_acls(acls: List[tuple], message: Optional[str] = None, nosort: bool = False):
     rows = []
     for acl_item in acls:
         ace_action, ace_principal, ace_permissions = acl_item
@@ -74,7 +78,8 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
                       f" {'/'.join(ace_permissions) if isinstance(ace_permissions, list) else str(ace_permissions)}")])
     table = PrettyTable()
     table.header = False
-    rows.sort(key=lambda row: row[0])
+    if nosort is not True:
+        rows.sort(key=lambda row: row[0])
     for row in rows:
         table.add_row(row)
     table.align = "l"
@@ -85,14 +90,30 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
 
 def print_acls_and_principals(acls: List[tuple], principals: List[str],
                               message: Optional[str] = None, permission: Optional[str] = None):
+    def find_matching_acl():  # noqa
+        # FYI: See pyramid/authorization.py ...
+        nonlocal acls, principals, permission
+        for acl_item in acls:
+            acl_action, acl_principal, acl_permissions = acl_item
+            if acl_principal in principals:
+                if permission in acl_permissions:
+                    return acl_item
+        return None
+    matching_acl = find_matching_acl()
     def acl_value(principal, uuid):  # noqa
         nonlocal acls, principals, permission
         if uuid:
             principal = f"{principal}.{uuid}"
         for acl_item in acls:
-            if acl_item[1] == principal:
-                return (f"{acl_item[0]} {chars.dot}"
-                        f" {'/'.join(acl_item[2]) if isinstance(acl_item[2], list) else str(acl_item[2])}")
+            acl_action, acl_principal, acl_permissions = acl_item
+            if acl_principal == principal:
+                value = (f"{acl_action} {chars.dot}"
+                         f" {'/'.join(acl_permissions) if isinstance(acl_permissions, list) else str(acl_permissions)}")
+                if acl_item == matching_acl:
+                    value += f" {chars.larrow}{chars.larrow}{chars.larrow}"
+                elif permission in acl_permissions:
+                    value += f" {chars.larrow_hollow}"
+                return value
         return ""
     output = print_principals(principals, value_callback=acl_value, value_header="PERMISSION", return_value=True)
     acls_not_in_principals = []
@@ -113,6 +134,17 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str],
     if message:
         print(message)
     print(output)
+
+
+if True:
+
+    acls = [('Allow', 'group.submitter', ['edit']), ('Allow', 'role.submission_center_member_rw', ['view']), ('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
+
+    principals = {'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Everyone', 'group.admin', 'accesskey.7JFE33AN', 'role.owner', 'role.submission_center_member_create', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68', 'role.submission_center_member_rw', 'group.submitter', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.consortium_member_create', 'role.consortium_member_rw', 'system.Authenticated', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff'}  # noqa
+
+    print_acls(acls)
+    print_principals(principals)
+    print_acls_and_principals(acls, principals, permission="view")
 
 
 if False:
