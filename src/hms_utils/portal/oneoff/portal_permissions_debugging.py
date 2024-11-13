@@ -63,7 +63,7 @@ def print_roles(roles: dict, message: Optional[str] = None):
     def role_value(principal, uuid):
         nonlocal roles
         return roles.get(f"{principal}.{uuid}") if uuid else roles.get(principal)
-    print_principals(list(roles.keys()), value_callback=role_value, value_header="ROLE VALUE")
+    print_principals(list(roles.keys()), message=message, value_callback=role_value, value_header="ROLE VALUE")
 
 
 def print_acls(acls: List[tuple], message: Optional[str] = None):
@@ -77,6 +77,8 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
     for row in rows:
         table.add_row(row)
     table.align = "l"
+    if message:
+        print(message)
     print(table)
 
 
@@ -102,6 +104,8 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
             output += f"\n{acl_item_output}"
             output += ((len(separator) - len(acl_item_output) - 1) * " ") + "|"
         output += "\n" + separator
+    if message:
+        print(message)
     print(output)
 
 
