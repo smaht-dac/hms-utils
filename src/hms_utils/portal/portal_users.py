@@ -15,6 +15,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--revoked"],
         ARGV.OPTIONAL(bool): ["--admin"],
         ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--submission-center", "--submission-centers", "--centers", "--center", "--sc"]
     })
 
