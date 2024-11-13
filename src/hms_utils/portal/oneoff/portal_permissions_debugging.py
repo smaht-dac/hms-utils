@@ -8,55 +8,55 @@ def print_principals(principals: List[str], message: Optional[str] = None,
                      value_callback: Optional[Callable] = None,
                      value_header: Optional[str] = None,
                      return_value: bool = False):
+
     def uuid_specific_principal(principal):  # noqa
         principal_uuid = ""
-        if isinstance(principal, str):
-            if principal.startswith("role."):
-                principal = principal.replace("role.", "role/")
-            if (index := principal.find(".")) > 0:
-                if is_uuid(value := principal[index + 1:]):
-                    principal_uuid = value
-                    principal = principal[0:index]
-            if principal.startswith("role/"):
-                principal = principal.replace("role/", "role.")
+        if principal.startswith("role."):
+            principal = principal.replace("role.", "role/")
+        if (index := principal.find(".")) > 0:
+            if is_uuid(value := principal[index + 1:]):
+                principal_uuid = value
+                principal = principal[0:index]
+        if principal.startswith("role/"):
+            principal = principal.replace("role/", "role.")
         return principal, principal_uuid
-    if isinstance(principals, list):
-        rows = [] ; header = None  # noqa
-        for principal in principals:
-            if isinstance(principal, str):
-                principal, principal_uuid = uuid_specific_principal(principal)
-                if principal_uuid:
-                    if (principal == "userid") and (not header):
-                        # header = [principal_uuid, "<<< USER UUID"]
-                        header = [principal_uuid, "ROLE UUID"]
-                        if value_callback:
-                            header.append(value_header or "")
-                    else:
-                        rows.append([principal, principal_uuid])
-                        if value_callback:
-                            rows[len(rows) - 1].append("")
-                else:
-                    rows.append([principal, chars.null])
-                    if value_callback:
-                        rows[len(rows) - 1].append("")
-        table = PrettyTable()
-        if header:
-            table.field_names = header
-            if value_callback and (role := value_callback("userid", header[0])):
-                rows.append(["userid", header[0], role])
+
+    rows = [] ; header = None  # noqa
+    for principal in principals:
+        principal, principal_uuid = uuid_specific_principal(principal)
+        if principal_uuid:
+            if (principal == "userid") and (not header):
+                # header = [principal_uuid, "<<< USER UUID"]
+                header = [principal_uuid, "ROLE UUID"]
+                if value_callback:
+                    header.append(value_header or "")
+            else:
+                rows.append([principal, principal_uuid])
+                if value_callback:
+                    rows[len(rows) - 1].append("")
         else:
-            table.header = False
-        rows.sort(key=lambda row: row[0] + "_" + row[1])
-        for row in rows:
-            if value_callback and (role := value_callback(row[0], row[1])):
-                row[2] = role
-            table.add_row(row)
-        table.align = "l"
-        output = f"{message}\n" if message else ""
-        output += str(table)
-        if return_value:
-            return output
-        print(output)
+            rows.append([principal, chars.null])
+            if value_callback:
+                rows[len(rows) - 1].append("")
+
+    table = PrettyTable()
+    if header:
+        table.field_names = header
+        if value_callback and (role := value_callback("userid", header[0])):
+            rows.append(["userid", header[0], role])
+    else:
+        table.header = False
+    rows.sort(key=lambda row: row[0] + "_" + row[1])
+    for row in rows:
+        if value_callback and (role := value_callback(row[0], row[1])):
+            row[2] = role
+        table.add_row(row)
+    table.align = "l"
+    output = f"{message}\n" if message else ""
+    output += str(table)
+    if return_value:
+        return output
+    print(output)
 
 
 def print_roles(roles: dict, message: Optional[str] = None):
@@ -67,18 +67,17 @@ def print_roles(roles: dict, message: Optional[str] = None):
 
 
 def print_acls(acls: List[tuple], message: Optional[str] = None):
-    if isinstance(acls, list):
-        rows = []
-        for acl_item in acls:
-            ace_action, ace_principal, ace_permissions = acl_item
-            rows.append([ace_principal, f"{ace_action} {chars.dot} {'/'.join(ace_permissions)}"])
-        table = PrettyTable()
-        table.header = False
-        rows.sort(key=lambda row: row[0])
-        for row in rows:
-            table.add_row(row)
-        table.align = "l"
-        print(table)
+    rows = []
+    for acl_item in acls:
+        ace_action, ace_principal, ace_permissions = acl_item
+        rows.append([ace_principal, f"{ace_action} {chars.dot} {'/'.join(ace_permissions)}"])
+    table = PrettyTable()
+    table.header = False
+    rows.sort(key=lambda row: row[0])
+    for row in rows:
+        table.add_row(row)
+    table.align = "l"
+    print(table)
 
 
 def print_acls_and_principals(acls: List[tuple], principals: List[str], message: Optional[str] = None):
