@@ -90,7 +90,7 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
         for acl_item in acls:
             if acl_item[1] == principal:
                 return (f"{acl_item[0]} {chars.dot}"
-                        f" {'/'.join(acl_item[2] if isinstance(acl_item[2], list) else str(acl_item[2]))}")
+                        f" {'/'.join(acl_item[2]) if isinstance(acl_item[2], list) else str(acl_item[2])}")
         return chars.null
     output = print_principals(principals, value_callback=acl_value, value_header="PERMISSION", return_value=True)
     acls_not_in_principals = []
