@@ -20,7 +20,6 @@ def main():
     argv = ARGV({
         ARGV.OPTIONAL(str): ["--env"],
         ARGV.OPTIONAL(str): ["--ini"],
-        ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.REQUIRED(str): ["--user"],
         ARGV.OPTIONAL(str): ["--access-keys-file-property-name", "--name"],

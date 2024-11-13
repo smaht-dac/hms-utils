@@ -1,9 +1,12 @@
 from __future__ import annotations
+import os
+import sys
 from typing import Callable, List, Optional, Union
 from dcicutils.captured_output import captured_output
-from hms_utils.chars import chars
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.ff_utils import delete_field, delete_metadata, purge_metadata
+from dcicutils.common import APP_SMAHT, ORCHESTRATED_APPS
+from hms_utils.chars import chars
 from hms_utils.type_utils import is_uuid, to_non_empty_string_list
 
 
@@ -53,8 +56,7 @@ class Portal(PortalFromUtils):
 
     @classmethod
     def create(cls,
-               env: Optional[str] = None,
-               ini: Optional[str] = None,
+               arg: Optional[str] = None,
                app: Optional[str] = None,
                raise_exception: bool = False,
                ping: bool = True,
@@ -63,12 +65,22 @@ class Portal(PortalFromUtils):
                show: bool = False,
                printf: Optional[Callable] = None, **kwargs) -> Portal:
 
+        env_environ_name = None
+        if not (isinstance(arg, str) and arg):
+            if isinstance(app, str) and app and (app in ORCHESTRATED_APPS):
+                env_app_name = app
+            else:
+                env_app_name = APP_SMAHT
+            env_environ_name = f"{env_app_name.upper()}_ENV"
+            if not (arg := os.environ.get(env_environ_name)):
+                env_environ_name = None
+
         if not callable(printf):
-            printf = print
+            printf = lambda *args, **kwargs: print(*args, **kwargs, file=sys.stderr)  # noqa
 
         with captured_output(debug is not True):
             try:
-                portal = cls(ini or env, app=app, raise_exception=raise_exception, **kwargs)
+                portal = cls(arg, app=app, raise_exception=raise_exception, **kwargs)
             except Exception as e:
                 if raise_exception is True:
                     raise
@@ -78,7 +90,11 @@ class Portal(PortalFromUtils):
 
         if verbose is True:
             if portal.env:
-                printf(f"Portal environment: {portal.env}")
+                if env_environ_name:
+                    printf(f"Portal environment: {portal.env}"
+                           f" {chars.dot} from environment variable: {env_environ_name}")
+                else:
+                    printf(f"Portal environment: {portal.env}")
             if portal.keys_file:
                 printf(f"Portal keys file: {portal.keys_file}")
             if portal.key_id:

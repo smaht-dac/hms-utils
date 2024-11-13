@@ -169,7 +169,6 @@ def main() -> int:
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
-        ARGV.AT_LEAST_ONE_OF: ["--env", "--ini"],
         ARGV.OPTIONAL(bool): ["--inserts", "--insert"],
         ARGV.OPTIONAL(str): ["--output", "--out", "--o"],
         ARGV.OPTIONAL(bool): ["--check-access-only", "--check-access", "--check", "--access"],
@@ -214,7 +213,7 @@ def main() -> int:
     if argv.ping:
         argv.verbose = True
 
-    if not (portal := Portal.create(env=argv.env, ini=argv.ini, app=argv.app, show=argv.show,
+    if not (portal := Portal.create(argv.env or argv.ini, app=argv.app, show=argv.show,
                                     verbose=argv.verbose and not argv.noheader, debug=argv.debug,
                                     raise_exception=argv.exceptions, printf=_info)):
         return 1

@@ -9,15 +9,15 @@ from hms_utils.type_utils import is_uuid
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["--env"],
+        ARGV.OPTIONAL(str): ["--env"],
         ARGV.REQUIRED(str): ["user"],
-        ARGV.OPTIONAL([str]): ["--consortia", "--consortium"],
-        ARGV.OPTIONAL([str]): ["--submission-centers", "--submission-center", "--centers", "--center"],
+        ARGV.OPTIONAL([str]): ["--consortia", "--consortium", "--c"],
+        ARGV.OPTIONAL([str]): ["--submission-centers", "--submission-center", "--sc", "--s"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"]
     })
 
-    portal = Portal.create(argv.env, debug=True)
+    portal = Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug)
 
     user_query = f"/users/{argv.user}"
     if not (user := portal.get_metadata(user_query)):
