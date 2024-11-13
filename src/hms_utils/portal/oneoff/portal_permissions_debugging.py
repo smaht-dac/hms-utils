@@ -26,7 +26,6 @@ def print_principals(principals: List[str], message: Optional[str] = None,
         principal, principal_uuid = uuid_specific_principal(principal)
         if principal_uuid:
             if (principal == "userid") and (not header):
-                # header = [principal_uuid, "<<< USER UUID"]
                 header = [principal_uuid, "ROLE UUID"]
                 if value_callback:
                     header.append(value_header or "")
@@ -35,7 +34,7 @@ def print_principals(principals: List[str], message: Optional[str] = None,
                 if value_callback:
                     rows[len(rows) - 1].append("")
         else:
-            rows.append([principal, chars.null])
+            rows.append([principal, ""])
             if value_callback:
                 rows[len(rows) - 1].append("")
 
@@ -46,11 +45,11 @@ def print_principals(principals: List[str], message: Optional[str] = None,
             rows.append(["userid", header[0], role])
     else:
         table.header = False
-    rows.sort(key=lambda row: row[0] + "_" + row[1])
+    rows.sort(key=lambda row: f"{row[0]}_{row[1]}")
     for row in rows:
         if value_callback and (role := value_callback(row[0], row[1])):
             row[2] = role
-        table.add_row(row)
+        table.add_row([item or chars.null for item in row])
     table.align = "l"
     output = f"{message}\n" if message else ""
     output += str(table)
@@ -93,7 +92,7 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
             if acl_item[1] == principal:
                 return (f"{acl_item[0]} {chars.dot}"
                         f" {'/'.join(acl_item[2]) if isinstance(acl_item[2], list) else str(acl_item[2])}")
-        return chars.null
+        return ""
     output = print_principals(principals, value_callback=acl_value, value_header="PERMISSION", return_value=True)
     acls_not_in_principals = []
     for acl_item in acls:
@@ -114,6 +113,11 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str], message:
         print(message)
     print(output)
 
+
+if False:
+    acl = [('Allow', 'group.submitter', ['edit']), ('Allow', 'role.submission_center_member_rw', ['view']), ('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
+    principals = {'accesskey.JMGZMR42', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.submission_center_member_rw.055cfde3-f82c-4d32-851d-b8061c7e2b95', 'system.Everyone', 'role.consortium_member_create', 'role.consortium_member_rw', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Authenticated', 'role.submission_center_member_create', 'group.submitter', 'userid.0d565156-00db-4948-82fe-021d151a5daf'}  # noqa
+    print_acls_and_principals(acl, principals)
 
 if False:
 
