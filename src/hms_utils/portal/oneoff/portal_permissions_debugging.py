@@ -86,6 +86,8 @@ def print_acls(acls: List[tuple], message: Optional[str] = None):
 
 def print_acls_and_principals(acls: List[tuple], principals: List[str], message: Optional[str] = None):
     def acl_value(principal, uuid):  # noqa
+        if uuid:
+            principal = f"{principle}.{uuid}"
         nonlocal acls, principals
         for acl_item in acls:
             if acl_item[1] == principal:
