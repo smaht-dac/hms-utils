@@ -74,31 +74,5 @@ def _get_affiliations(portal: Portal, values: List[str], affiliation_name: str) 
     return values_found
 
 
-def _get_consortia_display_value(user: dict) -> str:
-    values = []
-    if isinstance(consortia := user.get("consortia"), list):
-        for consortium in consortia:
-            if isinstance(value := consortium.get("identifier"), str):
-                values.append(value)
-    return ", ".join(values)
-
-
-def _get_submission_centers_display_value(user: dict) -> str:
-    values = []
-    if isinstance(submission_centers := user.get("submission_centers"), list):
-        for submission_center in submission_centers:
-            if isinstance(value := submission_center.get("identifier"), str):
-                values.append(value)
-    return ", ".join(values)
-
-
-def _get_group_display_value(user: dict) -> str:
-    values = []
-    if isinstance(user, dict):
-        if isinstance(groups := user.get("groups"), list):
-            values = groups
-    return ", ".join(values)
-
-
 if __name__ == "__main__":
     main()
