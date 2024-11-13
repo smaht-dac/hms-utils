@@ -1,0 +1,104 @@
+import json
+import sys
+from typing import List
+from hms_utils.argv import ARGV
+from hms_utils.portal.portal_utils import Portal as Portal
+from hms_utils.type_utils import is_uuid
+
+
+def main():
+
+    argv = ARGV({
+        ARGV.REQUIRED(str): ["--env"],
+        ARGV.REQUIRED(str): ["user"],
+        ARGV.OPTIONAL([str]): ["--consortia", "--consortium"],
+        ARGV.OPTIONAL([str]): ["--submission-centers", "--submission-center", "--centers", "--center"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"]
+    })
+
+    portal = Portal.create(argv.env, debug=True)
+
+    user_query = f"/users/{argv.user}"
+    if not (user := portal.get_metadata(user_query)):
+        print("Cannot find user: {argv.user")
+
+    consortia = None
+    if argv.consortia:
+        if (len(argv.consortia) == 1) and (argv.consortia[0].lower() in ["none", "null", "no", "empty"]):
+            if argv.verbose:
+                print(f"Removing consortia for {argv.user}")
+            portal.delete_metadata_property(user_query, "consortia")
+        else:
+            if (consortia := _get_consortia(portal, argv.consortia)):
+                if argv.verbose:
+                    print(f"Setting consortia for {argv.user} to: {', '.join(consortia)}")
+                portal.patch_metadata(user_query, {"consortia": consortia})
+
+    submission_centers = None
+    if argv.submission_centers:
+        if (len(argv.submission_centers) == 1) and (argv.submission_centers[0] in ["none", "null", "no", "empty"]):
+            # Deleting submission_centers does not seem to work; set it to empty list instead.
+            # portal.delete_metadata_property(user_query, "submission_centers")
+            if argv.verbose:
+                print(f"Removing submission-centers for {argv.user}")
+            portal.patch_metadata(user_query, {"submission_centers": []})
+        else:
+            if (submission_centers := _get_submission_centers(portal, argv.submission_centers)):
+                if argv.verbose:
+                    print(f"Setting submission-centers for {argv.user} to: {', '.join(submission_centers)}")
+                portal.patch_metadata(user_query, {"submission_centers": submission_centers})
+
+    user = portal.get_metadata(user_query, raw=True, database=True)
+    print(json.dumps(user, indent=4))
+
+
+def _get_consortia(portal: Portal, values: List[str]) -> List[str]:
+    return _get_affiliations(portal, values, "consortia")
+
+
+def _get_submission_centers(portal: Portal, values: List[str]) -> List[str]:
+    return _get_affiliations(portal, values, "submission-centers")
+
+
+def _get_affiliations(portal: Portal, values: List[str], affiliation_name: str) -> List[str]:
+    values_found = []
+    if isinstance(values, list):
+        for value in values:
+            if isinstance(value, str):
+                if ((value_found := portal.get_metadata(f"/{affiliation_name}/{value}", raise_exception=False)) and
+                    is_uuid(value_found_uuid := value_found.get("uuid"))):  # noqa
+                    values_found.append(value_found_uuid)
+                else:
+                    print(f"WARNING: Specified value ({affiliation_name}) not found: {value}", file=sys.stderr)
+    return values_found
+
+
+def _get_consortia_display_value(user: dict) -> str:
+    values = []
+    if isinstance(consortia := user.get("consortia"), list):
+        for consortium in consortia:
+            if isinstance(value := consortium.get("identifier"), str):
+                values.append(value)
+    return ", ".join(values)
+
+
+def _get_submission_centers_display_value(user: dict) -> str:
+    values = []
+    if isinstance(submission_centers := user.get("submission_centers"), list):
+        for submission_center in submission_centers:
+            if isinstance(value := submission_center.get("identifier"), str):
+                values.append(value)
+    return ", ".join(values)
+
+
+def _get_group_display_value(user: dict) -> str:
+    values = []
+    if isinstance(user, dict):
+        if isinstance(groups := user.get("groups"), list):
+            values = groups
+    return ", ".join(values)
+
+
+if __name__ == "__main__":
+    main()
