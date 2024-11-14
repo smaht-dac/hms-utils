@@ -14,6 +14,7 @@ def main():
         ARGV.OPTIONAL(bool): ["--inactive"],
         ARGV.OPTIONAL(bool): ["--revoked"],
         ARGV.OPTIONAL(bool): ["--admin"],
+        ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--verbose"],
         ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--ping"],
@@ -34,7 +35,7 @@ def main():
         status_query = "status=revoked"
     else:
         status_query = "status=current&status=inactive&status=deleted&status=revoked"
-    if not (users := portal.get(f"/users?{status_query}", limit=10000)):
+    if not (users := portal.get(f"/users?{status_query}", limit=10000, database=argv.database)):
         return
     if users.status_code == 404:
         return

@@ -136,7 +136,15 @@ def print_acls_and_principals(acls: List[tuple], principals: List[str],
     print(output)
 
 
-if True:
+if False:
+
+    import json
+    principals = ['group.submitter', 'role.consortium_member_create', 'accesskey.7JFE33AN', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Authenticated', 'group.admin', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Everyone', 'role.consortium_member_rw', 'userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b']  # noqa
+    print(json.dumps(principals, indent=4))
+    print_principals(principals)
+
+
+if False:
 
     acls = [('Allow', 'group.submitter', ['edit']), ('Allow', 'role.submission_center_member_rw', ['view']), ('Allow', 'group.admin', ['view', 'edit']), ('Allow', 'group.read-only-admin', ['view']), ('Allow', 'remoteuser.INDEXER', ['view']), ('Allow', 'remoteuser.EMBED', ['view']), ('Deny', 'system.Everyone', ['view', 'edit'])]  # noqa
 

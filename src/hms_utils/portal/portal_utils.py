@@ -117,6 +117,7 @@ class Portal(PortalFromUtils):
                     version = None
                     bluegreen = None
                     try:
+                        # SMaHT only just for BTW/FYI ...
                         health = portal.get_health().json()
                         version = health.get("project_version")
                         if (beanstalk_env := health.get("beanstalk_env")) == "smaht-production-green":
