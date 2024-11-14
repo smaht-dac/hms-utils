@@ -99,7 +99,12 @@ class Portal(PortalFromUtils):
                 self._get_call_count += 1
                 started = time.time()
                 items = self.get(query, raw=raw, database=database,
-                                 limit=limit, offset=offset, deleted=deleted, field=field).json()
+                                 limit=limit, offset=offset, deleted=deleted, field=field)
+                if items.status_code == 404:
+                    return Portal.Access.NOT_FOUND
+                elif items.status_code == 403:
+                    return Portal.Access.NO_ACCESS
+                items = items.json()
                 self._get_call_duration += time.time() - started
         except Exception as e:
             if (raise_exception is True) or self._raise_exception:
