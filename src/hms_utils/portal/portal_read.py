@@ -101,11 +101,10 @@ class Portal(PortalFromUtils):
                 items = self.get(query, raw=raw, database=database,
                                  limit=limit, offset=offset, deleted=deleted, field=field).json()
                 self._get_call_duration += time.time() - started
-        except Exception:
-            if raise_exception is True:
+        except Exception as e:
+            if (raise_exception is True) or self._raise_exception:
                 raise
-            if self._raise_exception:
-                raise
+            return Portal._get_access_status(e)
         if self._ignore_properties and items:
             delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
@@ -116,23 +115,31 @@ class Portal(PortalFromUtils):
         try:
             self.GET(query, metadata=metadata, raise_exception=True)
         except Exception as e:
-            # TODO
-            # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830a:
-            # 403. Reason: {'@type': ['HTTPForbidden', 'Error'], 'status': 'error',
-            # 'code': 403, 'title': 'Forbidden', 'description': 'Access was denied to this resource.',
-            # 'detail': 'Unauthorized: item_view failed permission check'}
-            # VS.
-            # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd:
-            # 404. Reason: {\'@type\': [\'HTTPNotFound\', \'Error\'], \'status\': \'error\',
-            # \'code\': 404, \'title\': \'Not Found\', \'description\':
-            # \'The resource could not be found.\', \'detail\':
-            # "debug_notfound of url http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd; path_info:
-            # \'/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', context: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
-            # view_name: \'a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', subpath: (), traversed: (),
-            # root: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
-            # vroot: <encoded.root.SMAHTRoot object at 0x1371d39b0>, vroot_path: ()"}'
-            def contains_word(text: str, word: str) -> bool:  # noqa
-                return bool(re.search(rf"\b{word}\b", text, re.IGNORECASE))
+            access = Portal._get_access_status(e)
+        if report is True:
+            Portal.report_access_status(access, query=query, verbose=False)
+        return access
+
+    @staticmethod
+    def _get_access_status(e: Optional[Exception]) -> Access:
+        # TODO
+        # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830a:
+        # 403. Reason: {'@type': ['HTTPForbidden', 'Error'], 'status': 'error',
+        # 'code': 403, 'title': 'Forbidden', 'description': 'Access was denied to this resource.',
+        # 'detail': 'Unauthorized: item_view failed permission check'}
+        # VS.
+        # Bad status code for GET request for http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd:
+        # 404. Reason: {\'@type\': [\'HTTPNotFound\', \'Error\'], \'status\': \'error\',
+        # \'code\': 404, \'title\': \'Not Found\', \'description\':
+        # \'The resource could not be found.\', \'detail\':
+        # "debug_notfound of url http://localhost:8000/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd; path_info:
+        # \'/a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', context: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
+        # view_name: \'a7ca8dab-b1f0-4f61-a892-87fe3516830aasfd\', subpath: (), traversed: (),
+        # root: <encoded.root.SMAHTRoot object at 0x1371d39b0>,
+        # vroot: <encoded.root.SMAHTRoot object at 0x1371d39b0>, vroot_path: ()"}'
+        def contains_word(text: str, word: str) -> bool:  # noqa
+            return bool(re.search(rf"\b{word}\b", text, re.IGNORECASE))
+        if isinstance(e, Exception):
             if (contains_word(e := str(e), "HTTPForbidden") or
                 contains_word(e, "forbidden") or contains_word(e, "unauthorized")):  # noqa
                 access = Portal.Access.NO_ACCESS
@@ -141,20 +148,38 @@ class Portal(PortalFromUtils):
                 access = Portal.Access.NOT_FOUND
             else:
                 access = Portal.Access.ERROR
-        if report is True:
-            if not callable(printf):
-                printf = print
-            if access == Portal.Access.NOT_FOUND:
-                printf(f"{query}: Not found")
-            elif access == Portal.Access.NO_ACCESS:
-                printf(f"{query}: Forbidden")
-            elif access == Portal.Access.ERROR:
-                printf(f"{query}: Error")
-            elif access == Portal.Access.OK:
-                printf(f"{query}: OK")
-            else:
-                _print(f"{query}: Unknown error")
+        else:
+            access = Portal.Access.OK
         return access
+
+    @staticmethod
+    def report_access_status(access: Portal.Access,
+                             query: Optional[str] = None, verbose: bool = False,
+                             printf: Optional[Callable] = None) -> None:
+        if not callable(printf):
+            printf = print
+        if access == Portal.Access.NOT_FOUND:
+            if verbose is True:
+                printf(f"Portal items(s) not found{f': {query}' if query else '.'}")
+            else:
+                printf(f"{f'{query}: ' if query else ''}Not found")
+        elif access == Portal.Access.NO_ACCESS:
+            if verbose is True:
+                printf(f"Forbidden access to Portal item(s){f': {query}' if query else '.'}")
+            else:
+                printf(f"{f'{query}: ' if query else ''}Forbidden")
+        elif access == Portal.Access.ERROR:
+            if verbose is True:
+                printf(f"Error retrieving Portal item(s){f': {query}' if query else ''}")
+            else:
+                printf(f"{f'{query}: ' if query else ''}Error")
+        elif access == Portal.Access.OK:
+            printf(f"{query}: OK")
+        else:
+            if verbose is True:
+                printf(f"Unknown error retrieving Portal item(s){f': {query}' if query else ''}")
+            else:
+                printf(f"{f'{query}: ' if query else ''}Unknown error")
 
 
 def main() -> int:
@@ -242,10 +267,11 @@ def main() -> int:
     if argv.check_access_only:
         return 0 if portal.access(argv.query, metadata=metadata, report=True, printf=_print) == Portal.Access.OK else 1
 
-    if not (items := _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
-                                 limit=argv.limit, offset=argv.offset, database=argv.database,
-                                 deleted=argv.deleted, nthreads=argv.nthreads)):
-        _info(f"Portal item(s) not found: {argv.query}")
+    items = _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
+                        limit=argv.limit, offset=argv.offset, database=argv.database,
+                        deleted=argv.deleted, nthreads=argv.nthreads)
+    if isinstance(items, Portal.Access):
+        portal.report_access_status(items, query=argv.query, verbose=True)
         return 1
 
     if graph := items.get("@graph"):
