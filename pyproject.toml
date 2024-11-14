@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.4.148"
+version = "1.4.149"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
@@ -55,6 +55,7 @@ hms-portal-read = "hms_utils.portal.portal_read:main"
 hms-portal-write = "hms_utils.portal.portal_write:main"
 hms-portal-users = "hms_utils.portal.portal_users:main"
 hms-portal-user-update = "hms_utils.portal.portal_user_update:main"
+hms-portal-simple-update = "hms_utils.portal.portal_simple_update:main"
 
 hms-encrypt = "hms_utils.cli.crypt_cli:main_encrypt"
 hms-decrypt = "hms_utils.cli.crypt_cli:main_decrypt"
