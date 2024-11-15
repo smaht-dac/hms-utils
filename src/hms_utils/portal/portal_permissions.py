@@ -357,15 +357,24 @@ def print_acls(acls: List[tuple], message: Optional[str] = None, nosort: bool = 
 def print_principals_with_acls(principals: List[str], acls: List[tuple],
                                action: Optional[Any] = None,
                                message: Optional[str] = None) -> None:
-    def find_matching_acl() -> Optional[tuple]:  # noqa
-        # FYI: See pyramid/authorization.py ...
-        nonlocal acls, principals, action
+    def find_matching_acls() -> Optional[tuple]:  # noqa
+        nonlocal principals, acls, action
+        matching_acls = []
         if action:
             for acl_item in acls:
                 acl_permission, acl_principal, acl_actions = acl_item
                 if (acl_principal in principals) and (action in acl_actions):
-                    return acl_item
-    matching_acl = find_matching_acl()
+                    matching_acls.append(acl_item)
+        return matching_acls
+    def action_allowed() -> Optional[bool]:  # noqa
+        nonlocal principals, acls, action
+        if action:
+            for acl_item in acls:
+                acl_permission, acl_principal, acl_actions = acl_item
+                if (acl_principal in principals) and (action in acl_actions):
+                    return acl_permission == "Allow"
+        return None
+    matching_acls = find_matching_acls()
     def acl_value(principal, principal_uuid):  # noqa
         nonlocal acls, principals, action
         if principal_uuid:
@@ -385,7 +394,7 @@ def print_principals_with_acls(principals: List[str], acls: List[tuple],
                     acl_actions_display = f" {chars.dot} ".join(acl_actions_display)
                 value = f"{acl_permission} {chars.larrow_hollow} {acl_actions_display}"
                 if action:
-                    if acl_item == matching_acl:
+                    if acl_item in matching_acls:
                         value += f" {chars.larrow}{chars.larrow}{chars.larrow}"
                         if acl_permission == "Allow":
                             value += f" {chars.check}"
@@ -395,10 +404,15 @@ def print_principals_with_acls(principals: List[str], acls: List[tuple],
                         value += f" {chars.larrow}"
                 values.append(value)
         return "\n".join(values)
-    print_principals(principals,
-                     value_callback=acl_value,
-                     value_header=f"ACL {chars.larrow_hollow} {action}" if action else "ACL",
-                     message=message)
+    if action:
+        value_header = f"ACL {chars.larrow_hollow} {action}"
+        if (action_allowd := action_allowed()) is True:
+            value_header += f" {chars.check}{chars.check}{chars.check}"
+        elif action_allowd is False:
+            value_header += f" {chars.xmark}"
+    else:
+        value_header = "ACL"
+    print_principals(principals, value_callback=acl_value, value_header=value_header, message=message)
 
 
 def get_affiliation(portal: Portal, uuid: str) -> Optional[str]:
