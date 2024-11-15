@@ -343,7 +343,7 @@ def print_acls(acls: List[tuple], message: Optional[str] = None, nosort: bool = 
             acl_actions = f" {chars.dot} ".join(acl_actions)
         rows.append([acl_principal, f"{acl_permission} {chars.larrow_hollow} {acl_actions}"])
     table = PrettyTable()
-    table.header = False
+    table.field_names = ["ACL PRINCIPAL/ROLE", "ACL PERMISSION/ACTION"]
     if nosort is not True:
         rows.sort(key=lambda row: row[0])
     for row in rows:
