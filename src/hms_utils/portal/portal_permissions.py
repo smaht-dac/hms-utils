@@ -392,7 +392,7 @@ def print_principals_with_acls(principals: List[str], acls: List[tuple],
                         elif acl_permission == "Deny":
                             value += f" {chars.xmark}"
                     elif action in acl_actions:
-                        value += f" {chars.larrow_hollow}"
+                        value += f" {chars.larrow}"
                 values.append(value)
         return "\n".join(values)
     print_principals(principals,
