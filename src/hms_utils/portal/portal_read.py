@@ -75,8 +75,7 @@ class Portal(PortalFromUtils):
     def ignore_properties(self, value: List[str]) -> None:
         self._ignore_properties = value if isinstance(value, list) else []
 
-    def GET(self, query: str, metadata: bool = False,
-            raw: bool = False, inserts: bool = False, database: bool = False,
+    def GET(self, query: str, metadata: bool = False, raw: bool = False, database: bool = False,
             limit: Optional[int] = None, offset: Optional[int] = None,
             field: Optional[str] = None, deleted: bool = False,
             raise_exception: bool = False) -> Optional[Union[List[dict], dict]]:
@@ -114,11 +113,11 @@ class Portal(PortalFromUtils):
             delete_properties_from_dictionaries(items, self._ignore_properties)
         return items
 
-    def access(self, query: str, metadata: bool = False,
+    def access(self, query: str, metadata: bool = False, raw: bool = False, inserts: bool = False,
                report: bool = False, printf: Optional[Callable] = None) -> Portal.Access:
         access = Portal.Access.OK
         try:
-            self.GET(query, metadata=metadata, raise_exception=True)
+            self.GET(query, metadata=metadata, raw=raw or inserts, raise_exception=True)
         except Exception as e:
             access = Portal._get_access_status(e)
         if report is True:
@@ -270,7 +269,8 @@ def main() -> int:
     _verbose(f"Querying Portal for item(s): {argv.query}")
 
     if argv.check_access_only:
-        return 0 if portal.access(argv.query, metadata=metadata, report=True, printf=_print) == Portal.Access.OK else 1
+        return 0 if portal.access(argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
+                                  report=True, printf=_print) == Portal.Access.OK else 1
 
     items = _portal_get(portal, argv.query, metadata=metadata, raw=argv.raw, inserts=argv.inserts,
                         limit=argv.limit, offset=argv.offset, database=argv.database,
