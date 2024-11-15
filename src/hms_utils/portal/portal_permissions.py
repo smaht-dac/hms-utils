@@ -56,8 +56,7 @@ def main():
     principals_allowed_for_item = get_principals_allowed_for_item(portal, target_item_uuid)
 
     print(f"\n{chars.rarrow} USER: {user_email} {chars.dot} {user_uuid}")
-    print_principals(user_principals, uuid_callback=lambda uuid,
-                     portal=portal: get_affiliation_identifier(portal, uuid))
+    print_principals(user_principals, uuid_callback=lambda uuid, portal=portal: get_affiliation(portal, uuid))
     if argv.debug:
         print(json.dumps(user_principals, indent=4))
 
@@ -207,7 +206,7 @@ def print_principals_with_actions(principals_allowed_for_item_by_action: dict) -
     print_principals(principals_allowed_for_item, value_callback=find_actions, value_header="ACTION")
 
 
-def get_affiliation_identifier(portal: Portal, uuid: str) -> Optional[str]:
+def get_affiliation(portal: Portal, uuid: str) -> Optional[str]:
     if isinstance(portal, Portal) and is_uuid(uuid):
         if isinstance(item := portal.get_metadata(uuid, raise_exception=True), dict):
             return item.get("identifier")
