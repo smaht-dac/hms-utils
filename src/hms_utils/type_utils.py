@@ -85,7 +85,7 @@ def is_uuid(value: str) -> bool:
 def to_flattened_list(*args) -> List[Any]:
     flattened_list = []
     def flatten(arg):  # noqa
-        if isinstance(arg, (list, tuple)):
+        if isinstance(arg, (list, tuple, set)):
             for item in arg:
                 flatten(item)
         else:

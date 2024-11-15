@@ -27,8 +27,10 @@ def main():
         ARGV.OPTIONAL(str): ["item"],
         ARGV.OPTIONAL(str): ["--env"],
         ARGV.OPTIONAL(str): ["--user"],
+        ARGV.OPTIONAL([str]): ["--actions", "--action"],
         ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(bool): ["--version"]
     })
 
@@ -46,39 +48,32 @@ def main():
     else:
         portal_for_user = portal
 
-    user_principals = get_user_principals(portal_for_user)
     user = portal_for_user.get_metadata("/me")
     user_email = user.get("email")
     user_uuid = user.get("uuid")
 
+    user_principals = get_user_principals(portal_for_user)
+    principals_allowed_for_item = get_principals_allowed_for_item(portal, target_item_uuid)
+
     print(f"\n{chars.rarrow} USER: {user_email} {chars.dot} {user_uuid}")
     print_principals(user_principals, uuid_callback=lambda uuid,
-                     portal=portal: get_affiliation_identifier(portal, uuid),
-                     value_callback=lambda x, y: "foo",
-                     header=['abc', 'def', 'ghi'],
-                     noheader=False)
+                     portal=portal: get_affiliation_identifier(portal, uuid))
+    if argv.debug:
+        print(json.dumps(user_principals, indent=4))
 
-    principals_allowed_for_item = get_principals_allowed_for_item(portal, target_item_uuid)
-    print('xxx')
-    x = [(group, permission) for permission, groups in principals_allowed_for_item.items() for group in groups]
-    y = list(set([group for groups in principals_allowed_for_item.values() for group in groups]))
+    print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}")
+    print_principals_with_actions(principals_allowed_for_item)
+    if argv.debug:
+        print(json.dumps(principals_allowed_for_item, indent=4))
 
-    def find_permissions(data, group_name):
-        nonlocal principals_allowed_for_item
-        permissions = [permission for permission, groups in data.items() if group_name in groups]
-        return f" {chars.dot} ".join(permissions)
-
-    print_principals(y)
-    print(json.dumps(x, indent=4))
-    print('xxx')
-    view_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, Action.VIEW)
-    edit_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, Action.EDIT)
-
-    print(f"{chars.rarrow} PORTAL ITEM: {argv.item}")
-    print(json.dumps(principals_allowed_for_item, indent=4))
-
-    print(view_allowed)
-    print(edit_allowed)
+    if argv.actions:
+        print(f"\n{chars.rarrow} PERMISSIONS: {target_item_uuid} {chars.larrow_hollow} {user_email}")
+        for action in argv.actions:
+            action_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, action)
+            print(f"  {chars.dot} ACTION: {action} {chars.rarrow_hollow}"
+                  f" {f'ALLOWED' if action_allowed else 'FORBIDDEN'}")
+            if not action_allowed:
+                status = 1
 
     return status
 
@@ -97,7 +92,6 @@ def get_user_principals(portal_or_key_or_key_name: Union[Portal, dict, str]) -> 
 
 def get_principals_allowed_for_item(portal: Portal, query: str,
                                     action: Optional[ActionType] = None) -> Optional[Union[dict, List[str]]]:
-    # if not (isinstance(action, str) and (action := action.strip())):
     if action not in ActionType:
         action = None
     if not (isinstance(portal, Portal) and isinstance(query, str) and query):
@@ -138,6 +132,7 @@ def is_user_allowed_item_access(user_principals_or_portal_or_key_or_key_name: Un
 
 def print_principals(principals: List[str], message: Optional[str] = None,
                      value_callback: Optional[Callable] = None,
+                     value_header: Optional[str] = None,
                      uuid_callback: Optional[Callable] = None,
                      parse_userid: bool = False,
                      header: Optional[List[str]] = None,
@@ -178,7 +173,8 @@ def print_principals(principals: List[str], message: Optional[str] = None,
         table.field_names = header
     elif noheader is not True:
         if callable(value_callback):
-            table.field_names = ["PRINCIPAL/ROLE", "ASSOCIATED UUID", ""]
+            table.field_names = ["PRINCIPAL/ROLE", "ASSOCIATED UUID",
+                                 value_header if isinstance(value_header, str) else ""]
         else:
             table.field_names = ["PRINCIPAL/ROLE", "ASSOCIATED UUID"]
     else:
@@ -198,8 +194,17 @@ def print_principals(principals: List[str], message: Optional[str] = None,
     print(output)
 
 
-def print_principals_by_action(x):
-    pass
+def print_principals_with_actions(principals_allowed_for_item_by_action: dict) -> None:
+    def find_actions(principal, principal_uuid) -> Optional[str]:
+        nonlocal principals_allowed_for_item_by_action
+        if isinstance(principal, str):
+            if is_uuid(principal_uuid):
+                principal += f".{principal_uuid}"
+            actions = [action for action, items in principals_allowed_for_item_by_action.items() if principal in items]
+            return f" {chars.dot} ".join(actions)
+    principals_allowed_for_item = [item for items in principals_allowed_for_item_by_action.values() for item in items]
+    principals_allowed_for_item = list(set(principals_allowed_for_item))
+    print_principals(principals_allowed_for_item, value_callback=find_actions, value_header="ACTION")
 
 
 def get_affiliation_identifier(portal: Portal, uuid: str) -> Optional[str]:
