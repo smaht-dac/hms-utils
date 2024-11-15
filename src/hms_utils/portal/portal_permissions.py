@@ -430,11 +430,10 @@ def error(message: Optional[str] = None, exit: bool = True, status: int = 1) -> 
 
 
 if __name__ == "__main__":
-    # sys.exit(main())
-    pass
+    sys.exit(main())
 
 
-if True:
+if False:
     principals = \
         {"group.admin", 'role.consortium_member_rw', 'role.consortium_member_create', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'group.submitter', 'accesskey.POOZOKLE', 'system.Authenticated', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.submission_center_member_rw', 'role.submission_center_member_create', 'userid.0d565156-00db-4948-82fe-021d151a5daf', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Everyone'}  # noqa
 
