@@ -366,14 +366,14 @@ def print_principals_with_acls(principals: List[str], acls: List[tuple],
                 if (acl_principal in principals) and (action in acl_actions):
                     matching_acls.append(acl_item)
         return matching_acls
-    def action_allowed() -> Optional[bool]:  # noqa
+    def action_allowed() -> bool:  # noqa
         nonlocal principals, acls, action
         if action:
             for acl_item in acls:
                 acl_permission, acl_principal, acl_actions = acl_item
                 if (acl_principal in principals) and (action in acl_actions):
                     return acl_permission == "Allow"
-        return None
+        return False
     matching_acls = find_matching_acls()
     def acl_value(principal, principal_uuid):  # noqa
         nonlocal acls, principals, action
@@ -406,9 +406,9 @@ def print_principals_with_acls(principals: List[str], acls: List[tuple],
         return "\n".join(values)
     if action:
         value_header = f"ACL {chars.larrow_hollow} {action}"
-        if (action_allowd := action_allowed()) is True:
+        if action_allowed():
             value_header += f" {chars.check}{chars.check}{chars.check}"
-        elif action_allowd is False:
+        else:
             value_header += f" {chars.xmark}"
     else:
         value_header = "ACL"
