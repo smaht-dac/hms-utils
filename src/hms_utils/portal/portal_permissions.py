@@ -66,10 +66,9 @@ def main():
         if not (principals_allowed_for_item := get_principals_allowed_for_item(portal, argv.item)):
             error(f"Cannot access Portal item: {argv.item}")
 
-        item_type = get_portal_item_type(portal, argv.item)
-
         if principals_allowed_for_item:
 
+            item_type = get_portal_item_type(portal, argv.item)
             print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}{f' {chars.dot} {item_type}' if item_type else ''}")
             print_principals_with_actions(principals_allowed_for_item)
             if argv.debug:
