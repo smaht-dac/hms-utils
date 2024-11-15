@@ -1,4 +1,5 @@
 import json
+from functools import lru_cache
 from prettytable import PrettyTable
 import sys
 from typing import Callable, List, Literal, Optional, Union
@@ -65,9 +66,11 @@ def main():
         if not (principals_allowed_for_item := get_principals_allowed_for_item(portal, argv.item)):
             error(f"Cannot access Portal item: {argv.item}")
 
+        item_type = get_portal_item_type(portal, argv.item)
+
         if principals_allowed_for_item:
 
-            print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}")
+            print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}{f' {chars.dot} {item_type}' if item_type else ''}")
             print_principals_with_actions(principals_allowed_for_item)
             if argv.debug:
                 print(json.dumps(principals_allowed_for_item, indent=4))
@@ -120,7 +123,7 @@ def get_principals_allowed_for_item(portal: Portal, query: str,
                                     action: Optional[ActionType] = None) -> Union[dict, List[str]]:
     """
     Returns the principals allowed fro the given Portal item (query). If an action (e.g. view or edit)
-    is NOT given then the esult looks something like this:
+    is NOT given then the result looks something like this:
         {
             "view": [
                 "group.admin",
@@ -147,7 +150,8 @@ def get_principals_allowed_for_item(portal: Portal, query: str,
         action = None
     if not (isinstance(portal, Portal) and isinstance(query, str) and query):
         return [] if action else {}
-    if not isinstance(item := portal.get_metadata(query, raise_exception=False), dict):
+    # if not isinstance(item := portal.get_metadata(query, raise_exception=False), dict):
+    if not isinstance(item := get_portal_item(portal, query), dict):
         return [] if action else {}
     if not isinstance(principals_allowed_for_item := item.get("principals_allowed"), dict):
         return [] if action else {}
@@ -157,6 +161,17 @@ def get_principals_allowed_for_item(portal: Portal, query: str,
         return principals_allowed_for_item_for_action
     else:
         return principals_allowed_for_item
+
+
+@lru_cache(maxsize=1)
+def get_portal_item(portal: Portal, query: str) -> Optional[dict]:
+    return portal.get_metadata(query, raise_exception=False)
+
+
+def get_portal_item_type(portal: Portal, query: str) -> Optional[dict]:
+    if item := get_portal_item(portal, query):
+        return Portal.get_item_type(item)
+    return None
 
 
 def is_user_allowed_item_access(user_principals_or_portal_or_key_or_key_name: Union[List[str], Portal, dict, str],

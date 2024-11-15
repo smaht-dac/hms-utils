@@ -35,11 +35,9 @@ def main():
         status_query = "status=revoked"
     else:
         status_query = "status=current&status=inactive&status=deleted&status=revoked"
-    if not (users := portal.get(f"/users?{status_query}", limit=10000, database=argv.database)):
+    if not (users := portal.get_metadata(f"/users?{status_query}", limit=10000, database=argv.database)):
         return
-    if users.status_code == 404:
-        return
-    users = users.json().get("@graph")
+    users = users.get("@graph")
 
     table = PrettyTable()
     table.field_names = ["N", "USER", "NAME", "CONSORTIA", "CENTERS", "GROUP", "STATUS"]
