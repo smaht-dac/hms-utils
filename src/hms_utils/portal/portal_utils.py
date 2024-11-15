@@ -61,6 +61,7 @@ class Portal(PortalFromUtils):
                raise_exception: bool = False,
                verbose: bool = False,
                debug: bool = False,
+               noerror: bool = False,
                ping: bool = False,
                noping: bool = False,
                show: bool = False,
@@ -88,7 +89,7 @@ class Portal(PortalFromUtils):
             except Exception as e:
                 if raise_exception is True:
                     raise
-                if verbose is True:
+                if (verbose is True) or (noerror is not True):
                     printf(f"ERROR: {str(e)}")
                 return None
 
@@ -129,8 +130,8 @@ class Portal(PortalFromUtils):
                     printf(f"Portal connectivity: OK {chars.dot}{f' {version}' if version else ''}"
                            f"{f' {chars.dot} {bluegreen}' if bluegreen else ''} {chars.check}")
             else:
-                printf(f"Portal connectivity: {portal.server} is unreachable {chars.xmark}")
-                status = 1
+                printf(f"Portal connectivity: {portal.server} ({portal.env}) is unreachable {chars.xmark}")
+                return None
             if ping is True:
                 exit(status)
 

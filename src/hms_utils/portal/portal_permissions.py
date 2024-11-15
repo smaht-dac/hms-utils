@@ -36,48 +36,75 @@ def main():
 
     status = 0
 
-    target_item_uuid = argv.item
-
-    portal = Portal.create(argv.env, verbose=argv.verbose, ping=argv.ping)
+    if not (portal := Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
+        error()
 
     if argv.user:
-        portal_for_user = Portal.create(argv.user or argv.env)
+        if not (portal_for_user := Portal.create(argv.user or argv.env, verbose=argv.verbose, debug=argv.debug)):
+            error()
         if portal.server != portal_for_user.server:
-            print(f"Mismatched Portal environments: {portal.server} vs {portal_for_user.server}")
-            exit(1)
+            error(f"Mismatched Portal environments: {portal.server} vs {portal_for_user.server}")
     else:
         portal_for_user = portal
 
-    user = portal_for_user.get_metadata("/me")
+    if not (user := portal_for_user.get_metadata("/me", raise_exception=False)):
+        error("Cannot retrieve user info from Portal")
+
     user_email = user.get("email")
     user_uuid = user.get("uuid")
 
     user_principals = get_user_principals(portal_for_user)
-    principals_allowed_for_item = get_principals_allowed_for_item(portal, target_item_uuid)
 
     print(f"\n{chars.rarrow} USER: {user_email} {chars.dot} {user_uuid}")
     print_principals(user_principals, uuid_callback=lambda uuid, portal=portal: get_affiliation(portal, uuid))
     if argv.debug:
         print(json.dumps(user_principals, indent=4))
 
-    print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}")
-    print_principals_with_actions(principals_allowed_for_item)
-    if argv.debug:
-        print(json.dumps(principals_allowed_for_item, indent=4))
+    if argv.item:
 
-    if argv.actions:
-        print(f"\n{chars.rarrow} PERMISSIONS: {target_item_uuid} {chars.larrow_hollow} {user_email}")
-        for action in argv.actions:
-            action_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, action)
-            print(f"  {chars.dot} ACTION: {action} {chars.rarrow_hollow}"
-                  f" {f'ALLOWED' if action_allowed else 'FORBIDDEN'}")
-            if not action_allowed:
-                status = 1
+        if not (principals_allowed_for_item := get_principals_allowed_for_item(portal, argv.item)):
+            error(f"Cannot access Portal item: {argv.item}")
+
+        if principals_allowed_for_item:
+
+            print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}")
+            print_principals_with_actions(principals_allowed_for_item)
+            if argv.debug:
+                print(json.dumps(principals_allowed_for_item, indent=4))
+
+            if (actions := argv.actions) or (actions := sorted(list(principals_allowed_for_item.keys()))):
+                print(f"\n{chars.rarrow} PERMISSIONS: {argv.item} {chars.larrow_hollow} {user_email}")
+                for action in actions:
+                    action_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, action)
+                    print(f"  {chars.dot} ACTION: {action} {chars.rarrow_hollow}"
+                          f" {f'ALLOWED' if action_allowed else 'FORBIDDEN'}")
+                    if not action_allowed:
+                        status = 1
+    print()
 
     return status
 
 
 def get_user_principals(portal_or_key_or_key_name: Union[Portal, dict, str]) -> List[str]:
+    """
+    Returns the principals for the given user, specified be either a Portal object,
+    or a key name (i.e. e.g. in the ~/.smaht-keys.json file), or a key (i.e. e.g. a
+    dictionary like {"key": "REDACTED", "secret", server: "http://data.smaht.org"}).
+    The result looks something like this:
+        [
+            "system.Everyone",
+            "system.Authenticated",
+            "role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff",
+            "accesskey.3HJDFQAD",
+            "submits_for.9626d82e-8110-4213-ac75-0a50adf890ff",
+            "role.consortium_member_rw",
+            "group.submitter",
+            "role.consortium_member_create",
+            "userid.74fef71a-dfc1-4aa4-acc0-cedcb7ac1d68",
+            "role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b"
+        ]
+    Note that this uses the (circa 2024-11-14) debugging/troubleshooting endpoint /debug_user_principals.
+    """
     if isinstance(portal_or_key_or_key_name, Portal):
         portal_for_user = portal_or_key_or_key_name
     elif isinstance(portal_or_key_or_key_name, (dict, str)):
@@ -90,12 +117,37 @@ def get_user_principals(portal_or_key_or_key_name: Union[Portal, dict, str]) -> 
 
 
 def get_principals_allowed_for_item(portal: Portal, query: str,
-                                    action: Optional[ActionType] = None) -> Optional[Union[dict, List[str]]]:
+                                    action: Optional[ActionType] = None) -> Union[dict, List[str]]:
+    """
+    Returns the principals allowed fro the given Portal item (query). If an action (e.g. view or edit)
+    is NOT given then the esult looks something like this:
+        {
+            "view": [
+                "group.admin",
+                "group.read-only-admin",
+                "remoteuser.INDEXER",
+                "role.submission_center_member_rw",
+                "role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff"
+            ],
+            "edit": [
+                "group.admin",
+                "group.submitter"
+            ]
+        }
+    If an action IS given (e.g. view or edit) then the result looks something like this:
+        [
+            "group.admin",
+            "group.read-only-admin",
+            "remoteuser.INDEXER",
+            "role.submission_center_member_rw",
+            "role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff"
+        ]
+    """
     if action not in ActionType:
         action = None
     if not (isinstance(portal, Portal) and isinstance(query, str) and query):
         return [] if action else {}
-    if not isinstance(item := portal.get_metadata(query), dict):
+    if not isinstance(item := portal.get_metadata(query, raise_exception=False), dict):
         return [] if action else {}
     if not isinstance(principals_allowed_for_item := item.get("principals_allowed"), dict):
         return [] if action else {}
@@ -203,7 +255,7 @@ def print_principals_with_actions(principals_allowed_for_item_by_action: dict) -
             return f" {chars.dot} ".join(actions)
     principals_allowed_for_item = [item for items in principals_allowed_for_item_by_action.values() for item in items]
     principals_allowed_for_item = list(set(principals_allowed_for_item))
-    print_principals(principals_allowed_for_item, value_callback=find_actions, value_header="ACTION")
+    print_principals(principals_allowed_for_item, value_callback=find_actions, value_header="ACTION      ")
 
 
 def get_affiliation(portal: Portal, uuid: str) -> Optional[str]:
@@ -211,6 +263,13 @@ def get_affiliation(portal: Portal, uuid: str) -> Optional[str]:
         if isinstance(item := portal.get_metadata(uuid, raise_exception=True), dict):
             return item.get("identifier")
     return None
+
+
+def error(message: Optional[str] = None, exit: bool = True, status: int = 1) -> None:
+    if isinstance(message, str) and message:
+        print(f"ERROR: {str(message)}", file=sys.stderr)
+    if exit is not False:
+        sys.exit(status if isinstance(status, int) else 1)
 
 
 if __name__ == "__main__":
