@@ -332,16 +332,16 @@ def print_principals_with_actions(principals_allowed_for_item_by_action: dict,
 def print_acls(acls: List[tuple], message: Optional[str] = None, nosort: bool = False) -> None:
     rows = []
     for acl_item in acls:
-        acl_action, acl_principal, acl_permissions = acl_item
-        if isinstance(acl_permissions, list):
-            for index in range(len(acl_permissions)):
-                if str(acl_permissions[index]).startswith("<pyramid.security.AllPermissionsList"):
-                    acl_permissions[index] = "pyramid.security.AllPermissionsList"
-        elif str(acl_permissions).startswith("<pyramid.security.AllPermissionsList"):
-            acl_permissions = "pyramid.security.AllPermissionsList"
-        if isinstance(acl_permissions, list):
-            acl_permissions = f" {chars.dot} ".join(acl_permissions)
-        rows.append([acl_principal, f"{acl_action} {chars.larrow_hollow} {acl_permissions}"])
+        acl_permission, acl_principal, acl_actions = acl_item
+        if isinstance(acl_actions, list):
+            for index in range(len(acl_actions)):
+                if str(acl_actions[index]).startswith("<pyramid.security.AllPermissionsList"):
+                    acl_actions[index] = "pyramid.ALL_PERMISSIONS"
+        elif str(acl_actions).startswith("<pyramid.security.AllPermissionsList"):
+            acl_actions = "pyramid.ALL_PERMISSIONS"
+        if isinstance(acl_actions, list):
+            acl_actions = f" {chars.dot} ".join(acl_actions)
+        rows.append([acl_principal, f"{acl_permission} {chars.larrow_hollow} {acl_actions}"])
     table = PrettyTable()
     table.header = False
     if nosort is not True:
@@ -357,44 +357,47 @@ def print_acls(acls: List[tuple], message: Optional[str] = None, nosort: bool = 
 def print_principals_with_acls(principals: List[str], acls: List[tuple],
                                action: Optional[Any] = None,
                                message: Optional[str] = None) -> None:
-    def find_matching_acl():  # noqa
+    def find_matching_acl() -> Optional[tuple]:  # noqa
         # FYI: See pyramid/authorization.py ...
         nonlocal acls, principals, action
-        for acl_item in acls:
-            acl_action, acl_principal, acl_permissions = acl_item
-            if acl_principal in principals:
-                if action in acl_permissions:
+        if action:
+            for acl_item in acls:
+                acl_permission, acl_principal, acl_actions = acl_item
+                if (acl_principal in principals) and (action in acl_actions):
                     return acl_item
-        return None
     matching_acl = find_matching_acl()
     def acl_value(principal, principal_uuid):  # noqa
         nonlocal acls, principals, action
         if principal_uuid:
             principal = f"{principal}.{principal_uuid}"
+        values = []
         for acl_item in acls:
-            acl_action, acl_principal, acl_permissions = acl_item
+            acl_permission, acl_principal, acl_actions = acl_item
             if acl_principal == principal:
-                acl_permissions_display = deepcopy(acl_permissions)
-                if isinstance(acl_permissions_display, list):
-                    for index in range(len(acl_permissions_display)):
-                        if str(acl_permissions_display[index]).startswith("<pyramid.security.AllPermissionsList"):
-                            acl_permissions_display[index] = "pyramid.security.AllPermissionsList"
-                elif str(acl_permissions_display).startswith("<pyramid.security.AllPermissionsList"):
-                    acl_permissions_display = "pyramid.security.AllPermissionsList"
-                if isinstance(acl_permissions_display, list):
-                    acl_permissions_display = f" {chars.dot} ".join(acl_permissions_display)
-                value = f"{acl_action} {chars.larrow_hollow} {acl_permissions_display}"
-                if acl_item == matching_acl:
-                    value += f" {chars.larrow}{chars.larrow}{chars.larrow}"
-                elif action in acl_permissions:
-                    value += f" {chars.larrow_hollow}"
-                return value
-        return ""
-    def allowed(principal, principal_uuid):  # noqa
-        pass
+                acl_actions_display = deepcopy(acl_actions)
+                if isinstance(acl_actions_display, list):
+                    for index in range(len(acl_actions_display)):
+                        if str(acl_actions_display[index]).startswith("<pyramid.security.AllPermissionsList"):
+                            acl_actions_display[index] = "pyramid.ALL_PERMISSIONS"
+                elif str(acl_actions_display).startswith("<pyramid.security.AllPermissionsList"):
+                    acl_actions_display = "pyramid.ALL_PERMISSIONS"
+                if isinstance(acl_actions_display, list):
+                    acl_actions_display = f" {chars.dot} ".join(acl_actions_display)
+                value = f"{acl_permission} {chars.larrow_hollow} {acl_actions_display}"
+                if action:
+                    if acl_item == matching_acl:
+                        value += f" {chars.larrow}{chars.larrow}{chars.larrow}"
+                        if acl_permission == "Allow":
+                            value += f" {chars.check}"
+                        elif acl_permission == "Deny":
+                            value += f" {chars.xmark}"
+                    elif action in acl_actions:
+                        value += f" {chars.larrow_hollow}"
+                values.append(value)
+        return "\n".join(values)
     print_principals(principals,
                      value_callback=acl_value,
-                     value_header=f"PERMISSION: {action}" if action else "PEMISSION",
+                     value_header=f"ACL {chars.larrow_hollow} {action}" if action else "ACL",
                      message=message)
 
 
@@ -413,10 +416,11 @@ def error(message: Optional[str] = None, exit: bool = True, status: int = 1) -> 
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # sys.exit(main())
+    pass
 
 
-if False:
+if True:
     principals = \
         {"group.admin", 'role.consortium_member_rw', 'role.consortium_member_create', 'submits_for.9626d82e-8110-4213-ac75-0a50adf890ff', 'group.submitter', 'accesskey.POOZOKLE', 'system.Authenticated', 'role.consortium_member_rw.358aed10-9b9d-4e26-ab84-4bd162da182b', 'role.submission_center_member_rw', 'role.submission_center_member_create', 'userid.0d565156-00db-4948-82fe-021d151a5daf', 'role.submission_center_member_rw.9626d82e-8110-4213-ac75-0a50adf890ff', 'system.Everyone'}  # noqa
 
@@ -425,5 +429,6 @@ if False:
 
     print_principals(principals)
     print_acls(acls)
-    action = "edit"
+    action = "visible_for_edit"
+    action = "search"
     print_principals_with_acls(principals, acls, action=action)
