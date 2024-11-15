@@ -13,13 +13,31 @@ class Action:
     ADD = "add"
     EDIT = "edit"
     CREATE = "create"
+    EXPAND = "expand"
+    INDEX = "index"
+    LIST = "list"
+    RESTRICTED_FIELDS = "restricted_fields"
+    SEARCH = "search"
     VIEW = "view"
     VIEW_DETAILS = "view_details"
+    VIEW_RAW = "view_raw"
     VISIBLE_FOR_EDIT = "visible_for_edit"
 
 
-ActionType = Literal[Action.ADD, Action.EDIT, Action.CREATE,
-                     Action.VIEW, Action.VIEW_DETAILS, Action.VISIBLE_FOR_EDIT]
+ActionType = Literal[
+    Action.ADD,
+    Action.EDIT,
+    Action.CREATE,
+    Action.EXPAND,
+    Action.INDEX,
+    Action.LIST,
+    Action.RESTRICTED_FIELDS,
+    Action.SEARCH,
+    Action.VIEW,
+    Action.VIEW_DETAILS,
+    Action.VIEW_RAW,
+    Action.VISIBLE_FOR_EDIT
+]
 
 
 def main():
