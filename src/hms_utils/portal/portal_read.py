@@ -572,6 +572,8 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
     run_concurrently([fetch_portal_item, fetch_portal_item_noraw], nthreads=min(2, nthreads))
     if not item:
         return {}
+    elif item in [Portal.Access.NOT_FOUND, Portal.Access.NO_ACCESS, Portal.Access.ERROR]:
+        return item
     if isinstance(graph := item.get("@graph"), list):
         if isinstance(item_noraw_graph := item_noraw.get("@graph"), list):
             def find_item_type(uuid: str) -> Optional[str]:
