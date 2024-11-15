@@ -213,6 +213,7 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--no-ignore" "--all"],
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--sort"],
+        ARGV.OPTIONAL(bool): ["--uuids"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(bool): ["--append"],
@@ -298,7 +299,31 @@ def main() -> int:
     if not argv.sid:
         _scrub_sids_from_items(items)
 
-    if argv.output:
+    if argv.uuids is True:
+        if not isinstance(items, list):
+            _error("Result set if not a list of items which is required when using the --uuids option.")
+        if argv.output:
+            if os.path.isdir(argv.output):
+                _error(f"Specified output file already exists as a directory: {argv.output}")
+            elif os.path.exists(argv.output):
+                if (not argv.append) and (argv.overwrite or yes_or_no("Overwrite this file?")):
+                    with io.open(argv.output, "w") as f:
+                        for item in items:
+                            if uuid := item.get("uuid"):
+                                f.write(f"{uuid}\n")
+                elif argv.append or yes_or_no("Append to this file?"):
+                    with io.open(argv.output, "a") as f:
+                        for item in items:
+                            if uuid := item.get("uuid"):
+                                f.write(f"{uuid}\n")
+                else:
+                    return 1
+        else:
+            for item in items:
+                if uuid := item.get("uuid"):
+                    _print(uuid)
+        return 0
+    elif argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
             _write_inserts_output_files(items, argv.output, noformat=argv.noformat,
                                         overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
@@ -337,7 +362,6 @@ def main() -> int:
     if argv.verbose or argv.timing or argv.debug:
         duration = time.time() - started
         _info(f"Duration: {format_duration(duration)}")
-
     return 0
 
 
@@ -682,4 +706,5 @@ def _setup_debugging(argv: ARGV) -> None:
 
 
 if __name__ == "__main__":
-    exit(main())
+    status = main()
+    sys.exit(status if isinstance(status, int) else 0)
