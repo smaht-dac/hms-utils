@@ -53,35 +53,35 @@ def main():
 
     user_email = user.get("email")
     user_uuid = user.get("uuid")
-
     user_principals = get_user_principals(portal_for_user)
 
+    if argv.item:
+        if not (principals_allowed_for_item := get_principals_allowed_for_item(portal, argv.item)):
+            error(f"Cannot access Portal item: {argv.item}")
+    else:
+        principals_allowed_for_item = None
+
     print(f"\n{chars.rarrow} USER: {user_email} {chars.dot} {user_uuid}")
-    print_principals(user_principals, uuid_callback=lambda uuid, portal=portal: get_affiliation(portal, uuid))
+    print_user_principals(user_principals, principals_allowed_for_item, portal)
     if argv.debug:
         print(json.dumps(user_principals, indent=4))
 
-    if argv.item:
+    if principals_allowed_for_item:
 
-        if not (principals_allowed_for_item := get_principals_allowed_for_item(portal, argv.item)):
-            error(f"Cannot access Portal item: {argv.item}")
+        item_type = get_portal_item_type(portal, argv.item)
+        print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}{f' {chars.dot} {item_type}' if item_type else ''}")
+        print_principals_with_actions(principals_allowed_for_item, user_principals)
+        if argv.debug:
+            print(json.dumps(principals_allowed_for_item, indent=4))
 
-        if principals_allowed_for_item:
-
-            item_type = get_portal_item_type(portal, argv.item)
-            print(f"\n{chars.rarrow} PORTAL ITEM: {argv.item}{f' {chars.dot} {item_type}' if item_type else ''}")
-            print_principals_with_actions(principals_allowed_for_item)
-            if argv.debug:
-                print(json.dumps(principals_allowed_for_item, indent=4))
-
-            if (actions := argv.actions) or (actions := sorted(list(principals_allowed_for_item.keys()))):
-                print(f"\n{chars.rarrow} PERMISSIONS: {argv.item} {chars.larrow_hollow} {user_email}")
-                for action in actions:
-                    action_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, action)
-                    print(f"  {chars.dot} ACTION: {action} {chars.rarrow_hollow}"
-                          f" {f'ALLOWED' if action_allowed else 'FORBIDDEN'}")
-                    if not action_allowed:
-                        status = 1
+        if (actions := argv.actions) or (actions := sorted(list(principals_allowed_for_item.keys()))):
+            print(f"\n{chars.rarrow} PERMISSIONS: {argv.item} {chars.larrow_hollow} {user_email}")
+            for action in actions:
+                action_allowed = is_user_allowed_item_access(user_principals, principals_allowed_for_item, action)
+                print(f"  {chars.dot} ACTION: {action} {chars.rarrow_hollow}"
+                      f" {f'ALLOWED' if action_allowed else 'FORBIDDEN'}")
+                if not action_allowed:
+                    status = 1
     print()
 
     return status
@@ -198,7 +198,8 @@ def is_user_allowed_item_access(user_principals_or_portal_or_key_or_key_name: Un
 def print_principals(principals: List[str], message: Optional[str] = None,
                      value_callback: Optional[Callable] = None,
                      value_header: Optional[str] = None,
-                     uuid_callback: Optional[Callable] = None,
+                     principal_callback: Optional[Callable] = None,
+                     principal_uuid_callback: Optional[Callable] = None,
                      parse_userid: bool = False,
                      header: Optional[List[str]] = None,
                      noheader: bool = False,
@@ -221,8 +222,11 @@ def print_principals(principals: List[str], message: Optional[str] = None,
     rows = []
     for principal in principals:
         principal, principal_uuid = uuid_specific_principal(principal)
-        if callable(uuid_callback):
-            if principal_uuid_annotation := uuid_callback(principal_uuid):
+        if callable(principal_callback):
+            if principal_annotation := principal_callback(principal, principal_uuid):
+                principal += principal_annotation
+        if callable(principal_uuid_callback):
+            if principal_uuid_annotation := principal_uuid_callback(principal_uuid):
                 principal_uuid += f" {chars.dot} {principal_uuid_annotation}"
         if principal_uuid:
             rows.append([principal, principal_uuid])
@@ -259,7 +263,32 @@ def print_principals(principals: List[str], message: Optional[str] = None,
     print(output)
 
 
-def print_principals_with_actions(principals_allowed_for_item_by_action: dict) -> None:
+def print_user_principals(user_principals: List[str],
+                          principals_allowed_for_item: Optional[dict] = None,
+                          portal: Optional[Portal] = None) -> None:
+    if isinstance(principals_allowed_for_item, dict):
+        principals_allowed_for_item_flattened = [item for items in principals_allowed_for_item.values()
+                                                 for item in items]
+        principals_allowed_for_item_flattened = list(set(principals_allowed_for_item_flattened))
+    else:
+        principals_allowed_for_item_flattened = None
+    def principal_annotation(principal: str, principal_uuid: Optional[str] = None):  # noqa
+        nonlocal principals_allowed_for_item_flattened
+        if isinstance(principal, str) and principal:
+            if isinstance(principal_uuid, str) and principal_uuid:
+                principal += f"{principal_uuid}"
+            if principal in principals_allowed_for_item_flattened:
+                return f" {chars.larrow}{chars.larrow}{chars.larrow}"
+    def principal_uuid_annotation(principal_uuid: str) -> Optional[str]:  # noqa
+        nonlocal portal
+        return get_affiliation(portal, principal_uuid)
+    print_principals(user_principals,
+                     principal_callback=principal_annotation if principals_allowed_for_item_flattened else None,
+                     principal_uuid_callback=principal_uuid_annotation if isinstance(portal, Portal) else None)
+
+
+def print_principals_with_actions(principals_allowed_for_item_by_action: dict,
+                                  user_principals: Optional[List[str]] = None) -> None:
     def find_actions(principal, principal_uuid) -> Optional[str]:
         nonlocal principals_allowed_for_item_by_action
         if isinstance(principal, str):
@@ -267,9 +296,18 @@ def print_principals_with_actions(principals_allowed_for_item_by_action: dict) -
                 principal += f".{principal_uuid}"
             actions = [action for action, items in principals_allowed_for_item_by_action.items() if principal in items]
             return f" {chars.dot} ".join(actions)
+    def principal_annotation(principal: str, principal_uuid: Optional[str] = None) -> None:  # noqa
+        nonlocal user_principals
+        if isinstance(principal, str) and principal:
+            if isinstance(principal_uuid, str) and principal_uuid:
+                principal += f"{principal_uuid}"
+            if principal in user_principals:
+                return f" {chars.larrow}{chars.larrow}{chars.larrow}"
     principals_allowed_for_item = [item for items in principals_allowed_for_item_by_action.values() for item in items]
     principals_allowed_for_item = list(set(principals_allowed_for_item))
-    print_principals(principals_allowed_for_item, value_callback=find_actions, value_header="ACTION      ")
+    print_principals(principals_allowed_for_item,
+                     principal_callback=principal_annotation if isinstance(user_principals, list) else None,
+                     value_callback=find_actions, value_header="ACTION     ")
 
 
 def get_affiliation(portal: Portal, uuid: str) -> Optional[str]:
