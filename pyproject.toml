@@ -57,6 +57,7 @@ hms-portal-users = "hms_utils.portal.portal_users:main"
 hms-portal-user-update = "hms_utils.portal.portal_user_update:main"
 hms-portal-simple-update = "hms_utils.portal.portal_simple_update:main"
 hms-portal-permissions = "hms_utils.portal.portal_permissions:main"
+hms-portal-files = "hms_utils.portal.portal_files:main"
 
 hms-encrypt = "hms_utils.cli.crypt_cli:main_encrypt"
 hms-decrypt = "hms_utils.cli.crypt_cli:main_decrypt"
