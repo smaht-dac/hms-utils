@@ -439,3 +439,25 @@ class JSON(dict):
                     unmerged_paths.append(key_path)
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
+
+
+def get_property_value(data: dict, name: str) -> Optional[Any]:
+    """
+    Returns the value of the given property name within the given dictionary, where the given
+    property name can be a dot-separated list of property names, which indicate a path into
+    nested dictionaries within the given dictionary; returns None if not found.
+    """
+    if isinstance(data, dict) and isinstance(name, str) and name:
+        if keys := name.split("."):
+            nkeys = len(keys) ; key_index_max = nkeys - 1  # noqa
+            for key_index in range(nkeys):
+                key = keys[key_index]
+                if (value := data.get(key, None)) is None:
+                    break
+                elif key_index == key_index_max:
+                    return value
+                elif not isinstance(value, dict):
+                    break
+                else:
+                    data = value
+    return None

@@ -16,7 +16,7 @@ from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import format_duration
 from hms_utils.dictionary_utils import contains_uuid, delete_properties_from_dictionaries, find_dictionary_item
-from hms_utils.dictionary_utils import get_uuids, get_referenced_uuids, sort_dictionary
+from hms_utils.dictionary_utils import get_property_value, get_uuids, get_referenced_uuids, sort_dictionary
 from hms_utils.portal.portal_utils import Portal as PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import is_uuid
@@ -214,6 +214,8 @@ def main() -> int:
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--sort"],
         ARGV.OPTIONAL(bool): ["--uuids"],
+        ARGV.OPTIONAL([str]): ["--pick"],
+        ARGV.OPTIONAL(str): ["--pick-separator", "--pick-sep"],
         ARGV.OPTIONAL(int): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip", "--from"],
         ARGV.OPTIONAL(bool): ["--append"],
@@ -299,7 +301,26 @@ def main() -> int:
     if not argv.sid:
         _scrub_sids_from_items(items)
 
-    if argv.uuids is True:
+    if argv.uuids or argv.pick:
+        if argv.pick:
+            if "uuid" not in argv.pick:
+                argv.pick.insert(0, "uuid")
+        else:
+            argv.pick = ["uuid"]
+        if argv.pick_separator:
+            if argv.pick_separator in ["\\t", "tab", "TAB"]:
+                argv.pick_separator = "\t"
+        def write_item_properties(items: List[dit], names: List[str],  # noqa
+                                  write: Callable, separator: Optional[str] = None) -> None:
+            if isinstance(items, list) and isinstance(names, list) and callable(write):
+                if not isinstance(separator, str):
+                    separator = " "
+                for item in items:
+                    values = []
+                    for name in names:
+                        if value := get_property_value(item, name):
+                            values.append(str(value))
+                    write(separator.join(values))
         if not isinstance(items, list):
             _error("Result set if not a list of items which is required when using the --uuids option.")
         if argv.output:
@@ -308,21 +329,18 @@ def main() -> int:
             elif os.path.exists(argv.output):
                 if (not argv.append) and (argv.overwrite or yes_or_no("Overwrite this file?")):
                     with io.open(argv.output, "w") as f:
-                        for item in items:
-                            if uuid := item.get("uuid"):
-                                f.write(f"{uuid}\n")
+                        write_item_properties(items, argv.pick,
+                                              write=lambda value: f.write(f"{value}\n"), separator=argv.pick_separator)
                 elif argv.append or yes_or_no("Append to this file?"):
                     with io.open(argv.output, "a") as f:
-                        for item in items:
-                            if uuid := item.get("uuid"):
-                                f.write(f"{uuid}\n")
+                        write_item_properties(items, argv.pick,
+                                              write=lambda value: f.write(f"{value}\n"), separator=argv.pick_separator)
                 else:
                     return 1
         else:
-            for item in items:
-                if uuid := item.get("uuid"):
-                    _print(uuid)
+            write_item_properties(items, argv.pick, write=print, separator=argv.pick_separator)
         return 0
+
     elif argv.output:
         if argv.inserts and (os.path.isdir(argv.output) or argv.output.endswith(os.sep)):
             _write_inserts_output_files(items, argv.output, noformat=argv.noformat,
@@ -330,6 +348,7 @@ def main() -> int:
         else:
             _write_output_file(items, argv.output, inserts=argv.inserts, noformat=argv.noformat,
                                overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
+
     else:
         _print_data(items, argv)
 
