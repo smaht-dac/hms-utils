@@ -441,7 +441,7 @@ class JSON(dict):
         return merged, merged_paths, unmerged_paths
 
 
-def get_property_value(data: dict, name: str) -> Optional[Any]:
+def get_property(data: dict, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
     """
     Returns the value of the given property name within the given dictionary, where the given
     property name can be a dot-separated list of property names, which indicate a path into
@@ -460,4 +460,4 @@ def get_property_value(data: dict, name: str) -> Optional[Any]:
                     break
                 else:
                     data = value
-    return None
+    return fallback

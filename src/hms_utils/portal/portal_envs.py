@@ -194,5 +194,5 @@ def get_duration(more_recent, less_recent):
 
 
 if __name__ == "__main__":
-    main()
-    pass
+    status = main()
+    sys.exit(status if isinstance(status, int) else 0)

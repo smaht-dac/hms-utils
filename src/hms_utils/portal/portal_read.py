@@ -252,7 +252,7 @@ def main() -> int:
         return 0
 
     if ("/" not in argv.query) and ("-" not in argv.query) and (schema := portal.get_schema(argv.query)):
-        _print_data(schema, argv)
+        _write_data(schema, argv)
         return 0
 
     if argv.noignore_properties:
@@ -350,7 +350,7 @@ def main() -> int:
                                overwrite=argv.overwrite, merge=argv.merge, append=argv.append)
 
     else:
-        _print_data(items, argv)
+        _write_data(items, argv)
 
     if argv.refs and argv.sanity_check:
         _verbose("Sanity checking for missing referenced items ...", end="")
@@ -537,7 +537,7 @@ def _write_output_file(items: dict, output_file: str, inserts: bool = False, nof
         _verbose(f"Output file written: {output_file}")
 
 
-def _print_data(data: Any, argv: ARGV) -> None:
+def _write_data(data: Any, argv: ARGV) -> None:
     if argv.yaml is True:
         _print(yaml.dump(data).strip())
     elif argv.noformat is True:
