@@ -667,9 +667,6 @@ class Argv:
                     if (option.startswith(Argv._OPTION_PREFIX) and
                         (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:])):  # noqa
                         return True
-                    elif (value.startswith(Argv._OPTION_PREFIX) and
-                          (option == Argv._FUZZY_OPTION_PREFIX + value[Argv._OPTION_PREFIX_LEN:])):
-                        return True
             return False
         if isinstance(options, str):
             options = [options]
