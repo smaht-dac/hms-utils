@@ -16,7 +16,7 @@ from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.datetime_utils import format_duration
 from hms_utils.dictionary_utils import contains_uuid, delete_properties_from_dictionaries, find_dictionary_item
-from hms_utils.dictionary_utils import get_property_value, get_uuids, get_referenced_uuids, sort_dictionary
+from hms_utils.dictionary_utils import get_property, get_uuids, get_referenced_uuids, sort_dictionary
 from hms_utils.portal.portal_utils import Portal as PortalFromUtils
 from hms_utils.threading_utils import run_concurrently
 from hms_utils.type_utils import is_uuid
@@ -318,7 +318,7 @@ def main() -> int:
                 for item in items:
                     values = []
                     for name in names:
-                        if value := get_property_value(item, name):
+                        if value := get_property(item, name):
                             values.append(str(value))
                     write(separator.join(values))
         if not isinstance(items, list):

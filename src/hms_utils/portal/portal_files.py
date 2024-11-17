@@ -16,10 +16,10 @@ def main():
     argv = ARGV({
         ARGV.OPTIONAL(str, "smaht-data"): ["--env"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(bool): ["--all"],
         ARGV.OPTIONAL(str): ["--from-date", "--from"],
         ARGV.OPTIONAL(str): ["--thru-date", "--thru", "--to"],
-        ARGV.OPTIONAL(int): ["--limit", "--count"],
+        ARGV.OPTIONAL(bool): ["--all-dates", "--any-dates", "--any-date", "--all", "--any"],
+        ARGV.OPTIONAL(int, 20): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip"],
         ARGV.OPTIONAL(str): ["--status", "--state"],
         ARGV.OPTIONAL(str): ["--sort"],
@@ -34,7 +34,7 @@ def main():
     if not (portal := Portal.create(argv.env, app=argv.app, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
         return 1
 
-    from_date, thru_date = _parse_from_and_thru_date_args(argv) if not argv.all else (None, None)
+    from_date, thru_date = _parse_from_and_thru_date_args(argv) if not argv.all_dates else (None, None)
 
     date_property_name = "file_status_tracking.released"
     if status := argv.status:
@@ -49,7 +49,8 @@ def main():
         elif status == "uploaded":
             date_property_name = "file_status_tracking.uploaded"
         else:
-            _error(f"Invalid status specified: {argv.status}")
+            date_property_name = "last_modified.date_modified"
+            # _error(f"Invalid status specified: {argv.status}")
 
     # FYI: Note that using a portal query like this (using just date no time):
     #
@@ -64,7 +65,7 @@ def main():
 
     query = "&".join(to_non_empty_string_list([
         f"/files",
-        f"limit=1000",
+        f"limit={argv.limit}",
         f"sort=file_status_tracking.released",
         f"status={status}" if status else None,
         f"file_status_tracking.{date_property_name}.from={from_date}" if from_date else None,
@@ -127,14 +128,17 @@ def main():
     # }
 
     table = PrettyTable()
-    table.field_names = ["FILE", "TYPE / SIZE", "STATUS", "DATE"]
+    table.field_names = ["N", "FILE", "TYPE / SIZE", "STATUS", "DATE"]
     table.align = "l"
-    # table.align["SIZE"] = "r"
+    table.align["N"] = "r"
     if argv.verbose:
         table.hrules = PrettyTableHorizontalStyle.ALL
 
+    nitems = 0
+
     for item in items:
 
+        nitems += 1
         uuid = item.get("uuid", "")
         type = portal.get_item_type(item)
         status = item.get("status", "")
@@ -153,10 +157,13 @@ def main():
             date = f"{format_date(date)}\n{format_time(date, notz=True)}"
             if by:
                 date += f"\n{by}"
+            if type_and_size:
+                type_and_size += f"\n{size}"
         else:
             date = f"{format_date(date)}"
 
         table.add_row([
+            nitems,
             name,
             type_and_size,
             status,
