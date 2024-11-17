@@ -188,9 +188,6 @@ def get_referenced_uuids(item: Union[dict, List[dict]],
         elif uuids := get_uuids_from_value(item):
             for uuid in uuids:
                 if (uuid not in ignore_uuids) and (uuid not in referenced_uuids):
-                    if uuid == "f8a68d42-2765-4773-ac77-a287207ef5ee":
-                        import pdb ; pdb.set_trace()  # noqa
-                        pass
                     referenced_uuids.append(uuid)
     def get_uuids_from_value(value: str) -> List[str]:  # noqa
         uuids = []
