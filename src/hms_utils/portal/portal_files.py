@@ -22,7 +22,8 @@ def main():
         ARGV.OPTIONAL(int, 20): ["--limit", "--count"],
         ARGV.OPTIONAL(int): ["--offset", "--skip"],
         ARGV.OPTIONAL(str): ["--status", "--state"],
-        ARGV.OPTIONAL(str): ["--sort"],
+        ARGV.OPTIONAL(str): ["--nosort"],
+        ARGV.OPTIONAL(bool): ["--sort-reverse", "--sort-reversed", "--reverse", "--reversed"],
         ARGV.OPTIONAL(bool): "--verbose",
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool, True): ["--debug"],
@@ -66,7 +67,7 @@ def main():
     query = "&".join(to_non_empty_string_list([
         f"/files",
         f"limit={argv.limit}",
-        f"sort=file_status_tracking.released",
+        f"sort={'' if argv.sort_reverse else '-'}{date_property_name}" if not argv.nosort else None,
         f"status={status}" if status else None,
         f"file_status_tracking.{date_property_name}.from={from_date}" if from_date else None,
         f"file_status_tracking.{date_property_name}.to={thru_date}" if thru_date else None,
