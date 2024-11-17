@@ -25,6 +25,7 @@ from hms_utils.version_utils import get_version
 _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
+_ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
 
 
 class Portal(PortalFromUtils):
@@ -367,7 +368,7 @@ def main() -> int:
 
     if argv.verbose:
         uuids_count = len(get_uuids(items))
-        referenced_uuids_count = len(get_referenced_uuids(items, exclude_properties=["viewconfig"]))
+        referenced_uuids_count = len(get_referenced_uuids(items, exclude_properties=_ITEM_IGNORE_REF_PROPERTIES))
         _verbose(f"Total items fetched:"
                  f" {uuids_count}"
                  f"{f' {chars.dot} refs: {referenced_uuids_count}' if referenced_uuids_count != uuids_count else ''}")
@@ -552,7 +553,7 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
     referenced_items = [] ; ignore_uuids = [] ; referenced_items_batch = item ; referenced_uuids_last = None  # noqa
     while referenced_uuids := get_referenced_uuids(referenced_items_batch, ignore_uuids=ignore_uuids,
                                                    exclude_uuid=True, include_paths=True,
-                                                   exclude_properties=["viewconfig"]):
+                                                   exclude_properties=_ITEM_IGNORE_REF_PROPERTIES):
         if (referenced_uuids := set(referenced_uuids)) == referenced_uuids_last:
             break
         referenced_uuids_last = referenced_uuids
@@ -583,6 +584,9 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], Set[str]
         nonlocal portal, metadata, raw, database, items
         if item := _portal_get(portal, uuid, metadata=True,
                                raw=raw, inserts=inserts, database=database, nthreads=nthreads):
+            if not isinstance(item, dict):
+                print(f"XYZZY[{uuid}]", file=sys.stderr)
+                print(item, file=sys.stderr)
             items.append(item)  # TODO: make thread-safe.
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
@@ -667,7 +671,7 @@ def _scrub_sids_from_items(items: dict) -> None:
 
 def _sanity_check_missing_items_referenced(data: Union[dict, list]) -> List[str]:
     missing_items_referenced = []
-    for referenced_uuid in get_referenced_uuids(data, exclude_properties=["viewconfig"]):
+    for referenced_uuid in get_referenced_uuids(data, exclude_properties=_ITEM_IGNORE_REF_PROPERTIES):
         if not contains_uuid(data, referenced_uuid):
             missing_items_referenced.append(referenced_uuid)
     return missing_items_referenced
