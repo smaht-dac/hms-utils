@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+import json
 from prettytable import PrettyTable, HRuleStyle as PrettyTableHorizontalStyle
 import sys
 from typing import List, Optional, Tuple, Union
@@ -28,8 +29,9 @@ def main():
         ARGV.OPTIONAL(str): ["--nosort"],
         ARGV.OPTIONAL(bool): ["--sort-reverse", "--sort-reversed", "--reverse", "--reversed"],
         ARGV.OPTIONAL(bool): "--verbose",
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--dump"],
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
-        ARGV.OPTIONAL(bool, True): ["--debug"],
         ARGV.OPTIONAL(bool): "--ping"
     })
 
@@ -131,12 +133,20 @@ def main():
 
     if argv.group:
         grouped_items = _group_by_month(items, date_property_name)
-        for month in grouped_items:
-            items = grouped_items[month]
-            _print(f"\n{chars.rarrow} MONTH: {month}")
-            _print_file_table(items, date_property_name=date_property_name, argv=argv)
+        if argv.dump:
+            _print(json.dumps(grouped_items, indent=4))
+        else:
+            for month in grouped_items:
+                items = grouped_items[month]
+                _print(f"\n{chars.rarrow} MONTH: {month}")
+                _print_file_table(items, date_property_name=date_property_name, argv=argv)
     else:
-        _print_file_table(items, date_property_name=date_property_name, argv=argv)
+        if argv.dump:
+            _print(json.dumps(grouped_items, indent=4))
+        else:
+            _print_file_table(items, date_property_name=date_property_name, argv=argv)
+
+    return 0
 
 
 def _print_file_table(items: List[dict], date_property_name: str, argv: ARGV) -> None:

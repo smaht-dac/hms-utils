@@ -164,7 +164,9 @@ def load_json_file(file: str, raise_exception: bool = False) -> Optional[dict]:
 
 def get_referenced_uuids(item: Union[dict, List[dict]],
                          ignore_uuids: Optional[List[str]] = None,
-                         exclude_uuid: bool = False, uuid_property_name: Optional[str] = None,
+                         exclude_uuid: bool = False,
+                         exclude_properties: Optional[List[str]] = None,
+                         uuid_property_name: Optional[str] = None,
                          include_paths: bool = False) -> List[str]:
     """
     Returns a list of uuids which appear as a value anywhere, recursively, within the given
@@ -177,8 +179,9 @@ def get_referenced_uuids(item: Union[dict, List[dict]],
     def find_referenced_uuids(item: Any) -> None:  # noqa
         nonlocal referenced_uuids, ignore_uuids
         if isinstance(item, dict):
-            for value in item.values():
-                find_referenced_uuids(value)
+            for key in item:
+                if (not isinstance(exclude_properties, list)) or (key not in exclude_properties):
+                    find_referenced_uuids(item[key])
         elif isinstance(item, (list, tuple)):
             for element in item:
                 find_referenced_uuids(element)
@@ -205,7 +208,8 @@ def get_referenced_uuids(item: Union[dict, List[dict]],
             ignore_uuids.append(uuid)
     elif isinstance(item, list):
         for element in item:
-            if (exclude_uuid is True) and (uuid := element.get(uuid_property_name)) and (uuid not in ignore_uuids):
+            if ((exclude_uuid is True) and isinstance(element, dict) and
+                (uuid := element.get(uuid_property_name)) and (uuid not in ignore_uuids)):  # noqa
                 ignore_uuids.append(uuid)
     find_referenced_uuids(item)
     return referenced_uuids

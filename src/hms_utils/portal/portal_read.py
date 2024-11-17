@@ -367,7 +367,7 @@ def main() -> int:
 
     if argv.verbose:
         uuids_count = len(get_uuids(items))
-        referenced_uuids_count = len(get_referenced_uuids(items))
+        referenced_uuids_count = len(get_referenced_uuids(items, exclude_properties=["viewconfig"]))
         _verbose(f"Total items fetched:"
                  f" {uuids_count}"
                  f"{f' {chars.dot} refs: {referenced_uuids_count}' if referenced_uuids_count != uuids_count else ''}")
@@ -551,17 +551,22 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
                                  nthreads: Optional[int] = None) -> List[dict]:
     referenced_items = [] ; ignore_uuids = [] ; referenced_items_batch = item ; referenced_uuids_last = None  # noqa
     while referenced_uuids := get_referenced_uuids(referenced_items_batch, ignore_uuids=ignore_uuids,
-                                                   exclude_uuid=True, include_paths=True):
+                                                   exclude_uuid=True, include_paths=True,
+                                                   exclude_properties=["viewconfig"]):
         if (referenced_uuids := set(referenced_uuids)) == referenced_uuids_last:
             break
         referenced_uuids_last = referenced_uuids
         referenced_items_batch = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
-        referenced_items.extend(referenced_items_batch)
+        # referenced_items.extend(referenced_items_batch)
+        for referenced_item in referenced_items_batch:
+            if isinstance(item, dict):
+                referenced_items.append(referenced_item)
         for item in referenced_items_batch:
-            if item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME):
-                if item_uuid not in ignore_uuids:
-                    ignore_uuids.append(item_uuid)
+            if isinstance(item, dict):
+                if item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME):
+                    if item_uuid not in ignore_uuids:
+                        ignore_uuids.append(item_uuid)
     return referenced_items
 
 
@@ -637,11 +642,12 @@ def _portal_get_inserts(portal: Portal, query: str, metadata: bool = False, data
 def _insertize_items(items: dict) -> dict:
     items_by_type = {}
     for item in items:
-        item_type = item.get(_ITEM_TYPE_PSEUDO_PROPERTY_NAME)
-        if not (item_list := items_by_type.get(item_type)):
-            items_by_type[item_type] = (item_list := [])
-        item_list.append(item)
-        item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
+        if isinstance(item, dict):
+            item_type = item.get(_ITEM_TYPE_PSEUDO_PROPERTY_NAME)
+            if not (item_list := items_by_type.get(item_type)):
+                items_by_type[item_type] = (item_list := [])
+            item_list.append(item)
+            item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
     return items_by_type
 
 
@@ -661,7 +667,7 @@ def _scrub_sids_from_items(items: dict) -> None:
 
 def _sanity_check_missing_items_referenced(data: Union[dict, list]) -> List[str]:
     missing_items_referenced = []
-    for referenced_uuid in get_referenced_uuids(data):
+    for referenced_uuid in get_referenced_uuids(data, exclude_properties=["viewconfig"]):
         if not contains_uuid(data, referenced_uuid):
             missing_items_referenced.append(referenced_uuid)
     return missing_items_referenced
