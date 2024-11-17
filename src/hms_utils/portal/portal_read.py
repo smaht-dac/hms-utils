@@ -559,9 +559,8 @@ def _get_portal_referenced_items(portal: Portal, item: dict, metadata: bool = Fa
         referenced_uuids_last = referenced_uuids
         referenced_items_batch = _get_portal_items_for_uuids(
             portal, referenced_uuids, metadata=metadata, raw=raw, inserts=inserts, database=database, nthreads=nthreads)
-        # referenced_items.extend(referenced_items_batch)
         for referenced_item in referenced_items_batch:
-            if isinstance(item, dict):
+            if isinstance(referenced_item, dict):
                 referenced_items.append(referenced_item)
         for item in referenced_items_batch:
             if isinstance(item, dict):
