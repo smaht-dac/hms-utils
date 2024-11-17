@@ -1,11 +1,11 @@
 from datetime import date, datetime, timedelta
 from prettytable import PrettyTable, HRuleStyle as PrettyTableHorizontalStyle
 import sys
-from typing import Optional, Tuple
-from dcicutils.datetime_utils import format_time
+from typing import Optional, Tuple, Union
+from dcicutils.datetime_utils import format_date, format_time
 from dcicutils.misc_utils import format_size
 from hms_utils.argv import ARGV
-from hms_utils.datetime_utils import format_date, parse_datetime_string
+from hms_utils.datetime_utils import parse_datetime_string
 from hms_utils.dictionary_utils import get_property
 from hms_utils.portal.portal_utils import Portal
 from hms_utils.type_utils import to_non_empty_string_list
@@ -25,7 +25,7 @@ def main():
         ARGV.OPTIONAL(str): ["--sort"],
         ARGV.OPTIONAL(bool): "--verbose",
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
-        ARGV.OPTIONAL(bool): "--debug",
+        ARGV.OPTIONAL(bool, True): ["--debug"],
         ARGV.OPTIONAL(bool): "--ping"
     })
 
@@ -179,12 +179,31 @@ def _parse_from_and_thru_date_args(argv: ARGV) -> Tuple[Optional[str], Optional[
     return format_date(from_date), format_date(thru_date)
 
 
-def _get_first_and_last_date_of_month(today: Optional[datetime] = None) -> Tuple[datetime, datetime]:
-    if not isinstance(today, datetime):
-        today = date.today()
-    first_day = today.replace(day=1)
+def _get_first_and_last_date_of_month(day: Optional[Union[datetime, date]] = None,
+                                      nmonths: int = 1) -> Tuple[datetime, datetime]:
+    """
+    Returns datetime objects in a tuple for the first and last days of the month of the given datetime or date
+    argument, or if none is passed then for today. If the nmonths argument is greater than one, then instead of the
+    first day of the month of the given day (or today), then returns the first day of the nmonth-th previous month.
+    """
+    def get_first_date_of_previous_month(day: Optional[Union[datetime]]) -> datetime:
+        if not isinstance(day, datetime):
+            if isinstance(day, date):
+                day = datetime.combine(day, datetime.min.time())
+            else:
+                day = datetime.today()
+        return day.replace(day=1).replace(month=day.month - 1 if day.month > 1 else 12)
+    if not isinstance(day, datetime):
+        if isinstance(day, date):
+            day = datetime.combine(day, datetime.min.time())
+        else:
+            day = datetime.today()
+    first_day = day.replace(day=1)
     next_month = first_day.replace(month=first_day.month % 12 + 1, day=1)
     last_day = next_month - timedelta(days=1)
+    if isinstance(nmonths, int) and (nmonths > 1):
+        for _ in range(nmonths - 1):
+            first_day = get_first_date_of_previous_month(first_day)
     return (first_day, last_day)
 
 

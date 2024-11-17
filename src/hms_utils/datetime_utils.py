@@ -1,6 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Union
-from dcicutils.datetime_utils import format_date as dcicutils_format_date
 from dcicutils.datetime_utils import parse_datetime_string as dcicutils_parse_datetime_string
 
 
@@ -94,9 +93,3 @@ def parse_datetime_string(value: str) -> Optional[datetime]:
     elif isinstance(value, date):
         return datetime.combine(value, datetime.min.time())
     return dcicutils_parse_datetime_string(value)
-
-
-def format_date(value: datetime):
-    if isinstance(value, date):
-        value = datetime.combine(value, datetime.min.time())
-    return dcicutils_format_date(value)
