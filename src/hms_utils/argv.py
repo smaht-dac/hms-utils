@@ -663,10 +663,9 @@ class Argv:
                 isinstance(value, str) and (value := value.strip())):  # noqa
                 if value == option:
                     return True
-                elif self._fuzzy:
-                    if (option.startswith(Argv._OPTION_PREFIX) and
-                        (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:])):  # noqa
-                        return True
+                elif (self._fuzzy and option.startswith(Argv._OPTION_PREFIX) and
+                      (value == Argv._FUZZY_OPTION_PREFIX + option[Argv._OPTION_PREFIX_LEN:])):  # noqa
+                    return True
             return False
         if isinstance(options, str):
             options = [options]
