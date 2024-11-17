@@ -1,10 +1,11 @@
 from datetime import date, datetime, timedelta
 from prettytable import PrettyTable, HRuleStyle as PrettyTableHorizontalStyle
 import sys
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from dcicutils.datetime_utils import format_date, format_time
 from dcicutils.misc_utils import format_size
 from hms_utils.argv import ARGV
+from hms_utils.chars import chars
 from hms_utils.datetime_utils import parse_datetime_string
 from hms_utils.dictionary_utils import get_property
 from hms_utils.portal.portal_utils import Portal
@@ -20,8 +21,10 @@ def main():
         ARGV.OPTIONAL(str): ["--thru-date", "--thru", "--to"],
         ARGV.OPTIONAL(bool): ["--all-dates", "--any-dates", "--any-date", "--all", "--any"],
         ARGV.OPTIONAL(int, 20): ["--limit", "--count"],
-        ARGV.OPTIONAL(int): ["--offset", "--skip"],
+        ARGV.OPTIONAL(int, 0): ["--offset", "--skip"],
         ARGV.OPTIONAL(str): ["--status", "--state"],
+        ARGV.OPTIONAL(int, 1): ["--nmonths", "--months"],
+        ARGV.OPTIONAL(bool): ["--group", "--grouped", "--group-month", "--grouped-month"],
         ARGV.OPTIONAL(str): ["--nosort"],
         ARGV.OPTIONAL(bool): ["--sort-reverse", "--sort-reversed", "--reverse", "--reversed"],
         ARGV.OPTIONAL(bool): "--verbose",
@@ -69,8 +72,8 @@ def main():
         f"limit={argv.limit}",
         f"sort={'' if argv.sort_reverse else '-'}{date_property_name}" if not argv.nosort else None,
         f"status={status}" if status else None,
-        f"file_status_tracking.{date_property_name}.from={from_date}" if from_date else None,
-        f"file_status_tracking.{date_property_name}.to={thru_date}" if thru_date else None,
+        f"{date_property_name}.from={from_date}" if from_date else None,
+        f"{date_property_name}.to={thru_date}" if thru_date else None,
     ])).replace("&", "?", 1)
 
     if argv.debug:
@@ -81,8 +84,6 @@ def main():
 
     if not isinstance(items := items.get("@graph"), list):
         _error(f"Query did not return a list as expected: {query}")
-
-    _verbose(f"Number of files retrieved: {len(items)}")
 
     # Example record:
     # {
@@ -128,6 +129,18 @@ def main():
     #     "status": "released"
     # }
 
+    if argv.group:
+        grouped_items = _group_by_month(items, date_property_name)
+        for month in grouped_items:
+            items = grouped_items[month]
+            _print(f"\n{chars.rarrow} MONTH: {month}")
+            _print_file_table(items, date_property_name=date_property_name, argv=argv)
+    else:
+        _print_file_table(items, date_property_name=date_property_name, argv=argv)
+
+
+def _print_file_table(items: List[dict], date_property_name: str, argv: ARGV) -> None:
+
     table = PrettyTable()
     table.field_names = ["N", "FILE", "TYPE / SIZE", "STATUS", "DATE"]
     table.align = "l"
@@ -141,7 +154,7 @@ def main():
 
         nitems += 1
         uuid = item.get("uuid", "")
-        type = portal.get_item_type(item)
+        type = Portal.get_item_type(item)
         status = item.get("status", "")
         description = item.get("description", "")
         name = item.get("filename", item.get("display_title", ""))
@@ -177,7 +190,7 @@ def main():
 def _parse_from_and_thru_date_args(argv: ARGV) -> Tuple[Optional[str], Optional[str]]:
     from_date = thru_date = None
     if not (argv.from_date and argv.thru_date):
-        from_date, thru_date = _get_first_and_last_date_of_month()
+        from_date, thru_date = _get_first_and_last_date_of_month(nmonths=argv.nmonths)
     if argv.from_date:
         if not (from_date := parse_datetime_string(argv.from_date)):
             _error(f"Cannot parse given from date: {argv.from_date}")
@@ -213,6 +226,18 @@ def _get_first_and_last_date_of_month(day: Optional[Union[datetime, date]] = Non
         for _ in range(nmonths - 1):
             first_day = get_first_date_of_previous_month(first_day)
     return (first_day, last_day)
+
+
+def _group_by_month(items: List[dict], date_property_name: str) -> dict:
+    grouped_items = {}
+    if isinstance(items, list):
+        for item in items:
+            if ((value := get_property(item, date_property_name)) and (value := parse_datetime_string(value))):
+                month = f"{value.year}-{value.month:02}"
+                if not grouped_items.get(month):
+                    grouped_items[month] = []
+                grouped_items[month].append(item)
+    return grouped_items
 
 
 def _print(*args, **kwargs) -> None:
