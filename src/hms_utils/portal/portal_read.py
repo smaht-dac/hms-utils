@@ -806,7 +806,7 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
                                 "item": item
                             },
                             "existing": {
-                                "portal": existing_source,
+                                existing_source_property_name: existing_source,
                                 "uuid": existing_item.get(_ITEM_UUID_PROPERTY_NAME),
                                 "item": existing_item
                             }
