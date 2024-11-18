@@ -313,7 +313,7 @@ def main() -> int:
             _print("CONFLICTS:")
             _print(json.dumps(conflicts, indent=4))
         else:
-            _print("No conflcts.")
+            _print("No conflicts.")
 
     elif argv.uuids or argv.pick:
         if argv.pick:
@@ -787,6 +787,14 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
         file = os.path.join(compare, f"{to_snake_case(item_type)}.json")
         return file if os.path.exists(file) else None
 
+    def reorder_item_properties(item: dict) -> None:
+        if isinstance(item, dict):
+            item = sort_dictionary(item)
+            if (uuid := item.get(_ITEM_UUID_PROPERTY_NAME)) is not None:
+                del item[_ITEM_UUID_PROPERTY_NAME]
+                item = {_ITEM_UUID_PROPERTY_NAME: uuid, **item}
+        return item
+
     if isinstance(compare, Portal):
         get_existing_item = get_item_from_portal
         get_existing_source = get_portal_item_source
@@ -819,9 +827,9 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
                 "identifying_properties": identifying_properties,
                 "conflicts": conflicts_item,
                 "retrieved_item_portal": portal_source.env,
-                "retrieved_item": item,
+                "retrieved_item": reorder_item_properties(item),
                 existing_source_property_name: get_existing_source(item_type),
-                "existing_item": existing_item
+                "existing_item": reorder_item_properties(existing_item)
             }
         })
 
@@ -844,9 +852,9 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
                 "identifying_properties": identifying_properties,
                 "conflicts": conflicts_item,
                 "retrieved_item_portal": portal_source.env,
-                "retrieved_item": item,
+                "retrieved_item": reorder_item_properties(item),
                 existing_source_property_name: get_existing_source(item_type),
-                "existing_item": existing_item
+                "existing_item": reorder_item_properties(existing_item)
             }
         })
     return conflicts
