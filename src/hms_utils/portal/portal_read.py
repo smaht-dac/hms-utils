@@ -231,6 +231,7 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--sanity-check", "--sanity"],
         ARGV.OPTIONAL(bool): ["--timing", "--time", "--times"],
         ARGV.OPTIONAL(bool): ["--noheader"],
+        ARGV.OPTIONAL(str): ["--conflicts", "--conflict"],
         ARGV.OPTIONAL(bool): ["--argv"],
         ARGV.AT_MOST_ONE_OF: ["--inserts", "--raw"],
         ARGV.AT_MOST_ONE_OF: ["--inserts-files", "--raw"],
@@ -302,12 +303,21 @@ def main() -> int:
     if not argv.sid:
         _scrub_sids_from_items(items)
 
-    if argv.uuids or argv.pick:
-        if argv.pick:
-            if "uuid" not in argv.pick:
-                argv.pick.insert(0, "uuid")
+    if argv.conflicts:
+        if not (portal_compare := Portal.create(argv.conflicts)):
+            _error(f"Cannot access portal for conflict checks: {argv.conflicts}")
+        if (conflicts := conflicts_exist(portal, items, portal_compare=portal_compare)):
+            _print("CONFLICTS:")
+            _print(json.dumps(conflicts, indent=4))
         else:
-            argv.pick = ["uuid"]
+            _print("No conflcts.")
+
+    elif argv.uuids or argv.pick:
+        if argv.pick:
+            if _ITEM_UUID_PROPERTY_NAME not in argv.pick:
+                argv.pick.insert(0, _ITEM_UUID_PROPERTY_NAME)
+        else:
+            argv.pick = [_ITEM_UUID_PROPERTY_NAME]
         if argv.pick_separator:
             if argv.pick_separator in ["\\t", "tab", "TAB"]:
                 argv.pick_separator = "\t"
@@ -731,6 +741,83 @@ def _setup_debugging(argv: ARGV) -> None:
 
     if argv.argv:
         _print(json.dumps(argv._dict, indent=4))
+
+
+def conflicts_exist(portal_source: Portal, items: dict, portal_compare: Optional[Portal] = None) -> List[dict]:
+    conflicts = []
+    for item_type in items:
+        for item in items[item_type]:
+            if item_conflicts := conflict_exists(portal_source, item, item_type, portal_compare):
+                conflicts.extend(item_conflicts)
+    return conflicts
+
+
+def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] = None,
+                    portal_compare: Optional[Portal] = None) -> List[dict]:
+    conflicts = []
+
+    def get_item_from_portal(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
+        return portal_compare.get_metadata(f"/{item_type}/{identifying_value}", raw=True, raise_exception=False)
+
+    def get_item_from_file_system(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
+        return None  # TODO
+
+    if isinstance(portal_compare, Portal):
+        get_existing_item = get_item_from_portal
+        existing_source = portal_compare.env
+        existing_source_property_name = "directory"
+    elif isinstance(portal_compare, str) and os.path.isdir(portal_compare):
+        get_existing_item = get_item_from_file_system
+        existing_source = portal_compare
+        existing_source_property_name = "portal"
+    else:
+        return conflicts
+
+    identifying_properties = portal_source.get_identifying_property_names(item_type)
+    item_uuid = item.get(_ITEM_UUID_PROPERTY_NAME)
+
+    for identifying_property in identifying_properties:
+        if (identifying_value := item.get(identifying_property)) is not None:
+            if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
+                if existing_item.get(_ITEM_UUID_PROPERTY_NAME) != item_uuid:
+                    conflicts.append({
+                        "conflict": {
+                            "identifying_property": identifying_property,
+                            "identifying_value": identifying_value,
+                            "retrieved": {
+                                "portal": portal_source.env,
+                                "uuid": item_uuid,
+                                "item": item
+                            },
+                            "existing": {
+                                "portal": existing_source,
+                                "uuid": existing_item.get(_ITEM_UUID_PROPERTY_NAME),
+                                "item": existing_item
+                            }
+                        }
+                    })
+
+    if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
+        for identifying_property in identifying_properties:
+            if existing_item.get(identifying_property) != item.get(identifying_property):
+                conflicts.append({
+                    "conflict": {
+                        "uuid": item_uuid,
+                        "identifying_property": identifying_property,
+                        "retrieved": {
+                            "portal": portal_source.env,
+                            "identifying_value": item.get(identifying_property),
+                            "item": item
+                        },
+                        "existing": {
+                            existing_source_property_name: existing_source,
+                            "identifying_value": existing_item.get(identifying_property),
+                            "item": existing_item
+                        }
+                    }
+                })
+
+    return conflicts
 
 
 if __name__ == "__main__":
