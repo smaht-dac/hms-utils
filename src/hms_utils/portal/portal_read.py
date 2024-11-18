@@ -308,7 +308,7 @@ def main() -> int:
             conflicts_source = os.path.expanduser(argv.conflicts)
         elif not (conflicts_source := Portal.create(argv.conflicts)):
             _error(f"Cannot access portal for conflict checks: {argv.conflicts}")
-        if (conflicts := conflicts_exist(portal, items, portal_compare=conflicts_source)):
+        if (conflicts := conflicts_exist(portal, items, compare=conflicts_source)):
             conflicts_source = argv.conflicts
             _print("CONFLICTS:")
             _print(json.dumps(conflicts, indent=4))
@@ -746,27 +746,32 @@ def _setup_debugging(argv: ARGV) -> None:
         _print(json.dumps(argv._dict, indent=4))
 
 
-def conflicts_exist(portal_source: Portal, items: dict, portal_compare: Optional[Portal] = None) -> List[dict]:
+def conflicts_exist(portal_source: Portal, items: dict, compare: Optional[Portal] = None) -> List[dict]:
     conflicts = []
     for item_type in items:
         for item in items[item_type]:
-            if item_conflicts := conflict_exists(portal_source, item, item_type, portal_compare):
+            if item_conflicts := conflict_exists(portal_source, item, item_type, compare):
                 conflicts.extend(item_conflicts)
     return conflicts
 
 
 def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] = None,
-                    portal_compare: Optional[Portal] = None) -> List[dict]:
+                    compare: Optional[Portal] = None) -> List[dict]:
     conflicts = []
 
     def get_item_from_portal(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
-        nonlocal portal_compare
-        return portal_compare.get_metadata(f"/{item_type}/{identifying_value}", raw=True, raise_exception=False)
+        nonlocal compare
+        return compare.get_metadata(f"/{item_type}/{identifying_value}", raw=True, raise_exception=False)
+
+    def get_portal_item_source(item_type: str) -> Optional[str]:
+        nonlocal compare
+        return compare.env
 
     def get_item_from_file_system(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
-        nonlocal portal_compare
-        file = os.path.join(portal_compare, f"{to_snake_case(item_type)}.json")
-        if os.path.exists(file):
+        nonlocal compare
+        # file = os.path.join(compare, f"{to_snake_case(item_type)}.json")
+        # if os.path.exists(file):
+        if file := get_file_system_item_source(item_type):
             try:
                 with io.open(file) as f:
                     if isinstance(items := json.load(f), list):
@@ -777,14 +782,19 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
                 pass
         return None  # TODO
 
-    if isinstance(portal_compare, Portal):
+    def get_file_system_item_source(item_type: str) -> Optional[str]:
+        nonlocal compare
+        file = os.path.join(compare, f"{to_snake_case(item_type)}.json")
+        return file if os.path.exists(file) else None
+
+    if isinstance(compare, Portal):
         get_existing_item = get_item_from_portal
-        existing_source = portal_compare.env
-        existing_source_property_name = "directory"
-    elif isinstance(portal_compare, str) and os.path.isdir(portal_compare):
+        get_existing_source = get_portal_item_source
+        existing_source_property_name = "existing_item_portal"
+    elif isinstance(compare, str) and os.path.isdir(compare):
         get_existing_item = get_item_from_file_system
-        existing_source = portal_compare
-        existing_source_property_name = "portal"
+        get_existing_source = get_file_system_item_source
+        existing_source_property_name = "existing_item_file"
     else:
         return conflicts
 
@@ -792,50 +802,53 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
     item_uuid = item.get(_ITEM_UUID_PROPERTY_NAME)
 
     for identifying_property in identifying_properties:
+        conflicts_item = []
         if (identifying_value := item.get(identifying_property)) is not None:
             if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
-                if existing_item.get(_ITEM_UUID_PROPERTY_NAME) != item_uuid:
-                    conflicts.append({
-                        "conflict": {
-                            "type": item_type,
-                            "identifying_property": identifying_property,
-                            "identifying_value": identifying_value,
-                            "retrieved": {
-                                "portal": portal_source.env,
-                                "uuid": item_uuid,
-                                "item": item
-                            },
-                            "existing": {
-                                existing_source_property_name: existing_source,
-                                "uuid": existing_item.get(_ITEM_UUID_PROPERTY_NAME),
-                                "item": existing_item
-                            }
-                        }
+                if (existing_item_uuid := existing_item.get(_ITEM_UUID_PROPERTY_NAME)) != item_uuid:
+                    conflicts_item.append({
+                        "identifying_property": identifying_property,
+                        "identifying_value": identifying_value,
+                        "retrieved_item_uuid": item_uuid,
+                        "existing_item_uuid": existing_item_uuid
                     })
+    if conflicts_item:
+        conflicts.append({
+            "conflict": {
+                "type": item_type,
+                "identifying_properties": identifying_properties,
+                "conflicts": conflicts_item,
+                "retrieved_item_portal": portal_source.env,
+                "retrieved_item": item,
+                existing_source_property_name: get_existing_source(item_type),
+                "existing_item": existing_item
+            }
+        })
 
+    conflicts_item = []
     if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
         for identifying_property in identifying_properties:
             if (((existing_item_identifying_value := existing_item.get(identifying_property)) is not None) and
                 ((item_identifying_value := item.get(identifying_property)) is not None) and
                 (existing_item_identifying_value != item_identifying_value)):  # noqa
-                conflicts.append({
-                    "conflict": {
-                        "type": item_type,
-                        "uuid": item_uuid,
-                        "identifying_property": identifying_property,
-                        "retrieved": {
-                            "portal": portal_source.env,
-                            "identifying_value": item.get(identifying_property),
-                            "item": item
-                        },
-                        "existing": {
-                            existing_source_property_name: existing_source,
-                            "identifying_value": existing_item.get(identifying_property),
-                            "item": existing_item
-                        }
-                    }
+                conflicts_item.append({
+                    "identifying_property": identifying_property,
+                    "retrieved_identifying_value": item_identifying_value,
+                    "existing_identifying_value": existing_item_identifying_value
                 })
-
+    if conflicts_item:
+        conflicts.append({
+            "conflict": {
+                "type": item_type,
+                "uuid": item_uuid,
+                "identifying_properties": identifying_properties,
+                "conflicts": conflicts_item,
+                "retrieved_item_portal": portal_source.env,
+                "retrieved_item": item,
+                existing_source_property_name: get_existing_source(item_type),
+                "existing_item": existing_item
+            }
+        })
     return conflicts
 
 

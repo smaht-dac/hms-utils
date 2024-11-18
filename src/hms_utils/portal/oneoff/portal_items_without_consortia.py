@@ -1,3 +1,4 @@
+import json
 from dcicutils.ff_utils import search_metadata
 from dcicutils.portal_utils import Portal
 from hms_utils.argv import ARGV
@@ -6,7 +7,8 @@ from hms_utils.argv import ARGV
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["--env", ARGV.DEFAULT, "smaht-local"]
+        ARGV.REQUIRED(str): ["--env", ARGV.DEFAULT, "smaht-local"],
+        ARGV.OPTIONAL(bool): ["--verbose"]
     })
 
     portal = Portal(argv.env)
@@ -21,6 +23,7 @@ def main():
             continue
         item_uuid = item.get("uuid")
         print(f"{item_uuid}: {item_type}")
+        print(json.dumps(item, indent=4))
         total += 1
 
     print(f"TOTAL: {total}")
