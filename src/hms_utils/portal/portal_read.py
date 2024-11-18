@@ -304,9 +304,12 @@ def main() -> int:
         _scrub_sids_from_items(items)
 
     if argv.conflicts:
-        if not (portal_compare := Portal.create(argv.conflicts)):
+        if os.path.isdir(os.path.expanduser(argv.conflicts)):
+            conflicts_source = os.path.expanduser(argv.conflicts)
+        elif not (conflicts_source := Portal.create(argv.conflicts)):
             _error(f"Cannot access portal for conflict checks: {argv.conflicts}")
-        if (conflicts := conflicts_exist(portal, items, portal_compare=portal_compare)):
+        if (conflicts := conflicts_exist(portal, items, portal_compare=conflicts_source)):
+            conflicts_source = argv.conflicts
             _print("CONFLICTS:")
             _print(json.dumps(conflicts, indent=4))
         else:
@@ -757,9 +760,21 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
     conflicts = []
 
     def get_item_from_portal(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
+        nonlocal portal_compare
         return portal_compare.get_metadata(f"/{item_type}/{identifying_value}", raw=True, raise_exception=False)
 
     def get_item_from_file_system(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
+        nonlocal portal_compare
+        file = os.path.join(portal_compare, f"{to_snake_case(item_type)}.json")
+        if os.path.exists(file):
+            try:
+                with io.open(file) as f:
+                    if isinstance(items := json.load(f), list):
+                        for item in items:
+                            if item.get(identifying_property) == identifying_value:
+                                return item
+            except Exception:
+                pass
         return None  # TODO
 
     if isinstance(portal_compare, Portal):
@@ -782,6 +797,7 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
                 if existing_item.get(_ITEM_UUID_PROPERTY_NAME) != item_uuid:
                     conflicts.append({
                         "conflict": {
+                            "type": item_type,
                             "identifying_property": identifying_property,
                             "identifying_value": identifying_value,
                             "retrieved": {
@@ -799,9 +815,12 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
 
     if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
         for identifying_property in identifying_properties:
-            if existing_item.get(identifying_property) != item.get(identifying_property):
+            if (((existing_item_identifying_value := existing_item.get(identifying_property)) is not None) and
+                ((item_identifying_value := item.get(identifying_property)) is not None) and
+                (existing_item_identifying_value != item_identifying_value)):  # noqa
                 conflicts.append({
                     "conflict": {
+                        "type": item_type,
                         "uuid": item_uuid,
                         "identifying_property": identifying_property,
                         "retrieved": {
