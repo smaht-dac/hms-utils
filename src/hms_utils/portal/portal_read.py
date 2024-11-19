@@ -809,8 +809,8 @@ def conflict_exists(portal_source: Portal, item: dict, item_type: Optional[str] 
     identifying_properties = portal_source.get_identifying_property_names(item_type)
     item_uuid = item.get(_ITEM_UUID_PROPERTY_NAME)
 
+    conflicts_item = []
     for identifying_property in identifying_properties:
-        conflicts_item = []
         if (identifying_value := item.get(identifying_property)) is not None:
             if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
                 if (existing_item_uuid := existing_item.get(_ITEM_UUID_PROPERTY_NAME)) != item_uuid:
