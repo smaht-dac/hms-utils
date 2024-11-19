@@ -25,7 +25,7 @@ from hms_utils.version_utils import get_version
 _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
-_ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
+_ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]  # , "static_content"]
 
 
 class Portal(PortalFromUtils):
@@ -597,8 +597,7 @@ def _get_portal_items_for_uuids(portal: Portal, uuids: Union[List[str], Set[str]
         if item := _portal_get(portal, uuid, metadata=True,
                                raw=raw, inserts=inserts, database=database, nthreads=nthreads):
             if not isinstance(item, dict):
-                print(f"XYZZY[{uuid}]", file=sys.stderr)
-                print(item, file=sys.stderr)
+                _debug(f"Cannot retrieve item: {uuid} [{item}]")
             items.append(item)  # TODO: make thread-safe.
     if fetch_portal_item_functions := [lambda uuid=uuid: fetch_portal_item(uuid) for uuid in uuids if is_uuid(uuid)]:
         run_concurrently(fetch_portal_item_functions, nthreads=nthreads)
