@@ -21,9 +21,11 @@ _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/exported-from-fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/exported-from-fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
+        ARGV.REQUIRED(str, "/tmp/files"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
-        ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
+        # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
+        ARGV.REQUIRED(str, "fourfront-local"): ["existing"],
         ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool, True): ["--verbose"],
