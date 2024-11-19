@@ -151,6 +151,7 @@ def main():
     parser.add_argument("--noprogress", action="store_true", required=False, default=False,
                         help="No progress bar output for --load.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
+    parser.add_argument("--nohack", action="store_true", required=False, default=False, help="Disabled fourfront hack.")
     args = parser.parse_args()
 
     def usage(message: Optional[str] = None) -> None:
@@ -171,7 +172,7 @@ def main():
             args.load = "/dev/stdin"
         _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
                    unresolved_output=args.unresolved_output, skip_links=args.skip_links,
-                   verbose=args.verbose, debug=args.debug, noprogress=args.noprogress)
+                   verbose=args.verbose, debug=args.debug, noprogress=args.noprogress, nohack=args.nohack)
 
     if explicit_schema_name := args.schema:
         schema, explicit_schema_name = _get_schema(portal, explicit_schema_name)
@@ -410,11 +411,30 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
 def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
                unresolved_output: Optional[str] = False,
                skip_links: bool = False, verbose: bool = False, debug: bool = False, noprogress: bool = False,
-               _single_insert_file: Optional[str] = None) -> bool:
+               nohack: bool = False, _single_insert_file: Optional[str] = None) -> bool:
 
     import snovault.loadxl
     from snovault.loadxl import load_all_gen, LoadGenWrapper
     from dcicutils.progress_bar import ProgressBar
+
+    def setup_hack_for_fourfront_imports():
+        from unittest.mock import patch
+        from snovault.loadxl import (
+            get_identifying_and_required_properties as original_get_identifying_and_required_properties)
+        def mocked_get_identifying_and_required_properties(schema):  # noqa
+            identifying_properties, req_fields = original_get_identifying_and_required_properties(schema)
+            if isinstance(schema, dict) and isinstance(schema_id := schema.get("$id"), str):
+                if schema_id == "/profiles/ontology_term.json":
+                    if "preferred_name" in identifying_properties:
+                        identifying_properties.remove("preferred_name")
+                elif schema_id == "/profiles/quality_metric_mcool.json":
+                    req_fields.append("Failed Balancing")
+            return identifying_properties, req_fields
+        patch("snovault.loadxl.get_identifying_and_required_properties",
+              mocked_get_identifying_and_required_properties).start()
+
+    if nohack is not True:
+        setup_hack_for_fourfront_imports()
 
     loadxl_summary = {}
     loadxl_unresolved = {}
@@ -424,7 +444,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
 
     def loadxl(portal: Portal, inserts_directory: str, schema_names_to_load: dict):
 
-        nonlocal LoadGenWrapper, load_all_gen, loadxl_summary, verbose, debug
+        nonlocal LoadGenWrapper, load_all_gen, loadxl_summary, verbose, debug, nohack
         nonlocal loadxl_total_item_count, loadxl_total_error_count
         progress_total = sum(schema_names_to_load.values()) * 2  # loadxl does two passes
         progress_bar = ProgressBar(progress_total, interrupt_exit=True) if not noprogress else None
@@ -560,7 +580,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                     return _load_data(portal=portal, load=tmpdir, ini_file=ini_file, explicit_schema_name=schema_name,
                                       unresolved_output=unresolved_output,
                                       skip_links=skip_links, verbose=verbose, debug=debug, noprogress=noprogress,
-                                      _single_insert_file=inserts_file)
+                                      nohack=nohack, _single_insert_file=inserts_file)
             elif isinstance(data, dict):
                 if schema_name := explicit_schema_name:
                     if _is_schema_name_list(portal, schema_names := list(data.keys())):
@@ -591,7 +611,7 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                         return _load_data(portal=portal, load=tmpdir, ini_file=ini_file,
                                           unresolved_output=unresolved_output,
                                           skip_links=skip_links, verbose=verbose, debug=debug, noprogress=noprogress,
-                                          _single_insert_file=inserts_file)
+                                          nohack=nohack, _single_insert_file=inserts_file)
                 return True
             else:
                 _print(f"Unrecognized JSON data in file: {inserts_file}")
