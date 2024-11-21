@@ -16,21 +16,21 @@ from hms_utils.type_utils import to_non_empty_string_list
 def main():
 
     argv = ARGV({
-        ARGV.OPTIONAL(str, "smaht-data"): ["--env"],
+        ARGV.OPTIONAL(str, "smaht-local"): ["--env"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str): ["--from-date", "--from"],
         ARGV.OPTIONAL(str): ["--thru-date", "--thru", "--to"],
         ARGV.OPTIONAL(bool): ["--all-dates", "--any-dates", "--any-date", "--all", "--any"],
-        ARGV.OPTIONAL(int, 20): ["--limit", "--count"],
+        ARGV.OPTIONAL(int, 200): ["--limit", "--count"],
         ARGV.OPTIONAL(int, 0): ["--offset", "--skip"],
-        ARGV.OPTIONAL(str): ["--status", "--state"],
+        ARGV.OPTIONAL(str, "released"): ["--status", "--state"],
         ARGV.OPTIONAL(int, 1): ["--nmonths", "--months"],
-        ARGV.OPTIONAL(bool): ["--group", "--grouped", "--group-month", "--grouped-month"],
+        ARGV.OPTIONAL(bool, True): ["--group", "--grouped", "--group-month", "--grouped-month"],
         ARGV.OPTIONAL(str): ["--nosort"],
         ARGV.OPTIONAL(bool): ["--sort-reverse", "--sort-reversed", "--reverse", "--reversed"],
-        ARGV.OPTIONAL(bool): "--verbose",
-        ARGV.OPTIONAL(bool): ["--debug"],
-        ARGV.OPTIONAL(bool): ["--dump"],
+        ARGV.OPTIONAL(bool, True): ["--verbose"],
+        ARGV.OPTIONAL(bool, True): ["--debug"],
+        ARGV.OPTIONAL(bool, True): ["--dump"],
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): "--ping"
     })
@@ -76,7 +76,10 @@ def main():
         f"status={status}" if status else None,
         f"{date_property_name}.from={from_date}" if from_date else None,
         f"{date_property_name}.to={thru_date}" if thru_date else None,
+        f"additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
     ])).replace("&", "?", 1)
+
+    # /search/?type=OutputFile&additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code&status=released&file_status_tracking.released.from=2024-11-20&format=json
 
     if argv.debug:
         _debug(f"Executing portal query: {query}")
