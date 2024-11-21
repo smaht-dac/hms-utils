@@ -254,9 +254,12 @@ def main() -> int:
     if not argv.query:
         return 0
 
-    if ("/" not in argv.query) and ("-" not in argv.query) and (schema := portal.get_schema(argv.query)):
-        _write_data(schema, argv)
-        return 0
+    if ("/" not in argv.query) and ("-" not in argv.query):
+        if argv.query.lower() == "schemas":
+            _write_data(portal.get_schemas(), argv)
+        elif schema := portal.get_schema(argv.query):
+            _write_data(schema, argv)
+            return 0
 
     if argv.noignore_properties:
         portal.ignore_properties = []
