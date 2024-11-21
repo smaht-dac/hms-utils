@@ -7,7 +7,11 @@ from typing import List, Union
 from uuid import uuid4
 from dcicutils.command_utils import yes_or_no
 
-file = os.path.expanduser("~/repos/etc/repo-extras/portal/4dn/data/exported-from-fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content/file_processed.json")  # noqa
+
+def main():
+    if len(sys.argv) > 1:
+        file = sys.argv[1]
+        randomize_md5sum_values_in_json_file(file, verbose=True)
 
 
 def randomize_md5sum_values(items: Union[List[dict], dict]) -> None:
@@ -56,4 +60,6 @@ def randomize_md5sum_values_in_json_file(file: str, overwrite: bool = False, ver
         return False
 
 
-randomize_md5sum_values_in_json_file(file, verbose=True)
+if __name__ == "__main__":
+    status = main()
+    sys.exit(status if isinstance(status, int) else 0)
