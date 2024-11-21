@@ -1,6 +1,7 @@
 from __future__ import annotations
 from enum import Enum, auto as enum_auto
 from functools import lru_cache
+import hashlib
 import io
 import json
 import os
@@ -9,6 +10,7 @@ import requests
 import sys
 import time
 from typing import Any, Callable, List, Optional, Set, Tuple, Union
+from uuid import uuid4
 import yaml
 from dcicutils.command_utils import yes_or_no
 from dcicutils.misc_utils import to_snake_case
@@ -28,6 +30,7 @@ _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 # _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id", "static_content"]
 # _ITEM_IGNORE_REF_PROPERTIES = []
 _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]  # "static_content"
+_ITEM_MD5SUM_PROPERTY_NAME = "md5sum"
 
 
 class Portal(PortalFromUtils):
@@ -224,7 +227,8 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--append"],
         ARGV.OPTIONAL(bool): ["--merge"],
         ARGV.OPTIONAL(bool): ["--overwrite"],
-        ARGV.OPTIONAL(bool): ["--sid"],
+        ARGV.OPTIONAL(bool): ["--randomize-md5sum-values"],
+        ARGV.OPTIONAL(bool): ["--noscrub-sids"],
         ARGV.OPTIONAL(bool): ["--show"],
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): ["--verbose"],
@@ -304,8 +308,12 @@ def main() -> int:
     if argv.sort:
         items = sort_dictionary(items)
 
-    if not argv.sid:
+    if not argv.noscrub_sids:
+        # If for some reasone there are "sid" values in the retrieved items then we remove them, by default.
         _scrub_sids_from_items(items)
+
+    if argv.randomize_md5sum_values:
+        _randomize_md5sum_values(items)
 
     if argv.uuids or argv.pick:
         if argv.pick:
@@ -672,6 +680,20 @@ def _insertize_items(items: dict) -> dict:
             item_list.append(item)
             item.pop(_ITEM_TYPE_PSEUDO_PROPERTY_NAME, None)
     return items_by_type
+
+
+def _randomize_md5sum_values(items: Union[List[dict], dict]) -> None:
+    global _ITEM_MD5SUM_PROPERTY_NAME
+    def create_random_md5() -> str:  # noqa
+        return hashlib.md5(str(uuid4()).encode()).hexdigest()
+    if isinstance(items, list):
+        for element in items:
+            _randomize_md5sum_values(element)
+    elif isinstance(items, dict):
+        for key in items:
+            if key == _ITEM_MD5SUM_PROPERTY_NAME:
+                items[key] = create_random_md5()
+            _randomize_md5sum_values(items[key])
 
 
 def _scrub_sids_from_items(items: dict) -> None:
