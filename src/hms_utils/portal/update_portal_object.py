@@ -427,8 +427,15 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                 if schema_id == "/profiles/ontology_term.json":
                     if "preferred_name" in identifying_properties:
                         identifying_properties.remove("preferred_name")
-                elif schema_id == "/profiles/quality_metric_mcool.json":
-                    req_fields.append("Failed Balancing")
+                elif schema_id == "/profiles/quality_metric_mcool.json":  # xyzzy
+                    # Hack to workaround funny business in /fourfront/.../types/quality_metric.py WRT to
+                    # these fields, which are certainly not required by the schema but need to be there
+                    # for that module; not sure how this normally works; came up for example trying to
+                    # import into local fourfront item 23da4b11-45bf-4714-891a-9acd5d3c817a (2024-11-21).
+                    if "Failed Balancing" not in req_fields:
+                        req_fields.append("Failed Balancing")
+                    if "Resolutions in File" not in req_fields:
+                        req_fields.append("Resolutions in File")
             return identifying_properties, req_fields
         patch("snovault.loadxl.get_identifying_and_required_properties",
               mocked_get_identifying_and_required_properties).start()

@@ -123,6 +123,12 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                 with io.open(file) as f:
                     if isinstance(items := json.load(f), list):
                         for item in items:
+                            # xyzzy
+                            if item_type == "ExperimentType":
+                                if (xyzzy_title := item.get("title")) is not None:
+                                    if (_ := item.get("experiment_name")) is None:
+                                        item["experiment_name"] = xyzzy_title.lower().replace(" ", "-")
+                            # xyzzy
                             if item.get(identifying_property) == identifying_value:
                                 return item
             except Exception:
