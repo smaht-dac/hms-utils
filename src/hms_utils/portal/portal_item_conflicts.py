@@ -23,10 +23,13 @@ def main():
     argv = ARGV({
         # ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/exported-from-fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "/Users/dmichaels/repos/smaht-portal/etc/data/exported-from-smaht-data-unaligned-reads-limit-100-20241119"): ["retrieved"],  # noqa
-        ARGV.REQUIRED(str, "/Users/dmichaels/repos/fourfront/etc/data/exported-from-fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content"): ["retrieved"],  # noqa
+        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/exported-from-fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/tmp/ex"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
-        ARGV.REQUIRED(str, "/Users/dmichaels/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
+        ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/fourfront/src/encoded/tests/data/workbook-inserts"): ["existing"],
+        # ARGV.REQUIRED(str, "/tmp/re"): ["existing"],
         ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool, True): ["--verbose"],

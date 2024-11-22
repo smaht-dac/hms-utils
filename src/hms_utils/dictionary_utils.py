@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict, deque
 from copy import deepcopy
 import glob
 import io
@@ -465,3 +466,78 @@ def get_property(data: dict, name: str, fallback: Optional[Any] = None) -> Optio
                 else:
                     data = value
     return fallback
+
+
+def order_dictionary_by_dependencies(items: List[dict],
+                                     dependencies: Union[List[str], str, Callable],
+                                     identifying_property_name: str = "uuid") -> List[dict]:
+    """
+    Orders the given list of items (dictionaries) so that each item appears after its dependencies
+    as defined by the given dependencies argument, where this can be a property name or a list of
+    property names of identifying values, or a callable which returns the identifying values for
+    a given item. There must be a single identifying value for each record whose property name
+    is specified by the given identifying_property_name argument, or is "uuid" if none.
+    Returns the ordered list of items; does NOT make changes in place.
+    CAVEAT: This function was adapted from ChatGPT generated code.
+    """
+    if not isinstance(items, list):
+        return []
+    if not (isinstance(identifying_property_name, str) and identifying_property_name):
+        identifying_property_name = "uuid"
+    if not callable(dependencies):
+        dependent_property_names = []
+        if isinstance(dependencies, list):
+            for dependency in dependencies:
+                if isinstance(dependency, str) and dependency:
+                    dependent_property_names.append(dependency)
+        elif isinstance(dependencies, str) and dependencies:
+            dependent_property_names = [dependencies]
+        if not dependent_property_names:
+            return items
+        def get_dependencies(item: dict) -> List[str]:  # noqa
+            nonlocal dependent_property_names
+            dependency_values = []
+            for dependent_property_name in dependent_property_names:
+                if (dependency_value := item.get(dependent_property_name)) is not None:
+                    if isinstance(dependency_value_list := dependency_value, list):
+                        for dependency_value in dependency_value_list:
+                            if dependency_value is not None:
+                                dependency_values.append(dependency_value)
+                    else:
+                        dependency_values.append(dependency_value)
+            return dependency_values
+        dependencies = get_dependencies
+
+    # Create a map from identifying-value to item.
+    identifying_value_to_item_map = {item[identifying_property_name]: item for item in items}
+
+    # Create adjacency list and in-degree count for topological sort.
+    adjacency_list = defaultdict(list)
+    in_degree = defaultdict(int)
+
+    # Build graph.
+    for item in items:
+        identifying_value = item[identifying_property_name]
+        if isinstance(dependency_values := dependencies(item), list):
+            for dependency_value in dependency_values:
+                if dependency_value is not None:
+                    adjacency_list[dependency_value].append(identifying_value)
+                    in_degree[identifying_value] += 1
+
+    # Topological sort.
+    sorted_items = []
+    zero_in_degree = deque([identifying_value for identifying_value in identifying_value_to_item_map
+                            if in_degree[identifying_value] == 0])
+    while zero_in_degree:
+        current_identifying_value = zero_in_degree.popleft()
+        sorted_items.append(identifying_value_to_item_map[current_identifying_value])
+        for dependent_value in adjacency_list[current_identifying_value]:
+            in_degree[dependent_value] -= 1
+            if in_degree[dependent_value] == 0:
+                zero_in_degree.append(dependent_value)
+
+    # Check for cycles (unsatisfied dependencies).
+    if len(sorted_items) != len(items):
+        raise ValueError("The input contains cyclic dependencies and cannot be ordered.")
+
+    return sorted_items
