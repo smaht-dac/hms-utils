@@ -21,9 +21,13 @@ _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
 def main():
 
     argv = ARGV({
-        # ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/exported-from-fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/smaht-portal/etc/data/exported-from-smaht-data-unaligned-reads-limit-100-20241119"): ["retrieved"],  # noqa
-        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/exported-from-fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/smaht-portal/etc/data/smaht-data-unaligned-reads-limit-100-20241119"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESPWMS2CD-20241122"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-1-20241122"): ["retrieved"],  # noqa
+        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESKM5UQ2L-20241121"): ["retrieved"],  # noqa
+        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-100-20241122"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "/tmp/ex"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
