@@ -39,7 +39,6 @@ def main():
         ARGV.OPTIONAL(bool): ["--version"],
         ARGV.OPTIONAL(bool, True): ["--verbose"],
         ARGV.OPTIONAL(bool, True): ["--debug"],
-        ARGV.AT_LEAST_ONE_OF: ["retrieved", "--ping", "--version"],
         ARGV.OPTIONAL(str): ["--app"],
         ARGV.OPTIONAL(str, "fourfront-data"): ["--env", "--e"],
         ARGV.OPTIONAL(str): ["--ini", "--ini-file"]
