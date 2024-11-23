@@ -7,6 +7,7 @@ import os
 import sys
 from typing import Any, List, Optional, Union
 from dcicutils.misc_utils import to_snake_case
+from dcicutils.portal_utils import Portal as PortalFromUtils
 from hms_utils.argv import ARGV
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import Portal as Portal
@@ -109,7 +110,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                     debug: bool = False) -> List[dict]:
     conflicts = []
 
-    if isinstance(item_source, Portal):
+    if isinstance(item_source, (Portal, PortalFromUtils)):
         item_source = item_source.env
     elif not isinstance(item_source, str):
         item_source = str(item_source)
@@ -155,7 +156,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                 item = {_ITEM_UUID_PROPERTY_NAME: uuid, **item}
         return item
 
-    if isinstance(existing_source, Portal):
+    if isinstance(existing_source, (Portal, PortalFromUtils)):
         get_existing_item = get_item_from_portal
         get_existing_source = get_portal_item_source
         existing_source_property_name = "existing_item_portal"
