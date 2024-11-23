@@ -12,118 +12,92 @@ from hms_utils.argv import ARGV
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import Portal as Portal
 from hms_utils.threading_utils import run_concurrently
-from hms_utils.version_utils import get_version
 
-_ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
-_ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
-_ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
 
 
 def main():
 
     argv = ARGV({
-        ARGV.REQUIRED(str): ["--retrieved"],  # noqa
-        ARGV.REQUIRED(str): ["--existing"],
-        ARGV.OPTIONAL(bool): ["--ping"],
-        ARGV.OPTIONAL(bool): ["--version"],
-        ARGV.OPTIONAL(bool): ["--verbose"],
-        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.REQUIRED(str): ["directory"],
+        ARGV.OPTIONAL(str): ["--env"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str): ["--env", "--e"],
-        ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
-        ARGV.OPTIONAL(int, 0): ["--threads"]
+        ARGV.OPTIONAL(int, 32): ["--threads"],
+        ARGV.OPTIONAL(bool): ["--ping"],
+        ARGV.OPTIONAL(bool, False): ["--verbose"],
+        ARGV.OPTIONAL(bool, False): ["--debug"],
     })
 
-    if argv.version:
-        print(f"hms-portal-read: {get_version()}")
-
-    portal = None
-
-    if argv.env:
-        if not (portal := Portal.create(argv.env or argv.ini, app=argv.app,
-                                        verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
-            print(f"Cannot access Portal: {argv.env}")
-            return 1
-
-    if not os.path.isdir(existing_items_source := os.path.expanduser(argv.existing)):
-        if not (existing_items_source := Portal.create(argv.existing)):
-            print(f"Cannot access existing portal specified by given environment: {argv.existing}")
-            sys.exit(1)
-        if not portal:
-            portal = existing_items_source
-
-    if not portal:
-        print(f"Portal access not specified.")
+    if not os.path.isdir(directory := os.path.expanduser(argv.directory)):
+        print(f"Cannot find directory: {directory}")
         return 1
 
-    if os.path.isdir(retrieved_items_directory := os.path.expanduser(argv.retrieved)):
-        if retrieved_items_files := glob.glob(os.path.join(retrieved_items_directory, "*.json")):
-            for retrieved_items_file in retrieved_items_files:
-                if not retrieved_items_file.endswith(".json"):
-                    print(f"WARNING: File name for retrieved items does not end with .json: {retrieved_items_file}")
+    nitems_total = 0
+    nfiles_total = 0
+
+    for file in glob.glob(os.path.join(directory, "*.json")):
+        if not (item_type := Portal.schema_name(file)):
+            print(f"WARNING: File name does not corresond to known item type name: {file}")
+            continue
+        try:
+            with io.open(file, "r") as f:
+                if not isinstance(items := json.load(f), list):
+                    print(f"WARNING: File does not contain JSON list: {file}")
                     continue
-                if not (retrieved_item_type := Portal.schema_name(retrieved_items_file)):
-                    print(f"WARNING: File name for retrieved items does not corresond to known item type name:"
-                          f" {retrieved_items_file}")
+                nfiles_total += 1
+                nitems = len(items)
+                nitems_total += nitems
+        except Exception:
+            print(f"WARNING: Exception loading JSON from file: {file}")
+            continue
+
+    if argv.verbose:
+        print(f"Checking JSON files in directory for Portal conflicts: {directory}")
+
+    if not (portal := Portal.create(argv.env, app=argv.app, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
+        print(f"Cannot access Portal: {argv.env}")
+        return 1
+
+    if argv.verbose:
+        print(f"Total files to check: {nfiles_total}")
+        print(f"Total items to check: items: {nitems_total}")
+        if argv.threads > 1:
+            print(f"Checking concurrency: {argv.threads} threads")
+
+    for file in glob.glob(os.path.join(directory, "*.json")):
+        if not (item_type := Portal.schema_name(file)):
+            print(f"WARNING: File name does not corresond to known item type name: {file}")
+            continue
+        try:
+            with io.open(file, "r") as f:
+                if not isinstance(items := json.load(f), list):
+                    print(f"WARNING: File does not contain JSON list: {file}")
                     continue
-                try:
-                    with io.open(retrieved_items_file) as f:
-                        if not isinstance(retrieved_items_for_type := json.load(f), list):
-                            print(f"WARNING: File for retrieved items deos not contain a JSON list:"
-                                  f" {retrieved_items_file}")
-                            continue
-                except Exception:
-                    print(f"WARNING: File for retrieved items does not contain valid JSON:"
-                          f" {retrieved_items_file}")
-                    continue
-                if argv.threads >= 0:
-                    def report_conflict_exists_function(retrieved_item: dict) -> None:
-                        nonlocal argv, portal, retrieved_item_type, retrieved_items_file, existing_items_source
-                        conflict_exists(portal,
-                                        item=retrieved_item,
-                                        item_type=retrieved_item_type,
-                                        item_source=retrieved_items_file,
-                                        existing_source=existing_items_source,
-                                        report=True, debug=argv.debug)
-                    conflict_exists_functions = []
-                    for retrieved_item in retrieved_items_for_type:
-                        conflict_exists_functions.append(
-                            lambda retrieved_item=retrieved_item: report_conflict_exists_function(retrieved_item))
-                    run_concurrently(conflict_exists_functions, nthreads=argv.threads)
-                else:
-                    for retrieved_item in retrieved_items_for_type:
-                        if retrieved_items_conflicts := conflict_exists(portal,
-                                                                        item=retrieved_item,
-                                                                        item_type=retrieved_item_type,
-                                                                        item_source=retrieved_items_file,
-                                                                        existing_source=existing_items_source,
-                                                                        debug=argv.debug):
-                            print("CONFLICT:")
-                            print(json.dumps(retrieved_items_conflicts, indent=4))
-    elif os.path.isfile(retrieved_items_file := os.path.expanduser(argv.retrieved)):
-        print("TODO")
-        sys.exit(1)
+        except Exception:
+            print(f"WARNING: Exception loading JSON from file: {file}")
+            continue
+        def check_item_for_conflicts_function(item: dict) -> None:  # noqa
+            nonlocal argv, portal, file, item_type
+            check_item_for_conflicts(portal, item=item, item_type=item_type,
+                                     item_source=file, existing_source=portal, report=True, debug=argv.debug)
+        if argv.verbose or argv.debug:
+            print(f"Checking file for conflicts: {file}")
+        if argv.threads > 0:
+            check_item_for_conflicts_functions = []
+            for item in items:
+                check_item_for_conflicts_functions.append(lambda item=item: check_item_for_conflicts_function(item))
+            run_concurrently(check_item_for_conflicts_functions, nthreads=argv.threads)
+        else:
+            for item in items:
+                check_item_for_conflicts(portal, item=item, item_type=item_type,
+                                         item_source=file, existing_source=portal, report=True, debug=argv.debug)
 
 
-def conflicts_exist(portal: Portal, items: dict,
-                    items_source: Optional[Union[Portal, str]] = None,
-                    existing_source: Optional[Portal, str] = None, debug: bool = False) -> List[dict]:
-    conflicts = []
-    for item_type in items:
-        for item in items[item_type]:
-            if item_conflicts := conflict_exists(portal, item, item_type,
-                                                 item_source=items_source,
-                                                 existing_source=existing_source, debug=debug):
-                conflicts.extend(item_conflicts)
-    return conflicts
-
-
-def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
-                    item_source: Optional[Union[Portal, str]] = None,
-                    existing_source: Optional[Union[Portal, str]] = None,
-                    report: bool = False, printf: Optional[Callable] = None,
-                    debug: bool = False) -> Union[List[dict], bool]:
+def check_item_for_conflicts(portal: Portal, item: dict, item_type: Optional[str] = None,
+                             item_source: Optional[Union[Portal, str]] = None,
+                             existing_source: Optional[Union[Portal, str]] = None,
+                             report: bool = False, printf: Optional[Callable] = None,
+                             debug: bool = False) -> Union[List[dict], bool]:
     conflicts = []
 
     if isinstance(item_source, (Portal, PortalFromUtils)):
@@ -188,8 +162,6 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
             if not isinstance(identifying_values, list):
                 identifying_values = [identifying_values]
             for identifying_value in identifying_values:
-                if debug:
-                    printf(f"Checking retrieved item for conflicts: /{item_type}/{identifying_value}")
                 if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
                     if (existing_item_uuid := existing_item.get(_ITEM_UUID_PROPERTY_NAME)) != item_uuid:
                         conflicts_item.append({
@@ -210,14 +182,8 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                                 "existing_item": reorder_item_properties(existing_item)
                             }
                         }
-                        if report is True:
-                            printf("CONFLICT FOUND:")
-                            printf(json.dumps(conflict, indent=4))
-                        else:
-                            conflicts.append(conflict)
+                        conflicts.append(conflict)
 
-    if debug:
-        printf(f"Checking retrieved item for conflicts: /{item_type}/{item_uuid}")
     if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
         conflicts_item = []
         for identifying_property in identifying_properties:
@@ -242,11 +208,21 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                     "existing_item": reorder_item_properties(existing_item)
                 }
             }
-            if report is True:
-                printf("CONFLICT FOUND:")
-                printf(json.dumps(conflict, indent=4))
-            else:
-                conflicts.append(conflict)
+            conflicts.append(conflict)
+
+    if debug is True:
+        message = f"Checking item for conflicts: /{item_type}/{item_uuid} ... "
+        if conflicts:
+            message += "conflicts found:"
+            message += "\n" + json.dumps(conflict, indent=4)
+        else:
+            message += "OK"
+        printf(message)
+    elif (report is True) and conflicts:
+        message = f"Conflicts found in item: /{item_type}/{item_uuid}"
+        message += "\n" + json.dumps(conflict, indent=4)
+        printf(message)
+
     return conflicts if (report is not True) else (len(conflicts) > 0)
 
 
