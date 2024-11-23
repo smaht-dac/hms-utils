@@ -38,14 +38,24 @@ def main():
     if argv.version:
         print(f"hms-portal-read: {get_version()}")
 
-    if not (portal := Portal.create(argv.env or argv.ini, app=argv.app,
-                                    verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
-        return 1
+    portal = None
+
+    if argv.env:
+        if not (portal := Portal.create(argv.env or argv.ini, app=argv.app,
+                                        verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
+            print(f"Cannot access Portal: {argv.env}")
+            return 1
 
     if not os.path.isdir(existing_items_source := os.path.expanduser(argv.existing)):
         if not (existing_items_source := Portal.create(argv.existing)):
             print(f"Cannot access existing portal specified by given environment: {argv.existing}")
             sys.exit(1)
+        if not portal:
+            portal = existing_items_source
+
+    if not portal:
+        print(f"Portal access not specified.")
+        return 1
 
     if os.path.isdir(retrieved_items_directory := os.path.expanduser(argv.retrieved)):
         if retrieved_items_files := glob.glob(os.path.join(retrieved_items_directory, "*.json")):
