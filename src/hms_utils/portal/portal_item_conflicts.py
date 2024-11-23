@@ -28,11 +28,11 @@ def main():
         # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESPWMS2CD-20241122"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-1-20241122"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESKM5UQ2L-20241121"): ["retrieved"],  # noqa
-        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-100-20241122"): ["retrieved"],  # noqa
+        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-100-20241122"): ["--retrieved"],  # noqa
         # ARGV.REQUIRED(str, "/tmp/ex"): ["retrieved"],  # noqa
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
         # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
-        ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
+        ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["--existing"],
         # ARGV.REQUIRED(str, "/Users/dmichaels/repos/fourfront/src/encoded/tests/data/workbook-inserts"): ["existing"],
         # ARGV.REQUIRED(str, "/tmp/re"): ["existing"],
         ARGV.OPTIONAL(bool): ["--ping"],
