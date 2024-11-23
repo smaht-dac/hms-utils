@@ -5,12 +5,13 @@ import io
 import json
 import os
 import sys
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 from dcicutils.misc_utils import to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from hms_utils.argv import ARGV
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import Portal as Portal
+from hms_utils.threading_utils import run_concurrently
 from hms_utils.version_utils import get_version
 
 _ITEM_SID_PROPERTY_NAME = "sid"
@@ -22,26 +23,16 @@ _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]
 def main():
 
     argv = ARGV({
-        # ARGV.REQUIRED(str, "~/repos/fourfront/etc/data/fourfront-data-experiment-set-replicates-4DNES7BZ38JT-20241119"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/smaht-portal/etc/data/smaht-data-unaligned-reads-limit-100-20241119"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESXP5VE8C-20241120-3-noignore-static-content"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESPWMS2CD-20241122"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-1-20241122"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-4DNESKM5UQ2L-20241121"): ["retrieved"],  # noqa
-        ARGV.REQUIRED(str, "/Users/dmichaels/repos/etc/repo-extras/portal/4dn/data/fourfront-data-experiment-set-replicates-limit-100-20241122"): ["--retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "/tmp/ex"): ["retrieved"],  # noqa
-        # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["existing"],
-        # ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/master-inserts"): ["existing"],
-        ARGV.REQUIRED(str, "~/repos/fourfront/src/encoded/tests/data/inserts"): ["--existing"],
-        # ARGV.REQUIRED(str, "/Users/dmichaels/repos/fourfront/src/encoded/tests/data/workbook-inserts"): ["existing"],
-        # ARGV.REQUIRED(str, "/tmp/re"): ["existing"],
+        ARGV.REQUIRED(str): ["--retrieved"],  # noqa
+        ARGV.REQUIRED(str): ["--existing"],
         ARGV.OPTIONAL(bool): ["--ping"],
         ARGV.OPTIONAL(bool): ["--version"],
-        ARGV.OPTIONAL(bool, True): ["--verbose"],
-        ARGV.OPTIONAL(bool, True): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
         ARGV.OPTIONAL(str): ["--app"],
-        ARGV.OPTIONAL(str, "fourfront-data"): ["--env", "--e"],
-        ARGV.OPTIONAL(str): ["--ini", "--ini-file"]
+        ARGV.OPTIONAL(str): ["--env", "--e"],
+        ARGV.OPTIONAL(str): ["--ini", "--ini-file"],
+        ARGV.OPTIONAL(int, 0): ["--threads"]
     })
 
     if argv.version:
@@ -76,15 +67,30 @@ def main():
                     print(f"WARNING: File for retrieved items does not contain valid JSON:"
                           f" {retrieved_items_file}")
                     continue
-                for retrieved_item in retrieved_items_for_type:
-                    if retrieved_items_conflicts := conflict_exists(portal,
-                                                                    item=retrieved_item,
-                                                                    item_type=retrieved_item_type,
-                                                                    item_source=retrieved_items_file,
-                                                                    existing_source=existing_items_source,
-                                                                    debug=argv.debug):
-                        print("CONFLICT:")
-                        print(json.dumps(retrieved_items_conflicts, indent=4))
+                if argv.threads >= 0:
+                    def report_conflict_exists_function(retrieved_item: dict) -> None:
+                        nonlocal argv, portal, retrieved_item_type, retrieved_items_file, existing_items_source
+                        conflict_exists(portal,
+                                        item=retrieved_item,
+                                        item_type=retrieved_item_type,
+                                        item_source=retrieved_items_file,
+                                        existing_source=existing_items_source,
+                                        report=True, debug=argv.debug)
+                    conflict_exists_functions = []
+                    for retrieved_item in retrieved_items_for_type:
+                        conflict_exists_functions.append(
+                            lambda retrieved_item=retrieved_item: report_conflict_exists_function(retrieved_item))
+                    run_concurrently(conflict_exists_functions, nthreads=argv.threads)
+                else:
+                    for retrieved_item in retrieved_items_for_type:
+                        if retrieved_items_conflicts := conflict_exists(portal,
+                                                                        item=retrieved_item,
+                                                                        item_type=retrieved_item_type,
+                                                                        item_source=retrieved_items_file,
+                                                                        existing_source=existing_items_source,
+                                                                        debug=argv.debug):
+                            print("CONFLICT:")
+                            print(json.dumps(retrieved_items_conflicts, indent=4))
     elif os.path.isfile(retrieved_items_file := os.path.expanduser(argv.retrieved)):
         print("TODO")
         sys.exit(1)
@@ -106,13 +112,16 @@ def conflicts_exist(portal: Portal, items: dict,
 def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                     item_source: Optional[Union[Portal, str]] = None,
                     existing_source: Optional[Union[Portal, str]] = None,
-                    debug: bool = False) -> List[dict]:
+                    report: bool = False, printf: Optional[Callable] = None,
+                    debug: bool = False) -> Union[List[dict], bool]:
     conflicts = []
 
     if isinstance(item_source, (Portal, PortalFromUtils)):
         item_source = item_source.env
     elif not isinstance(item_source, str):
         item_source = str(item_source)
+    if not callable(printf):
+        printf = print
 
     @lru_cache(maxsize=1024)
     def get_item_from_portal(item_type: str, identifying_property: str, identifying_value: Any) -> Optional[dict]:
@@ -130,12 +139,6 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                 with io.open(file) as f:
                     if isinstance(items := json.load(f), list):
                         for item in items:
-                            # xyzzy
-                            if item_type == "ExperimentType":
-                                if (xyzzy_title := item.get("title")) is not None:
-                                    if (_ := item.get("experiment_name")) is None:
-                                        item["experiment_name"] = xyzzy_title.lower().replace(" ", "-")
-                            # xyzzy
                             if item.get(identifying_property) == identifying_value:
                                 return item
             except Exception:
@@ -164,7 +167,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
         get_existing_source = get_file_system_item_source
         existing_source_property_name = "existing_item_file"
     else:
-        return conflicts
+        return conflicts if report is not True else (len(conflicts) > 0)
 
     identifying_properties = portal.get_identifying_property_names(item_type)
     item_uuid = item.get(_ITEM_UUID_PROPERTY_NAME)
@@ -176,7 +179,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                 identifying_values = [identifying_values]
             for identifying_value in identifying_values:
                 if debug:
-                    print(f"Checking retrieved item for conflicts: /{item_type}/{identifying_value}")
+                    printf(f"Checking retrieved item for conflicts: /{item_type}/{identifying_value}")
                 if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
                     if (existing_item_uuid := existing_item.get(_ITEM_UUID_PROPERTY_NAME)) != item_uuid:
                         conflicts_item.append({
@@ -186,7 +189,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                             "existing_item_uuid": existing_item_uuid
                         })
                     if conflicts_item:
-                        conflicts.append({
+                        conflict = {
                             "conflict": {
                                 "type": item_type,
                                 "identifying_properties": identifying_properties,
@@ -196,10 +199,15 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                                 existing_source_property_name: get_existing_source(item_type),
                                 "existing_item": reorder_item_properties(existing_item)
                             }
-                        })
+                        }
+                        if report is True:
+                            printf("CONFLICT FOUND:")
+                            printf(json.dumps(conflict, indent=4))
+                        else:
+                            conflicts.append(conflict)
 
     if debug:
-        print(f"Checking retrieved item for conflicts: /{item_type}/{item_uuid}")
+        printf(f"Checking retrieved item for conflicts: /{item_type}/{item_uuid}")
     if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
         conflicts_item = []
         for identifying_property in identifying_properties:
@@ -212,7 +220,7 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                     "existing_identifying_value": existing_item_identifying_value
                 })
         if conflicts_item:
-            conflicts.append({
+            conflict = {
                 "conflict": {
                     "type": item_type,
                     "uuid": item_uuid,
@@ -223,8 +231,13 @@ def conflict_exists(portal: Portal, item: dict, item_type: Optional[str] = None,
                     existing_source_property_name: get_existing_source(item_type),
                     "existing_item": reorder_item_properties(existing_item)
                 }
-            })
-    return conflicts
+            }
+            if report is True:
+                printf("CONFLICT FOUND:")
+                printf(json.dumps(conflict, indent=4))
+            else:
+                conflicts.append(conflict)
+    return conflicts if (report is not True) else (len(conflicts) > 0)
 
 
 if __name__ == "__main__":
