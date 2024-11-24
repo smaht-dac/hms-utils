@@ -31,7 +31,6 @@ from dcicutils.ff_utils import delete_metadata, purge_metadata
 from dcicutils.misc_utils import get_error_message, ignored, normalize_string, PRINT, to_camel_case, to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.tmpfile_utils import temporary_directory
-from hms_utils.portal.portal_item_conflicts import conflict_exists
 
 
 class Portal(PortalFromUtils):
@@ -153,7 +152,6 @@ def main():
                         help="No progress bar output for --load.")
     parser.add_argument("--debug", action="store_true", required=False, default=False, help="Debugging output.")
     parser.add_argument("--nohack", action="store_true", required=False, default=False, help="Disabled fourfront hack.")
-    parser.add_argument("--conflicts", action="store_true", required=False, default=False, help="Check for conflicts.")
     args = parser.parse_args()
 
     def usage(message: Optional[str] = None) -> None:
@@ -175,7 +173,7 @@ def main():
         _load_data(portal=portal, load=args.load, ini_file=args.ini, explicit_schema_name=args.schema,
                    unresolved_output=args.unresolved_output, skip_links=args.skip_links,
                    verbose=args.verbose, debug=args.debug, noprogress=args.noprogress,
-                   nohack=args.nohack, conflicts=args.conflicts)
+                   nohack=args.nohack)
 
     if explicit_schema_name := args.schema:
         schema, explicit_schema_name = _get_schema(portal, explicit_schema_name)
@@ -414,8 +412,7 @@ def _upsert_data(portal: Portal, data: dict, schema_name: str,
 def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: Optional[str] = None,
                unresolved_output: Optional[str] = False,
                skip_links: bool = False, verbose: bool = False, debug: bool = False, noprogress: bool = False,
-               nohack: bool = False, _single_insert_file: Optional[str] = None,
-               conflicts: bool = False) -> bool:
+               nohack: bool = False, _single_insert_file: Optional[str] = None) -> bool:
 
     import snovault.loadxl
     from snovault.loadxl import load_all_gen, LoadGenWrapper
@@ -552,23 +549,6 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
             progress_bar.set_progress(progress_total)
             if loadxl_total_item_count > loadxl_total_error_count:
                 _print()
-
-    def check_for_conflicts(portal: Portal, inserts_directory: str) -> List[dict]:
-        conflicts_found = []
-        print(f"CONFLICT CHECKING DIRECTORY: {inserts_directory}")
-        for file in glob.glob(os.path.join(inserts_directory, "*.json")):
-            print(f"CONFLICT CHECKING FILE: {file}")
-            with io.open(file, "r") as f:
-                items = json.load(f)
-                item_type = Portal.schema_name(file)
-                for item in items:
-                    if conflicts := conflict_exists(portal, item, item_type,
-                                                    item_source=inserts_directory, existing_source=portal):
-                        print(f"CONFLICT FOUND! {file}")
-                        print(json.dumps(conflicts, indent=4))
-            print(f"DONE CONFLICT CHECKING FILE: {file}")
-        print(f"DONE CONFLICT CHECKING DIRECTORY: {inserts_directory}")
-        return conflicts_found
 
     if not portal.vapp:
         _print("Must using INI based Portal object with --load (use --ini option to specify an INI file).")
@@ -718,9 +698,6 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
         return False
     if copy_to_temporary_directory:
         with temporary_directory() as tmpdir:
-            if conflicts is True:
-                check_for_conflicts(portal, tmpdir)
-                return
             if debug:
                 _print(f"Using temporary directory: {tmpdir}")
             for json_file_path in glob.glob(os.path.join(inserts_directory, "*.json")):
@@ -749,9 +726,6 @@ def _load_data(portal: Portal, load: str, ini_file: str, explicit_schema_name: O
                             json.dump(existing_data_for_renamed_json_file, f)
             loadxl(portal=portal, inserts_directory=tmpdir, schema_names_to_load=schema_names_to_load)
     else:
-        if conflicts is True:
-            check_for_conflicts(portal, inserts_directory)
-            return
         loadxl(portal=portal, inserts_directory=inserts_directory, schema_names_to_load=schema_names_to_load)
 
     if verbose:
