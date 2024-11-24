@@ -9,6 +9,7 @@ from typing import Any, Callable, List, Optional, Union
 from dcicutils.misc_utils import to_snake_case
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from hms_utils.argv import ARGV
+from hms_utils.chars import chars
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.portal.portal_utils import Portal as Portal
 from hms_utils.threading_utils import run_concurrently
@@ -156,6 +157,7 @@ def check_item_for_conflicts(portal: Portal, item: dict, item_type: Optional[str
     identifying_properties = portal.get_identifying_property_names(item_type)
     item_uuid = item.get(_ITEM_UUID_PROPERTY_NAME)
 
+    existing_items_found = 0
     for identifying_property in identifying_properties:
         conflicts_item = []
         if (identifying_values := item.get(identifying_property)) is not None:
@@ -163,6 +165,7 @@ def check_item_for_conflicts(portal: Portal, item: dict, item_type: Optional[str
                 identifying_values = [identifying_values]
             for identifying_value in identifying_values:
                 if (existing_item := get_existing_item(item_type, identifying_property, identifying_value)) is not None:
+                    existing_items_found += 1
                     if (existing_item_uuid := existing_item.get(_ITEM_UUID_PROPERTY_NAME)) != item_uuid:
                         conflicts_item.append({
                             "identifying_property": identifying_property,
@@ -185,6 +188,7 @@ def check_item_for_conflicts(portal: Portal, item: dict, item_type: Optional[str
                         conflicts.append(conflict)
 
     if (existing_item := get_existing_item(item_type, _ITEM_UUID_PROPERTY_NAME, item_uuid)) is not None:
+        existing_items_found += 1
         conflicts_item = []
         for identifying_property in identifying_properties:
             if (((existing_item_identifying_value := existing_item.get(identifying_property)) is not None) and
@@ -216,7 +220,12 @@ def check_item_for_conflicts(portal: Portal, item: dict, item_type: Optional[str
             message += "conflicts found:"
             message += "\n" + json.dumps(conflict, indent=4)
         else:
-            message += "OK"
+            if existing_items_found == 1:
+                message += f"OK"
+            elif existing_items_found == 0:
+                message += f"OK {chars.dot} found: none"
+            elif existing_items_found > 1:
+                message += f"OK {chars.dot} found: {existing_items_found}"
         printf(message)
     elif (report is True) and conflicts:
         message = f"Conflicts found in item: /{item_type}/{item_uuid}"
