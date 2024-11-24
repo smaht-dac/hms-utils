@@ -32,15 +32,21 @@ _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]  # "static_content"
 _ITEM_MD5SUM_PROPERTY_NAME = "md5sum"
 
+_ITEM_IGNORE_PROPERTIES_INSERTS = [
+    "date_created",
+    "last_modified",
+    "schema_version",
+    "submitted_by"
+]
+
+_ITEM_IGNORE_PROPERTIES_NOCRUFT = [
+    *_ITEM_IGNORE_PROPERTIES_INSERTS,
+    "principals_allowed",
+    "actions"
+]
+
 
 class Portal(PortalFromUtils):
-
-    _ITEM_IGNORE_PROPERTIES_INSERTS = [
-        "date_created",
-        "last_modified",
-        "schema_version",
-        "submitted_by"
-    ]
 
     class Access(Enum):
         OK = enum_auto()
@@ -55,7 +61,7 @@ class Portal(PortalFromUtils):
         self._get_call_duration = 0
         self._get_metadata_call_duration = 0
         self._raise_exception = kwargs.get("raise_exception") is True
-        self._ignore_properties = Portal._ITEM_IGNORE_PROPERTIES_INSERTS
+        self._ignore_properties = []
 
     @property
     def get_call_count(self) -> int:
@@ -218,6 +224,7 @@ def main() -> int:
         ARGV.OPTIONAL(bool): ["--refs", "--ref"],
         ARGV.OPTIONAL(bool): ["--noignore-properties", "--noignore", "--no-ignore-properties", "--no-ignore" "--all"],
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
+        ARGV.OPTIONAL(bool): ["--nocruft"],
         ARGV.OPTIONAL(bool): ["--sort"],
         ARGV.OPTIONAL(bool): ["--uuids"],
         ARGV.OPTIONAL([str]): ["--pick"],
@@ -267,9 +274,13 @@ def main() -> int:
 
     if argv.noignore_properties:
         portal.ignore_properties = []
+    elif argv.inserts:
+        portal.ignore_properties = _ITEM_IGNORE_PROPERTIES_INSERTS
 
+    if argv.nocruft:
+        portal.ignore_properties = _ITEM_IGNORE_PROPERTIES_NOCRUFT
     if argv.ignore_properties:
-        portal.ignore_properties = argv.ignore_properties
+        portal.ignore_properties = portal.ignore_properties + argv.ignore_properties
 
     # By default use Portal.get_metadata, iff the given query argument does not start with a slash,
     # otherwise use Portal.get; override to use portal.get_metadata with the --metadata
