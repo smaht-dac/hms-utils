@@ -28,7 +28,6 @@ _ITEM_SID_PROPERTY_NAME = "sid"
 _ITEM_UUID_PROPERTY_NAME = "uuid"
 _ITEM_TYPE_PSEUDO_PROPERTY_NAME = "@@@__TYPE__@@@"
 # _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id", "static_content"]
-# _ITEM_IGNORE_REF_PROPERTIES = []
 _ITEM_IGNORE_REF_PROPERTIES = ["viewconfig", "higlass_uid", "blob_id"]  # "static_content"
 _ITEM_MD5SUM_PROPERTY_NAME = "md5sum"
 
@@ -226,6 +225,7 @@ def main() -> int:
         ARGV.OPTIONAL([str]): ["--ignore-properties", "--ignore"],
         ARGV.OPTIONAL(bool): ["--nocruft"],
         ARGV.OPTIONAL(bool): ["--sort"],
+        ARGV.OPTIONAL(bool): ["--reorganize", "--reorg"],
         ARGV.OPTIONAL(bool): ["--uuids"],
         ARGV.OPTIONAL([str]): ["--pick"],
         ARGV.OPTIONAL(str): ["--pick-separator", "--pick-sep"],
@@ -318,6 +318,27 @@ def main() -> int:
 
     if argv.sort:
         items = sort_dictionary(items)
+
+    if argv.reorganize:
+        # Simply put uuid and @type at the top of each item.
+        def reorganize_item(item: dict) -> None:  # noqa
+            if isinstance(item, dict):
+                if (item_type := item.get("@type")) is not None:
+                    del item["@type"]
+                    item = {"@type": item_type, **item}
+                if (item_uuid := item.get(_ITEM_UUID_PROPERTY_NAME)) is not None:
+                    del item[_ITEM_UUID_PROPERTY_NAME]
+                    item = {_ITEM_UUID_PROPERTY_NAME: item_uuid, **item}
+            return item
+        def reorganize_items(items: List[dict]) -> None:  # noqa
+            if isinstance(items, list):
+                for index in range(len(items)):
+                    items[index] = reorganize_item(items[index])
+        if isinstance(items, list):
+            reorganize_items(items)
+        elif isinstance(items, dict):
+            for item_type in items:
+                reorganize_items(items[item_type])
 
     if not argv.noscrub_sids:
         # If for some reasone there are "sid" values in the retrieved items then we remove them, by default.
