@@ -62,7 +62,11 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
     for user in users:
         try:
             user_metadata = portal_get_user(portal, user[PROPERTY.EMAIL])
-            user_portal = get_user_from_portal_metadata(user_metadata)
+            if not (user_portal := get_user_from_portal_metadata(user_metadata)):
+                _info(f"User from spreadsheet NOT FOUND in portal: {user[PROPERTY.EMAIL]}")
+                if verbose:
+                    print(json.dumps(user, indent=4))
+                continue
             if debug is True:
                 _debug(f"Read user from portal OK: {user[PROPERTY.EMAIL]}")
             if users_are_equal(user, user_portal):
@@ -259,6 +263,7 @@ users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241031.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241104.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241107.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_20241112.tsv"
+users_spreadsheet = "smaht_users_from_spreadsheet_20241125.tsv"
 
 portal_env = "smaht-data"
 dump = False
