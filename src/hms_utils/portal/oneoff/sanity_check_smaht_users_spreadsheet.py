@@ -264,6 +264,7 @@ users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241104.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241107.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_20241112.tsv"
 users_spreadsheet = "smaht_users_from_spreadsheet_20241125.tsv"
+users_spreadsheet = "smaht_users_from_spreadsheet_20241126.tsv"
 
 portal_env = "smaht-data"
 dump = False
