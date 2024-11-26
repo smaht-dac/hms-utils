@@ -1,6 +1,7 @@
 from copy import deepcopy
 from functools import lru_cache
 import json
+import os
 import sys
 from typing import List, Optional, Union
 import unicodedata
@@ -258,13 +259,7 @@ def _error(message: str, plain: bool = False) -> None:
 
 
 # https://docs.google.com/spreadsheets/d/1WYc_UKkpVUUBPJPbZdwwBX28f6Qr5I9PblOdGqu7g1M/view?gid=446162554#gid=446162554
-users_spreadsheet = "smaht_users_from_spreadsheet_20241028.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241031.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241104.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_with_dua_20241107.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_20241112.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_20241125.tsv"
-users_spreadsheet = "smaht_users_from_spreadsheet_20241126.tsv"
+users_spreadsheet = os.path.expanduser("~/tmp/smaht_users_from_spreadsheet_20241126.tsv")
 
 portal_env = "smaht-data"
 dump = False

@@ -1,4 +1,5 @@
 from prettytable import PrettyTable, HRuleStyle
+from typing import List
 from hms_utils.argv import ARGV
 from hms_utils.chars import chars
 from hms_utils.portal.portal_utils import Portal as Portal
@@ -13,6 +14,9 @@ def main():
         ARGV.OPTIONAL(bool): ["--deleted"],
         ARGV.OPTIONAL(bool): ["--inactive"],
         ARGV.OPTIONAL(bool): ["--revoked"],
+        ARGV.OPTIONAL(bool): ["--submitters", "--submitter"],
+        ARGV.OPTIONAL(bool): ["--non-submitters", "--non-submitter",
+                              "--nonsubmitters", "--nonsubmitter", "--nosubmitters", "--nosubmitter"],
         ARGV.OPTIONAL(bool): ["--admin"],
         ARGV.OPTIONAL(bool): ["--database"],
         ARGV.OPTIONAL(bool): ["--verbose"],
@@ -66,6 +70,18 @@ def main():
         user_email = user.get("email", "")
         user_first_name = user.get("first_name", "")
         user_last_name = user.get("last_name", "")
+        user_status = user.get("status")
+        user_groups = _get_group_display_value(user) or chars.null
+        user_submission_centers = submission_centers or chars.null
+        if (user_submits_for := _get_submits_for(user)):
+            if argv.non_submitters:
+                continue
+            if (user_submits_for == _get_submission_centers(user)):
+                user_submission_centers += f" {chars.check}"
+            else:
+                user_submission_centers += f" Σ"
+        elif argv.submitters:
+            continue
         if argv.query:
             if not ((argv.query in user_uuid.lower()) or
                     (argv.query in user_email.lower()) or
@@ -77,9 +93,9 @@ def main():
             user_email + ("\n" + user_uuid if argv.verbose else ""),
             user_first_name + " " + user_last_name,
             _get_consortia_display_value(user, verbose=argv.verbose) or chars.null,
-            submission_centers or chars.null,
-            _get_group_display_value(user) or chars.null,
-            user.get("status"),
+            user_submission_centers,
+            user_groups,
+            user_status
         ])
         ordinal += 1
     if ordinal > 1:
@@ -112,6 +128,36 @@ def _get_submission_centers_display_value(user: dict, verbose: bool = False) -> 
     if values_verbose:
         values += values_verbose
     return values
+
+
+def _get_submission_centers(user: dict) -> List[str]:
+    values = []
+    if isinstance(submission_centers := user.get("submission_centers"), list):
+        for submission_center in submission_centers:
+            if isinstance(value := submission_center.get("identifier"), str):
+                if value not in values:
+                    values.append(value)
+    return sorted(values)
+
+
+def _get_submits_for_display_value(user: dict) -> str:
+    values = []
+    if isinstance(submits_for := user.get("submits_for"), list):
+        for submit_for in submits_for:
+            if isinstance(value := submit_for.get("identifier"), str):
+                values.append(value)
+    values = ", ".join(values)
+    return values
+
+
+def _get_submits_for(user: dict) -> List[str]:
+    values = []
+    if isinstance(submission_centers := user.get("submission_centers"), list):
+        for submission_center in submission_centers:
+            if isinstance(value := submission_center.get("identifier"), str):
+                if value not in values:
+                    values.append(value)
+    return sorted(values)
 
 
 def _get_group_display_value(user: dict) -> str:
