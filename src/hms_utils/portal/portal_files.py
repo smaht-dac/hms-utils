@@ -24,13 +24,14 @@ def main():
         ARGV.OPTIONAL(int, 200): ["--limit", "--count"],
         ARGV.OPTIONAL(int, 0): ["--offset", "--skip"],
         ARGV.OPTIONAL(str, "released"): ["--status", "--state"],
+        ARGV.OPTIONAL(bool, True): ["--noqc", "--noqcs"],
         ARGV.OPTIONAL(int, 1): ["--nmonths", "--months"],
         ARGV.OPTIONAL(bool, True): ["--group", "--grouped", "--group-month", "--grouped-month"],
         ARGV.OPTIONAL(str): ["--nosort"],
         ARGV.OPTIONAL(bool): ["--sort-reverse", "--sort-reversed", "--reverse", "--reversed"],
-        ARGV.OPTIONAL(bool, True): ["--verbose"],
-        ARGV.OPTIONAL(bool, True): ["--debug"],
-        ARGV.OPTIONAL(bool, True): ["--dump"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"],
+        ARGV.OPTIONAL(bool): ["--dump"],
         ARGV.OPTIONAL(bool): ["--nowarnings", "--nowarning", "--nowarn"],
         ARGV.OPTIONAL(bool): "--ping"
     })
@@ -74,11 +75,14 @@ def main():
         f"limit={argv.limit}",
         f"sort={'' if argv.sort_reverse else '-'}{date_property_name}" if not argv.nosort else None,
         f"status={status}" if status else None,
+        f"data_category!=Quality Control" if argv.noqc else None,
         f"{date_property_name}.from={from_date}" if from_date else None,
         f"{date_property_name}.to={thru_date}" if thru_date else None,
         f"additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
     ])).replace("&", "?", 1)
 
+    import pdb ; pdb.set_trace()  # noqa
+    pass
     # /search/?type=OutputFile&additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code&status=released&file_status_tracking.released.from=2024-11-20&format=json
 
     if argv.debug:
@@ -155,7 +159,10 @@ def main():
 def _print_file_table(items: List[dict], date_property_name: str, argv: ARGV) -> None:
 
     table = PrettyTable()
-    table.field_names = ["N", "FILE", "TYPE / SIZE", "STATUS", "DATE"]
+    if argv.verbose:
+        table.field_names = ["N", "FILE", "TYPE / SIZE", "STATUS", "CATEGORY", "DATE"]
+    else:
+        table.field_names = ["N", "FILE", "TYPE / SIZE", "STATUS", "DATE"]
     table.align = "l"
     table.align["N"] = "r"
     if argv.verbose:
@@ -172,6 +179,9 @@ def _print_file_table(items: List[dict], date_property_name: str, argv: ARGV) ->
         description = item.get("description", "")
         name = item.get("filename", item.get("display_title", ""))
         size = item.get("file_size", "")
+        if isinstance(category := item.get("data_category", ""), list):
+            if (category := "\n".join(category)) == "Quality Control":
+                category = "QC"
         date = get_property(item, date_property_name, get_property(item, "last_modified.date_modified"))
         by = get_property(item, "submitted_by.display_title",
                                 get_property(item, "last_modified.modified_by.display_title"))
@@ -189,13 +199,10 @@ def _print_file_table(items: List[dict], date_property_name: str, argv: ARGV) ->
         else:
             date = f"{format_date(date)}"
 
-        table.add_row([
-            nitems,
-            name,
-            type_and_size,
-            status,
-            date
-        ])
+        if argv.verbose:
+            table.add_row([nitems, name, type_and_size, status, category, date])
+        else:
+            table.add_row([nitems, name, type_and_size, status, date])
 
     print(table)
 
