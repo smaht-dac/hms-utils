@@ -147,7 +147,11 @@ def sort_dictionary(data: dict, reverse: bool = False, sensitive: bool = False, 
     if not isinstance(data, dict):
         return data
     sorted_data = {}
-    for key in sorted(data.keys(), reverse=reverse is True, key=None if sensitive is True else str.lower):
+    def sorted_key(key: Any) -> str:  # noqa
+        if not isinstance(key, str):
+            key = str(key)
+        return key.lower() if (sensitive is True) else key
+    for key in sorted(data.keys(), reverse=reverse is True, key=sorted_key):
         sorted_data[key] = sort_dictionary(data[key], reverse=reverse)
     return sorted_data
 
