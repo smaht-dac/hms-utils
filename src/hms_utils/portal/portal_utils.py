@@ -139,6 +139,12 @@ class Portal(PortalFromUtils):
         return portal
 
 
+def select_items(items: List[dict], predicate: Callable) -> List[dict]:
+    if not (isinstance(items, list) and items):
+        return []
+    return [item for item in items if predicate(item)]
+
+
 def group_items_by(items: list[dict], grouping: str,
                    identifying_property: Optional[str] = None, raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and grouping):
@@ -196,5 +202,21 @@ def group_items_by_groupings(items: list[dict], groupings: List[str],
     return main_grouped_items
 
 
-def select_items(items: List[dict], predicate: Callable) -> List[dict]:
-    return [item for item in items if predicate(item)]
+def print_grouped_items(grouped_items: dict, indent: Optional[int] = None) -> None:
+    if not (isinstance(indent, int) and (indent > 0)):
+        indent = 0
+    spaces = (" " * indent) if indent > 0 else ""
+    group = grouped_items["group"]
+    group_count = grouped_items["group_count"]
+    item_count = grouped_items["item_count"]
+    group_items = grouped_items["group_items"]
+    print(f"{spaces}{chars.diamond} GROUP: {group} ({group_count}) {chars.dot} items: {item_count}")
+    for group_item_key in group_items:
+        grouped_items = group_items[group_item_key]
+        print(f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
+              f" {group_item_key if group_item_key is not None else chars.null}")
+        if isinstance(grouped_items, dict):
+            print_grouped_items(grouped_items, indent=indent+4)
+        elif isinstance(grouped_items, list):
+            for grouped_item in grouped_items:
+                print(f"{spaces}    {chars.dot} {grouped_item}")
