@@ -4,8 +4,7 @@
         "uuid": "c53931bc-e3dc-4a37-97f3-05ffa2dc438b",
         "donors": [
             {
-                "display_title": "ST004",
-                "uuid": "0222e296-2430-4f74-bd70-4b181ba48eb6"
+                "display_title": "ST004"
             }
         ],
         "file_sets": [
@@ -288,8 +287,7 @@
         "uuid": "1a5b9cea-104e-45f3-9bef-8ed06aeede24",
         "donors": [
             {
-                "display_title": "ST003",
-                "uuid": "fbac0236-ed2d-4855-b323-ba55f2285b0c"
+                "display_title": "ST003"
             }
         ],
         "file_sets": [
@@ -324,8 +322,7 @@
         "uuid": "ea0f5f17-5753-42ed-b141-186e8261c58e",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
             }
         ],
         "file_sets": [
@@ -365,8 +362,7 @@
         "uuid": "f9cc4a7a-9508-441b-91f2-99530f8c82c7",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
             }
         ],
         "file_sets": [
@@ -406,8 +402,7 @@
         "uuid": "3dccda14-8b17-4157-b3e6-4d9f1fafda5f",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
             }
         ],
         "file_sets": [
@@ -447,8 +442,10 @@
         "uuid": "4cd1dff1-ceda-48c7-824e-26c43906083a",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
+            },
+            {
+                "display_title": "DAC_DONOR_COLO829_001"
             }
         ],
         "file_sets": [
@@ -488,8 +485,7 @@
         "uuid": "fffceff8-4283-485d-b7ab-0cc19d3d1fa7",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
             }
         ],
         "file_sets": [
@@ -529,8 +525,7 @@
         "uuid": "bdfb8964-1102-4baa-bd54-52b2feda4b03",
         "donors": [
             {
-                "display_title": "DAC_DONOR_COLO829",
-                "uuid": "a4f69010-3d74-48de-b071-57ef2cadb77b"
+                "display_title": "DAC_DONOR_COLO829"
             }
         ],
         "file_sets": [

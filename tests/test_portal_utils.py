@@ -65,7 +65,7 @@ def test_portal_utils_a():
     assert group_items_by(items, GROUPING_DONORS, identifying_property="uuid") == {
         "group": "donors.display_title",
         "item_count": 10,
-        "group_count": 4,
+        "group_count": 5,
         "group_items": {
             None: [
                 "dbba7681-88ea-4a09-884d-ff64cc6c557a",
@@ -84,6 +84,9 @@ def test_portal_utils_a():
                 "4cd1dff1-ceda-48c7-824e-26c43906083a",
                 "fffceff8-4283-485d-b7ab-0cc19d3d1fa7",
                 "bdfb8964-1102-4baa-bd54-52b2feda4b03"
+            ],
+            "DAC_DONOR_COLO829_001": [
+                "4cd1dff1-ceda-48c7-824e-26c43906083a"
             ]
         }
     }
@@ -216,7 +219,7 @@ def test_portal_utils_a():
             "COLO829BL": {
                 "group": "donors.display_title",
                 "item_count": 3,
-                "group_count": 1,
+                "group_count": 2,
                 "group_items": {
                     "DAC_DONOR_COLO829": {
                         "group": "release_tracker_description",
@@ -227,6 +230,16 @@ def test_portal_utils_a():
                                 "3dccda14-8b17-4157-b3e6-4d9f1fafda5f",
                                 "bdfb8964-1102-4baa-bd54-52b2feda4b03"
                             ],
+                            "WGS Illumina NovaSeq X bam": [
+                                "4cd1dff1-ceda-48c7-824e-26c43906083a"
+                            ]
+                        }
+                    },
+                    "DAC_DONOR_COLO829_001": {
+                        "group": "release_tracker_description",
+                        "item_count": 1,
+                        "group_count": 1,
+                        "group_items": {
                             "WGS Illumina NovaSeq X bam": [
                                 "4cd1dff1-ceda-48c7-824e-26c43906083a"
                             ]
