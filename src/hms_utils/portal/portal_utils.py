@@ -202,7 +202,7 @@ def group_items_by_groupings(items: list[dict], groupings: List[str],
     return main_grouped_items
 
 
-def print_grouped_items(grouped_items: dict, indent: Optional[int] = None) -> None:
+def print_grouped_items(grouped_items: dict, indent: Optional[int] = None, display_item_count: bool = False) -> None:
     if not (isinstance(indent, int) and (indent > 0)):
         indent = 0
     spaces = (" " * indent) if indent > 0 else ""
@@ -210,13 +210,20 @@ def print_grouped_items(grouped_items: dict, indent: Optional[int] = None) -> No
     group_count = grouped_items["group_count"]
     item_count = grouped_items["item_count"]
     group_items = grouped_items["group_items"]
-    print(f"{spaces}{chars.diamond} GROUP: {group} ({group_count}) {chars.dot} items: {item_count}")
+    message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
+    if display_item_count is True:
+        message += f" {chars.dot} items: {item_count}"
+    print(message)
     for group_item_key in group_items:
         grouped_items = group_items[group_item_key]
-        print(f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
-              f" {group_item_key if group_item_key is not None else chars.null}")
+        message = (f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
+                   f" {group_item_key if group_item_key is not None else chars.null}")
         if isinstance(grouped_items, dict):
+            if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
+                message += f" ({grouped_items_count})"
+            print(message)
             print_grouped_items(grouped_items, indent=indent+4)
         elif isinstance(grouped_items, list):
+            print(f"{message} ({len(grouped_items)})")
             for grouped_item in grouped_items:
                 print(f"{spaces}    {chars.dot} {grouped_item}")
