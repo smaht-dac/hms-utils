@@ -17,7 +17,7 @@ def test_portal_utils_a():
     GROUPING_FILE_DESCRIPTOR = "release_tracker_description"
 
     assert group_items_by(items, GROUPING_CELL_LINES, identifying_property="uuid") == {
-        "group_name": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
+        "group": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
         "item_count": 10,
         "group_count": 9,
         "group_items": {
@@ -63,7 +63,7 @@ def test_portal_utils_a():
     }
 
     assert group_items_by(items, GROUPING_DONORS, identifying_property="uuid") == {
-        "group_name": "donors.display_title",
+        "group": "donors.display_title",
         "item_count": 10,
         "group_count": 4,
         "group_items": {
@@ -89,7 +89,7 @@ def test_portal_utils_a():
     }
 
     assert group_items_by(items, GROUPING_FILE_DESCRIPTOR, identifying_property="uuid") == {
-        "group_name": "release_tracker_description",
+        "group": "release_tracker_description",
         "item_count": 10,
         "group_count": 3,
         "group_items": {
@@ -118,12 +118,12 @@ def test_portal_utils_a():
         GROUPING_FILE_DESCRIPTOR
     ]
     assert group_items_by_groupings(items, groupings, identifying_property="uuid") == {
-        "group_name": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
+        "group": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
         "item_count": 10,
         "group_count": 9,
         "group_items": {
             None: {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 2,
                 "group_items": {
@@ -136,7 +136,7 @@ def test_portal_utils_a():
                 }
             },
             "HG00438": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -147,7 +147,7 @@ def test_portal_utils_a():
                 }
             },
             "HG02486": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -158,7 +158,7 @@ def test_portal_utils_a():
                 }
             },
             "HG02622": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -169,7 +169,7 @@ def test_portal_utils_a():
                 }
             },
             "HG005": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -180,7 +180,7 @@ def test_portal_utils_a():
                 }
             },
             "HG02257": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -191,7 +191,7 @@ def test_portal_utils_a():
                 }
             },
             "HG002": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
@@ -202,7 +202,7 @@ def test_portal_utils_a():
                 }
             },
             "COLO829T": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 3,
                 "group_count": 1,
                 "group_items": {
@@ -214,12 +214,12 @@ def test_portal_utils_a():
                 }
             },
             "COLO829BL": {
-                "group_name": "donors.display_title",
+                "group": "donors.display_title",
                 "item_count": 3,
                 "group_count": 1,
                 "group_items": {
                     "DAC_DONOR_COLO829": {
-                        "group_name": "release_tracker_description",
+                        "group": "release_tracker_description",
                         "item_count": 3,
                         "group_count": 2,
                         "group_items": {

@@ -163,7 +163,7 @@ def group_items_by(items: list[dict], grouping: str,
     if (raw is True) or (not results):
         return results
     return {
-        "group_name": grouping,
+        "group": grouping,
         "item_count": len(items),
         "group_count": len(results),
         "group_items": results
