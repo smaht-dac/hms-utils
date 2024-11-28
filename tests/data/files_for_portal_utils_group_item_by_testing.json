@@ -3,34 +3,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "ST004-1Q-XX-M73-A001-uwsc-SMAFIFJDDXY9-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "c53931bc-e3dc-4a37-97f3-05ffa2dc438b",
-        "analytes": [
-            {
-                "display_title": "PS00617",
-                "uuid": "ec6bef6a-b373-46b6-81b5-0abc2e25b031"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "ST004-1Q",
-                "uuid": "ce6667ea-8115-4273-8bf0-23bde2bc21d2"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00617",
-                "uuid": "3660bc54-3472-42b3-85d5-b77fcc945b27"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "ST004-1Q-019X",
-                "uuid": "22d1c4c7-1214-49c9-a13f-7776f3e847c5"
-            },
-            {
-                "display_title": "ST004-1Q-019X",
-                "uuid": "f3634d60-93c9-4477-a871-50301050fa0d"
-            }
-        ],
         "donors": [
             {
                 "display_title": "ST004",
@@ -73,30 +45,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "SMHTHAPMAP6-X-X-NN-A001-bcm-SMAFIXLDO5QN-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-        "analytes": [
-            {
-                "display_title": "BCM_ANALYTE_SMAHT_CORIELL_POOL1_1_GDNA_1",
-                "uuid": "da477172-1f13-498f-a24f-85e76c81aa12"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "WASHU_CELL-CULTURE-MIXTURE_SMAHT_CORIELL_POOL1",
-                "uuid": "db8d013a-7957-4894-8313-20f3dd241f41"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "BCM_LIBRARY_SMAHT_CORIELL_POOL1_1_NOVASEQX_2",
-                "uuid": "c0e64c69-d70e-4947-baa8-9da75ac334df"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "BCM_CELL-CULTURE-SAMPLE_SMAHT_CORIELL_POOL1",
-                "uuid": "b132fddc-1714-495b-afb5-665ef67fe078"
-            }
-        ],
         "file_sets": [
             {
                 "display_title": "BCM_FILE-SET_SMAHT_CORIELL_POOL1_1_NOVASEQX_2",
@@ -245,30 +193,6 @@
         "release_tracker_description": "WGS ONT PromethION 24 bam",
         "display_title": "SMHTHAPMAP6-X-X-NN-D001-uwsc-SMAFIWI78FL3-sentieon_minimap2_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "f2584000-f810-44b6-8eb7-855298c58eb3",
-        "analytes": [
-            {
-                "display_title": "UWSC_ANALYTE_CORIELL-POOL_1_HMWGDNA_1",
-                "uuid": "47689b7b-58af-448d-ba03-75a74292b79c"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "WASHU_CELL-CULTURE-MIXTURE_SMAHT_CORIELL_POOL1",
-                "uuid": "db8d013a-7957-4894-8313-20f3dd241f41"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00548",
-                "uuid": "29547573-619f-4823-a6e7-d463bb889091"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_HAPMAP_1",
-                "uuid": "024a9909-13c0-4e21-9133-e62c940cee80"
-            }
-        ],
         "file_sets": [
             {
                 "display_title": "UWSC_FILE-SET_CORIELL_POOL_STD-ONT-R10_PS00548",
@@ -417,34 +341,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "ST003-1Q-XX-M22-A001-bcm-SMAFIBRGA72I-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "1a5b9cea-104e-45f3-9bef-8ed06aeede24",
-        "analytes": [
-            {
-                "display_title": "BCM_ANALYTE_ST003-BRAIN-002_GDNA_2",
-                "uuid": "a6852ede-5b5f-4fa8-be0d-43f7f8011196"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "ST003-1Q",
-                "uuid": "c0762c4f-b7d6-4d03-8bb6-e49e877fc68e"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "ILWGS_SMaHT_ST003-Brain-002_344407_2",
-                "uuid": "62b44055-876c-4510-8f5e-5b147aa34460"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "ST003-1Q-002X",
-                "uuid": "340ebe66-edfc-4f22-9844-bfc9487055d3"
-            },
-            {
-                "display_title": "ST003-1Q-002X",
-                "uuid": "c561d85e-1a42-4432-abb4-c9ddd9b00c25"
-            }
-        ],
         "donors": [
             {
                 "display_title": "ST003",
@@ -487,30 +383,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "SMHTCOLO829T-X-X-M45-A001-uwsc-SMAFIZO17Q9I-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "ea0f5f17-5753-42ed-b141-186e8261c58e",
-        "analytes": [
-            {
-                "display_title": "PS00359",
-                "uuid": "268c2d47-4efc-460d-95b0-7be761220558"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829T_2",
-                "uuid": "e9bea9a9-f635-475f-b374-bd4119d3f345"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00359",
-                "uuid": "aadc6ef8-d332-4afa-82c5-71d8ebc9752a"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829T_3",
-                "uuid": "438165c3-c026-45a2-8288-52e9c62c2dbe"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
@@ -559,30 +431,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "SMHTCOLO829T-X-X-M45-A001-uwsc-SMAFIJT6LSYA-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "f9cc4a7a-9508-441b-91f2-99530f8c82c7",
-        "analytes": [
-            {
-                "display_title": "PS00359",
-                "uuid": "268c2d47-4efc-460d-95b0-7be761220558"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829T_2",
-                "uuid": "e9bea9a9-f635-475f-b374-bd4119d3f345"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00359",
-                "uuid": "08bb2cee-e700-4877-9436-1367a95c5cd9"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829T_3",
-                "uuid": "438165c3-c026-45a2-8288-52e9c62c2dbe"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
@@ -631,30 +479,6 @@
         "release_tracker_description": "Fiber-seq PacBio Revio bam",
         "display_title": "SMHTCOLO829BL-X-X-M45-B004-uwsc-SMAFIEQ93MZL-pbmm2_1.13.0_GRCh38.aligned.sorted.bam",
         "uuid": "3dccda14-8b17-4157-b3e6-4d9f1fafda5f",
-        "analytes": [
-            {
-                "display_title": "PS00338",
-                "uuid": "57718c8a-58cc-4339-8d32-2314f76e7457"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829BL_1",
-                "uuid": "8d7e3b2d-5086-4787-aa9d-91cbd13fbbea"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00338",
-                "uuid": "6d0647c4-21cd-4b92-a464-57860eb12355"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829BL_2",
-                "uuid": "87fa6309-c734-48ea-a7b9-b91873fb98ab"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
@@ -703,30 +527,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "SMHTCOLO829BL-X-X-M45-A001-uwsc-SMAFI23Q8I71-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "4cd1dff1-ceda-48c7-824e-26c43906083a",
-        "analytes": [
-            {
-                "display_title": "PS00340",
-                "uuid": "f4274746-fb59-46f3-8c34-f22fdb2c1901"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829BL_1",
-                "uuid": "8d7e3b2d-5086-4787-aa9d-91cbd13fbbea"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00340",
-                "uuid": "57cb090e-7c2b-4515-80e7-bcb22985c647"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829BL_1",
-                "uuid": "d752faa1-6df2-41ee-9188-cfea9ec07a22"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
@@ -775,30 +575,6 @@
         "release_tracker_description": "WGS Illumina NovaSeq X bam",
         "display_title": "SMHTCOLO829T-X-X-M45-A001-uwsc-SMAFINVE9PC1-sentieon_bwamem_202308.01_GRCh38.aligned.sorted.bam",
         "uuid": "fffceff8-4283-485d-b7ab-0cc19d3d1fa7",
-        "analytes": [
-            {
-                "display_title": "PS00359",
-                "uuid": "268c2d47-4efc-460d-95b0-7be761220558"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829T_2",
-                "uuid": "e9bea9a9-f635-475f-b374-bd4119d3f345"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00359",
-                "uuid": "479d9d91-e073-4470-8b8a-4ef5928bbb37"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829T_3",
-                "uuid": "438165c3-c026-45a2-8288-52e9c62c2dbe"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
@@ -847,30 +623,6 @@
         "release_tracker_description": "Fiber-seq PacBio Revio bam",
         "display_title": "SMHTCOLO829BL-X-X-M45-B004-uwsc-SMAFIFRLAQ54-pbmm2_1.13.0_GRCh38.aligned.sorted.bam",
         "uuid": "bdfb8964-1102-4baa-bd54-52b2feda4b03",
-        "analytes": [
-            {
-                "display_title": "PS00356",
-                "uuid": "6ea130ba-efc7-45ea-a369-1bd7ddc91d70"
-            }
-        ],
-        "sample_sources": [
-            {
-                "display_title": "UWSC_CELL-CULTURE_COLO-829BL_1",
-                "uuid": "8d7e3b2d-5086-4787-aa9d-91cbd13fbbea"
-            }
-        ],
-        "libraries": [
-            {
-                "display_title": "PS00356",
-                "uuid": "cceff724-ca29-4f6e-8f21-3b3ebc9f6cce"
-            }
-        ],
-        "samples": [
-            {
-                "display_title": "UWSC_CELL-CULTURE-SAMPLE_COLO-829BL_3",
-                "uuid": "69f5943f-1486-4819-9642-f7dd39536eb7"
-            }
-        ],
         "donors": [
             {
                 "display_title": "DAC_DONOR_COLO829",
