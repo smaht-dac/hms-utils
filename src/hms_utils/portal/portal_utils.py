@@ -3,6 +3,7 @@ import os
 import sys
 from typing import Callable, List, Optional, Union
 from dcicutils.captured_output import captured_output
+from hms_utils.dictionary_utils import get_properties
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.ff_utils import delete_field, delete_metadata, purge_metadata
 from dcicutils.common import APP_SMAHT, ORCHESTRATED_APPS
@@ -136,3 +137,64 @@ class Portal(PortalFromUtils):
                 exit(status)
 
         return portal
+
+
+def group_items_by(items: list[dict], grouping: str,
+                   identifying_property: Optional[str] = None, raw: bool = False) -> dict:
+    if not (isinstance(items, list) and items and isinstance(grouping, str) and grouping):
+        return {}
+    if not (isinstance(identifying_property, str) and identifying_property):
+        identifying_property = None
+    results = {None: []}  # To make sure None is the first one for convenience; delete later of no None.
+    for item in items:
+        if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
+            item_identity = identifying_value
+        else:
+            item_identity = item
+        if grouping_values := get_properties(item, grouping):
+            for grouping_value in grouping_values:
+                if results.get(grouping_value) is None:
+                    results[grouping_value] = []
+                results[grouping_value].append(item_identity)
+        else:
+            results[None].append(item_identity)
+    if not results[None]:
+        del results[None]
+    if (raw is True) or (not results):
+        return results
+    return {
+        "group_name": grouping,
+        "item_count": len(items),
+        "group_count": len(results),
+        "group_items": results
+    }
+
+
+def group_items_by_groupings(items: list[dict], groupings: List[str],
+                             identifying_property: Optional[str] = None) -> dict:
+    if not (isinstance(items, list) and items):
+        return {}
+    if isinstance(groupings, str) and groupings:
+        groupings = [groupings]
+    elif not (isinstance(groupings, list) and groupings):
+        return {}
+    if not (isinstance(identifying_property, str) and identifying_property):
+        identifying_property = None
+    main_grouped_items = None
+    grouped_items = None
+    for grouping in groupings:
+        if main_grouped_items is None:
+            if not (main_grouped_items := group_items_by(items, grouping, identifying_property=identifying_property)):
+                break
+            grouped_items = main_grouped_items
+            continue
+        for grouped_item_key in (group_items := grouped_items["group_items"]):
+            grouped_items = group_items_by(
+                select_items(items, lambda item: item.get(identifying_property) in group_items[grouped_item_key]),
+                grouping, identifying_property=identifying_property)
+            group_items[grouped_item_key] = grouped_items
+    return main_grouped_items
+
+
+def select_items(items: List[dict], predicate: Callable) -> List[dict]:
+    return [item for item in items if predicate(item)]
