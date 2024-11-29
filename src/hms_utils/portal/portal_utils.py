@@ -246,11 +246,12 @@ def old_create_pyramid_request_for_testing(portal: Union[Portal,
     return request
 
 
-def create_pyramid_request_for_testing(portal_or_vapp: Union[Portal, webtest.app.TestApp],
+def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
                                        path: Optional[str] = None,
                                        method: Optional[str] = None) -> Optional[pyramid.request.Request]:
     if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
-        if not (isinstance(portal_or_vapp, Portal) and isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
+        if not (isinstance(portal_or_vapp, PortalFromUtils) and
+                isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
             return None
     if not isinstance(router := vapp.app, pyramid.router.Router):
         return None
@@ -263,7 +264,8 @@ def create_pyramid_request_for_testing(portal_or_vapp: Union[Portal, webtest.app
     return request
 
 
-def portal_custom_search(portal_or_vapp_or_request: Union[Portal, webtest.app.TestApp, pyramid.request.Request],
+def portal_custom_search(portal_or_vapp_or_request: Union[PortalFromUtils,
+                                                          webtest.app.TestApp, pyramid.request.Request],
                          query: str,
                          method: Optional[str] = None,
                          aggregations: Optional[dict] = None) -> Optional[dict]:
