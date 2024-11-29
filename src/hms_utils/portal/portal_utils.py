@@ -1,6 +1,8 @@
 from __future__ import annotations
 import os
+import pyramid
 import sys
+import webtest
 from typing import Callable, List, Optional, Union
 from dcicutils.captured_output import captured_output
 from hms_utils.dictionary_utils import get_properties
@@ -227,3 +229,59 @@ def print_grouped_items(grouped_items: dict, indent: Optional[int] = None, displ
             print(f"{message} ({len(grouped_items)})")
             for grouped_item in grouped_items:
                 print(f"{spaces}    {chars.dot} {grouped_item}")
+
+
+def old_create_pyramid_request_for_testing(portal: Union[Portal,
+                                                         webtest.app.TestApp]) -> Optional[pyramid.request.Request]:
+    if not (isinstance(portal, Portal) and isinstance(vapp := portal.vapp, webtest.app.TestApp)):
+        return None
+    if not isinstance(registry := vapp.app.registry, pyramid.registry.Registry):
+        return None
+    if not isinstance(request := vapp.get("/").request, webtest.app.TestRequest):
+        return None
+    if not isinstance(environ := request.environ, dict):
+        return None
+    request = pyramid.request.Request(environ)
+    request.registry = registry
+    return request
+
+
+def create_pyramid_request_for_testing(portal_or_vapp: Union[Portal, webtest.app.TestApp],
+                                       path: Optional[str] = None,
+                                       method: Optional[str] = None) -> Optional[pyramid.request.Request]:
+    if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
+        if not (isinstance(portal_or_vapp, Portal) and isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
+            return None
+    if not isinstance(router := vapp.app, pyramid.router.Router):
+        return None
+    if not (isinstance(path, str) and path):
+        path = "/"
+    if not (isinstance(method, str) and method):
+        method = "GET"
+    request = pyramid.request.Request.blank(path, method=method)
+    request.registry = router.registry
+    return request
+
+
+def portal_custom_search(portal_or_vapp_or_request: Union[Portal, webtest.app.TestApp, pyramid.request.Request],
+                         query: str,
+                         method: Optional[str] = None,
+                         aggregations: Optional[dict] = None) -> Optional[dict]:
+    try:
+        from snovault.search.search import search as snovault_search
+        from snovault.search.search_utils import make_search_subreq as snovault_make_search_subreq
+    except Exception:
+        print("ERROR: Cannot execute this code outside of snovault context!", file=sys.stderr, flush=True)
+        exit(1)
+    if not (isinstance(method, str) and (method := method.strip())):
+        method = "GET"
+    if not isinstance(request := portal_or_vapp_or_request, pyramid.request.Request):
+        # TODO: not actually sure at the moment (2024-11-28 22:25) if passing method here makes sense.
+        if not (request := create_pyramid_request_for_testing(portal_or_vapp_or_request, method=method)):
+            return None
+    if not isinstance(query, str):
+        query = "/"
+    if not isinstance(aggregations, dict):
+        aggregations = None
+    request = snovault_make_search_subreq(request, path=query, method=method)
+    return snovault_search(None, request, custom_aggregations=aggregations)
