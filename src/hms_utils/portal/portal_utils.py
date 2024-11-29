@@ -176,7 +176,7 @@ def group_items_by(items: list[dict], grouping: str,
     if sort is True:
         # Currently sort means to sort the groups in descending order of the
         # number of items in each group list; and secondarily by the group value.
-        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0])))
+        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
     if (raw is True) or (not results):
         return results
     return {
