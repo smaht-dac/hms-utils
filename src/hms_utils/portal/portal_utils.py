@@ -153,7 +153,9 @@ def group_items_by(items: list[dict], grouping: str,
         return {}
     if not (isinstance(identifying_property, str) and identifying_property):
         identifying_property = None
-    results = {None: []}  # To make sure None is the first one for convenience; delete later of no None.
+    # Initialize results with first None element to make sure items which are not
+    # part of a group are listed first; delete later of no such (ungrouped) items.
+    results = {None: []}
     for item in items:
         if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
             item_identity = identifying_value
@@ -192,7 +194,8 @@ def group_items_by_groupings(items: list[dict], groupings: List[str],
     grouped_items = None
     for grouping in groupings:
         if main_grouped_items is None:
-            if not (main_grouped_items := group_items_by(items, grouping, identifying_property=identifying_property)):
+            if not (main_grouped_items := group_items_by(items, grouping,
+                                                         identifying_property=identifying_property)):
                 break
             grouped_items = main_grouped_items
             continue
@@ -200,21 +203,19 @@ def group_items_by_groupings(items: list[dict], groupings: List[str],
             grouped_items = group_items_by(
                 select_items(items, lambda item: item.get(identifying_property) in group_items[grouped_item_key]),
                 grouping, identifying_property=identifying_property)
-            group_items[grouped_item_key] = grouped_items
+            if grouped_items:
+                group_items[grouped_item_key] = grouped_items
     return main_grouped_items
 
 
-def print_grouped_items(grouped_items: dict, indent: Optional[int] = None, display_item_count: bool = False) -> None:
+def print_grouped_items(grouped_items: dict, display_items: bool = False, indent: Optional[int] = None) -> None:
     if not (isinstance(indent, int) and (indent > 0)):
         indent = 0
     spaces = (" " * indent) if indent > 0 else ""
     group = grouped_items["group"]
     group_count = grouped_items["group_count"]
-    item_count = grouped_items["item_count"]
     group_items = grouped_items["group_items"]
     message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
-    if display_item_count is True:
-        message += f" {chars.dot} items: {item_count}"
     print(message)
     for group_item_key in group_items:
         grouped_items = group_items[group_item_key]
@@ -224,11 +225,12 @@ def print_grouped_items(grouped_items: dict, indent: Optional[int] = None, displ
             if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
                 message += f" ({grouped_items_count})"
             print(message)
-            print_grouped_items(grouped_items, indent=indent+4)
+            print_grouped_items(grouped_items, display_items=display_items, indent=indent+4)
         elif isinstance(grouped_items, list):
             print(f"{message} ({len(grouped_items)})")
-            for grouped_item in grouped_items:
-                print(f"{spaces}    {chars.dot} {grouped_item}")
+            if display_items is True:
+                for grouped_item in grouped_items:
+                    print(f"{spaces}    {chars.dot} {grouped_item}")
 
 
 def old_create_pyramid_request_for_testing(portal: Union[Portal,
