@@ -148,10 +148,10 @@ def select_items(items: List[dict], predicate: Callable) -> List[dict]:
 
 
 def group_items_by(items: list[dict], grouping: str,
-                   identifying_property: Optional[str] = None, raw: bool = False) -> dict:
-    if not (isinstance(items, list) and items and isinstance(grouping, str) and grouping):
+                   identifying_property: Optional[str] = "uuid", raw: bool = False) -> dict:
+    if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
-    if not (isinstance(identifying_property, str) and identifying_property):
+    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
     # Initialize results with first None element to make sure items which are not
     # part of a group are listed first; delete later of no such (ungrouped) items.
@@ -180,15 +180,15 @@ def group_items_by(items: list[dict], grouping: str,
     }
 
 
-def group_items_by_groupings(items: list[dict], groupings: List[str],
-                             identifying_property: Optional[str] = None) -> dict:
+def group_items_by_groupings(items: List[dict], groupings: List[str],
+                             identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
     if isinstance(groupings, str) and groupings:
         groupings = [groupings]
     elif not (isinstance(groupings, list) and groupings):
         return {}
-    if not (isinstance(identifying_property, str) and identifying_property):
+    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
     main_grouped_items = None
     grouped_items = None
@@ -208,10 +208,15 @@ def group_items_by_groupings(items: list[dict], groupings: List[str],
     return main_grouped_items
 
 
-def print_grouped_items(grouped_items: dict, display_items: bool = False, indent: Optional[int] = None) -> None:
+def print_grouped_items(grouped_items: dict, display_items: bool = False,
+                        display_title: Optional[str] = None, indent: Optional[int] = None) -> None:
     if not (isinstance(indent, int) and (indent > 0)):
         indent = 0
     spaces = (" " * indent) if indent > 0 else ""
+    if isinstance(display_title, str) and display_title:
+        print(f"{spaces}{chars.rarrow} {display_title}")
+        indent += 2
+        spaces = " " * indent
     group = grouped_items["group"]
     group_count = grouped_items["group_count"]
     group_items = grouped_items["group_items"]
@@ -231,39 +236,6 @@ def print_grouped_items(grouped_items: dict, display_items: bool = False, indent
             if display_items is True:
                 for grouped_item in grouped_items:
                     print(f"{spaces}    {chars.dot} {grouped_item}")
-
-
-def old_create_pyramid_request_for_testing(portal: Union[Portal,
-                                                         webtest.app.TestApp]) -> Optional[pyramid.request.Request]:
-    if not (isinstance(portal, Portal) and isinstance(vapp := portal.vapp, webtest.app.TestApp)):
-        return None
-    if not isinstance(registry := vapp.app.registry, pyramid.registry.Registry):
-        return None
-    if not isinstance(request := vapp.get("/").request, webtest.app.TestRequest):
-        return None
-    if not isinstance(environ := request.environ, dict):
-        return None
-    request = pyramid.request.Request(environ)
-    request.registry = registry
-    return request
-
-
-def obsolete_create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
-                                                path: Optional[str] = None,
-                                                method: Optional[str] = None) -> Optional[pyramid.request.Request]:
-    if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
-        if not (isinstance(portal_or_vapp, PortalFromUtils) and
-                isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
-            return None
-    if not isinstance(router := vapp.app, pyramid.router.Router):
-        return None
-    if not (isinstance(path, str) and path):
-        path = "/"
-    if not (isinstance(method, str) and method):
-        method = "GET"
-    request = pyramid.request.Request.blank(path, method=method)
-    request.registry = router.registry
-    return request
 
 
 def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils,
