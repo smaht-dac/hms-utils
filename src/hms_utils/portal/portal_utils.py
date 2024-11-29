@@ -148,13 +148,16 @@ def select_items(items: List[dict], predicate: Callable) -> List[dict]:
 
 
 def group_items_by(items: list[dict], grouping: str,
-                   identifying_property: Optional[str] = "uuid", raw: bool = False) -> dict:
+                   identifying_property: Optional[str] = "uuid",
+                   sort: bool = False,
+                   raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
     if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
     # Initialize results with first None element to make sure items which are not
-    # part of a group are listed first; delete later of no such (ungrouped) items.
+    # part of a group are listed first; delete later of no such (ungrouped) items;
+    # though if sort is True then this is irrelevant.
     results = {None: []}
     for item in items:
         if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
@@ -170,6 +173,10 @@ def group_items_by(items: list[dict], grouping: str,
             results[None].append(item_identity)
     if not results[None]:
         del results[None]
+    if sort is True:
+        # Currently sort means to sort the groups in descending order of the
+        # number of items in each group list; and secondarily by the group value.
+        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0])))
     if (raw is True) or (not results):
         return results
     return {
@@ -181,6 +188,7 @@ def group_items_by(items: list[dict], grouping: str,
 
 
 def group_items_by_groupings(items: List[dict], groupings: List[str],
+                             sort: bool = False,
                              identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
@@ -194,7 +202,7 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
     grouped_items = None
     for grouping in groupings:
         if main_grouped_items is None:
-            if not (main_grouped_items := group_items_by(items, grouping,
+            if not (main_grouped_items := group_items_by(items, grouping, sort=sort,
                                                          identifying_property=identifying_property)):
                 break
             grouped_items = main_grouped_items
@@ -202,7 +210,7 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
         for grouped_item_key in (group_items := grouped_items["group_items"]):
             grouped_items = group_items_by(
                 select_items(items, lambda item: item.get(identifying_property) in group_items[grouped_item_key]),
-                grouping, identifying_property=identifying_property)
+                grouping, sort=sort, identifying_property=identifying_property)
             if grouped_items:
                 group_items[grouped_item_key] = grouped_items
     return main_grouped_items
