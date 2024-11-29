@@ -246,9 +246,9 @@ def old_create_pyramid_request_for_testing(portal: Union[Portal,
     return request
 
 
-def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
-                                       path: Optional[str] = None,
-                                       method: Optional[str] = None) -> Optional[pyramid.request.Request]:
+def obsolete_create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
+                                                path: Optional[str] = None,
+                                                method: Optional[str] = None) -> Optional[pyramid.request.Request]:
     if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
         if not (isinstance(portal_or_vapp, PortalFromUtils) and
                 isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
@@ -261,6 +261,27 @@ def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils, we
         method = "GET"
     request = pyramid.request.Request.blank(path, method=method)
     request.registry = router.registry
+    return request
+
+
+def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils,
+                                                             webtest.app.TestApp]) -> Optional[pyramid.request.Request]:
+    if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
+        if not (isinstance(portal_or_vapp, PortalFromUtils) and
+                isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
+            return None
+    if not isinstance(router := vapp.app, pyramid.router.Router):
+        return None
+    if not isinstance(registry := router.registry, pyramid.registry.Registry):
+        return None
+    if not isinstance(response := vapp.get("/"), webtest.response.TestResponse):
+        return None
+    if not isinstance(request := response.request, webtest.app.TestRequest):
+        return None
+    if not isinstance(environ := request.environ, dict):
+        return None
+    request = pyramid.request.Request(environ)
+    request.registry = registry
     return request
 
 
@@ -278,8 +299,7 @@ def portal_custom_search(portal_or_vapp_or_request: Union[PortalFromUtils,
     if not (isinstance(method, str) and (method := method.strip())):
         method = "GET"
     if not isinstance(request := portal_or_vapp_or_request, pyramid.request.Request):
-        # TODO: not actually sure at the moment (2024-11-28 22:25) if passing method here makes sense.
-        if not (request := create_pyramid_request_for_testing(portal_or_vapp_or_request, method=method)):
+        if not (request := create_pyramid_request_for_testing(portal_or_vapp_or_request)):
             return None
     if not isinstance(query, str):
         query = "/"
