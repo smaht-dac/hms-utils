@@ -378,6 +378,7 @@ def group_items_by(items: list[dict], grouping: str,
     # Initialize results with first None element to make sure items which are not
     # part of a group are listed first; delete later of no such (ungrouped) items;
     # though if sort is True then this is irrelevant.
+    non_unique_item_count = 0
     results = {None: 0 if noitems is True else []}
     for item in items:
         if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
@@ -394,10 +395,13 @@ def group_items_by(items: list[dict], grouping: str,
                     if results.get(grouping_value) is None:
                         results[grouping_value] = []
                     results[grouping_value].append(item_identity)
+                non_unique_item_count += 1
         elif noitems is True:
             results[None] += 1
+            non_unique_item_count += 1
         else:
             results[None].append(item_identity)
+            non_unique_item_count += 1
     if not results[None]:
         del results[None]
     if sort is True:
@@ -411,7 +415,8 @@ def group_items_by(items: list[dict], grouping: str,
         return results
     return {
         "group": grouping,
-        "item_count": len(items),
+        "item_count": non_unique_item_count,
+        "unique_item_count": len(items),
         "group_count": len(results),
         "group_items": results
     }

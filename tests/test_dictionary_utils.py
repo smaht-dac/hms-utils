@@ -453,7 +453,8 @@ def test_group_items_by_a():
 
     assert group_items_by(items, GROUPING_CELL_LINES, identifying_property="uuid") == {
         "group": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
-        "item_count": 10,
+        "item_count": 20,
+        "unique_item_count": 10,
         "group_count": 9,
         "group_items": {
             None: [
@@ -499,7 +500,8 @@ def test_group_items_by_a():
 
     assert group_items_by(items, GROUPING_DONORS, identifying_property="uuid") == {
         "group": "donors.display_title",
-        "item_count": 10,
+        "item_count": 11,
+        "unique_item_count": 10,
         "group_count": 5,
         "group_items": {
             None: [
@@ -529,6 +531,7 @@ def test_group_items_by_a():
     assert group_items_by(items, GROUPING_FILE_DESCRIPTOR, identifying_property="uuid") == {
         "group": "release_tracker_description",
         "item_count": 10,
+        "unique_item_count": 10,
         "group_count": 3,
         "group_items": {
             "WGS Illumina NovaSeq X bam": [
@@ -558,17 +561,20 @@ def test_group_items_by_a():
     result = group_items_by_groupings(items, groupings, identifying_property="uuid", sort=True)
     expected_result = {
         "group": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
-        "item_count": 10,
+        "item_count": 20,
+        "unique_item_count": 10,
         "group_count": 9,
         "group_items": {
             "COLO829BL": {
                 "group": "donors.display_title",
-                "item_count": 3,
+                "item_count": 4,
+                "unique_item_count": 3,
                 "group_count": 2,
                 "group_items": {
                     "DAC_DONOR_COLO829": {
                         "group": "release_tracker_description",
                         "item_count": 3,
+                        "unique_item_count": 3,
                         "group_count": 2,
                         "group_items": {
                             "Fiber-seq PacBio Revio bam": [
@@ -583,6 +589,7 @@ def test_group_items_by_a():
                     "DAC_DONOR_COLO829_001": {
                         "group": "release_tracker_description",
                         "item_count": 1,
+                        "unique_item_count": 1,
                         "group_count": 1,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -595,11 +602,13 @@ def test_group_items_by_a():
             "COLO829T": {
                 "group": "donors.display_title",
                 "item_count": 3,
+                "unique_item_count": 3,
                 "group_count": 1,
                 "group_items": {
                     "DAC_DONOR_COLO829": {
                         "group": "release_tracker_description",
                         "item_count": 3,
+                        "unique_item_count": 3,
                         "group_count": 1,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -614,11 +623,13 @@ def test_group_items_by_a():
             "HG002": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -634,11 +645,13 @@ def test_group_items_by_a():
             "HG00438": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -654,11 +667,13 @@ def test_group_items_by_a():
             "HG005": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -674,11 +689,13 @@ def test_group_items_by_a():
             "HG02257": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -694,11 +711,13 @@ def test_group_items_by_a():
             "HG02486": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -714,11 +733,13 @@ def test_group_items_by_a():
             "HG02622": {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 1,
                 "group_items": {
                     None: {
                         "group": "release_tracker_description",
                         "item_count": 2,
+                        "unique_item_count": 2,
                         "group_count": 2,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -734,11 +755,13 @@ def test_group_items_by_a():
             None: {
                 "group": "donors.display_title",
                 "item_count": 2,
+                "unique_item_count": 2,
                 "group_count": 2,
                 "group_items": {
                     "ST003": {
                         "group": "release_tracker_description",
                         "item_count": 1,
+                        "unique_item_count": 1,
                         "group_count": 1,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
@@ -749,6 +772,7 @@ def test_group_items_by_a():
                     "ST004": {
                         "group": "release_tracker_description",
                         "item_count": 1,
+                        "unique_item_count": 1,
                         "group_count": 1,
                         "group_items": {
                             "WGS Illumina NovaSeq X bam": [
