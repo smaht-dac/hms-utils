@@ -611,33 +611,6 @@ def test_group_items_by_a():
                     }
                 }
             },
-            None: {
-                "group": "donors.display_title",
-                "item_count": 2,
-                "group_count": 2,
-                "group_items": {
-                    "ST003": {
-                        "group": "release_tracker_description",
-                        "item_count": 1,
-                        "group_count": 1,
-                        "group_items": {
-                            "WGS Illumina NovaSeq X bam": [
-                                "1a5b9cea-104e-45f3-9bef-8ed06aeede24"
-                            ]
-                        }
-                    },
-                    "ST004": {
-                        "group": "release_tracker_description",
-                        "item_count": 1,
-                        "group_count": 1,
-                        "group_items": {
-                            "WGS Illumina NovaSeq X bam": [
-                                "c53931bc-e3dc-4a37-97f3-05ffa2dc438b"
-                            ]
-                        }
-                    }
-                }
-            },
             "HG002": {
                 "group": "donors.display_title",
                 "item_count": 2,
@@ -753,6 +726,33 @@ def test_group_items_by_a():
                             ],
                             "WGS ONT PromethION 24 bam": [
                                 "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
+                }
+            },
+            None: {
+                "group": "donors.display_title",
+                "item_count": 2,
+                "group_count": 2,
+                "group_items": {
+                    "ST003": {
+                        "group": "release_tracker_description",
+                        "item_count": 1,
+                        "group_count": 1,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "1a5b9cea-104e-45f3-9bef-8ed06aeede24"
+                            ]
+                        }
+                    },
+                    "ST004": {
+                        "group": "release_tracker_description",
+                        "item_count": 1,
+                        "group_count": 1,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "c53931bc-e3dc-4a37-97f3-05ffa2dc438b"
                             ]
                         }
                     }

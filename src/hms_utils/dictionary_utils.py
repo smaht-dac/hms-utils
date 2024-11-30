@@ -404,9 +404,9 @@ def group_items_by(items: list[dict], grouping: str,
         # Currently sort means to sort the groups in descending order of the
         # number of items in each group list; and secondarily by the group value.
         if noitems is True:
-            results = dict(sorted(results.items(), key=lambda item: (-item[1], item[0] or "")))
+            results = dict(sorted(results.items(), key=lambda item: (-item[1], item[0] is None, item[0] or "")))
         else:
-            results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
+            results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] is None, item[0] or "")))
     if (raw is True) or (not results):
         return results
     return {
