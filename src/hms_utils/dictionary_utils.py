@@ -9,91 +9,6 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, Union
 from hms_utils.type_utils import is_uuid, to_non_empty_string_list
 
 
-def print_dictionary_tree(data: dict,
-                          indent: Optional[int] = None,
-                          paths: bool = False,
-                          path_separator: str = "/",
-                          key_modifier: Optional[Callable] = None,
-                          value_modifier: Optional[Callable] = None,
-                          value_annotator: Optional[Callable] = None,
-                          arrow_indicator: Optional[Callable] = None,
-                          printf: Optional[Callable] = None) -> None:
-    """
-    Pretty prints the given dictionary. ONLY handles dictionaries
-    containing primitive values or other dictionaries recursively.
-    """
-    if not callable(key_modifier):
-        key_modifier = None
-    if not callable(value_annotator):
-        value_annotator = None
-    if not callable(value_modifier):
-        value_modifier = None
-    if not callable(arrow_indicator):
-        arrow_indicator = None
-    if not callable(printf):
-        printf = print
-    output = (lambda value: printf(f"{' ' * indent}{value}")) if isinstance(indent, int) and indent > 0 else printf
-    def traverse(data: dict, indent: str = "", first: bool = False, last: bool = True, path: str = ""):  # noqa
-        nonlocal output, paths, key_modifier, value_annotator, value_modifier
-        space = "    " if not first else "  "
-        for index, key in enumerate(keys := list(data.keys())):
-            last = (index == len(keys) - 1)
-            corner = "▷" if first else ("└──" if last else "├──")
-            key_path = f"{path}{path_separator}{key}" if path else key
-            if isinstance(value := data[key], dict):
-                output(indent + corner + " " + key)
-                inner_indent = indent + (space if last else f"{' ' if first else '│'}{space[1:]}")
-                traverse(value, indent=inner_indent, last=last, path=key_path)
-            else:
-                if paths:
-                    key = key_path
-                key_modification = key_modifier(key_path, key) if key_modifier else key
-                value_modification = value_modifier(key_path, value) if value_modifier else value
-                value_annotation = value_annotator(key_path) if value_annotator else ""
-                arrow_indication = arrow_indicator(key_path, value) if arrow_indicator else ""
-                if key_modification:
-                    key = key_modification
-                if value_modification:
-                    value = value_modification
-                if arrow_indication:
-                    corner = corner[:-1] + arrow_indication
-                output(f"{indent}{corner} {key}: {value}{f' {value_annotation}' if value_annotation else ''}")
-    traverse(data, first=True)
-
-
-def print_dictionary_list(data: dict,
-                          path_separator: str = "/",
-                          prefix: Optional[str] = None,
-                          key_modifier: Optional[Callable] = None,
-                          value_modifier: Optional[Callable] = None,
-                          value_annotator: Optional[Callable] = None) -> None:
-    if not callable(key_modifier):
-        key_modifier = None
-    if not callable(value_annotator):
-        value_annotator = None
-    if not callable(value_modifier):
-        value_modifier = None
-    if not isinstance(prefix, str):
-        prefix = ""
-    def traverse(data: dict, path: str = "") -> None:  # noqa
-        nonlocal path_separator, key_modifier, value_annotator, value_modifier
-        for key in data:
-            key_path = f"{path}{path_separator}{key}" if path else key
-            if isinstance(item := data[key], dict):
-                traverse(item, path=key_path)
-            else:
-                value = str(item)
-                key_modification = key_modifier(key_path) if key_modifier else key_path
-                value_modification = value_modifier(key_path, value) if value_modifier else value
-                value_annotation = value_annotator(key_path) if value_annotator else ""
-                if key_modification:
-                    key = key_modification
-                if value_modification:
-                    value = value_modification
-                print(f"{prefix}{key}: {value}{f' {value_annotation}' if value_annotation else ''}")
-    traverse(data)
-
-
 def delete_paths_from_dictionary(data: dict, paths: List[str], separator: str = "/", copy: bool = True):
     """
     Deletes from the given dictionary the keys/properies specified in the given list of key paths;
@@ -566,6 +481,28 @@ def order_dictionary_by_dependencies(items: List[dict],
         raise ValueError("The input contains cyclic dependencies and cannot be ordered.")
 
     return sorted_items
+
+
+def normalize_elastic_search_grouped_results(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return {}
+    if "buckets" not in data:
+        return {}
+    result = {
+        "group": data.get("meta", {}).get("field_name", "group"),
+        "item_count": sum(bucket["doc_count"] for bucket in data["buckets"]),
+        "group_count": len(data["buckets"]),
+        "group_items": {}
+    }
+    for bucket in data["buckets"]:
+        key = bucket["key"] if bucket["key"] != "No value" else "null"
+        doc_count = bucket["doc_count"]
+        nested_field = next((k for k in bucket if k.startswith("field_")), None)
+        if nested_field and isinstance(bucket[nested_field], dict):
+            result["group_items"][key] = normalize_elastic_search_grouped_results(bucket[nested_field])
+        else:
+            result["group_items"][key] = doc_count
+    return result
 
 
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.

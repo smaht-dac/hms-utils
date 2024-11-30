@@ -14,10 +14,8 @@ import traceback
 from typing import Any, List, Optional, Tuple, Union
 import yaml
 from hms_utils.chars import chars
-from hms_utils.dictionary_utils import (
-    JSON, delete_paths_from_dictionary, print_dictionary_list,
-    print_dictionary_tree, sort_dictionary
-)
+from hms_utils.dictionary_utils import JSON, delete_paths_from_dictionary, sort_dictionary
+from hms_utils.dictionary_print_utils import print_dictionary_list, print_dictionary_tree
 from hms_utils.version_utils import get_version
 from hms_utils.terminal_utils import terminal_color as color
 
