@@ -172,3 +172,5 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
             if noitems is not True:
                 for grouped_item in grouped_items:
                     print(f"{spaces}    {chars.dot} {grouped_item}")
+        elif isinstance(grouped_items, int):
+            print(f"{message} ({grouped_items})")
