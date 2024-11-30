@@ -369,6 +369,7 @@ def select_items(items: List[dict], predicate: Callable) -> List[dict]:
 def group_items_by(items: list[dict], grouping: str,
                    identifying_property: Optional[str] = "uuid",
                    sort: bool = False,
+                   noitems: bool = False,
                    raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
@@ -377,7 +378,7 @@ def group_items_by(items: list[dict], grouping: str,
     # Initialize results with first None element to make sure items which are not
     # part of a group are listed first; delete later of no such (ungrouped) items;
     # though if sort is True then this is irrelevant.
-    results = {None: []}
+    results = {None: 0 if noitems is True else []}
     for item in items:
         if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
             item_identity = identifying_value
@@ -385,9 +386,16 @@ def group_items_by(items: list[dict], grouping: str,
             item_identity = item
         if grouping_values := get_properties(item, grouping):
             for grouping_value in grouping_values:
-                if results.get(grouping_value) is None:
-                    results[grouping_value] = []
-                results[grouping_value].append(item_identity)
+                if noitems is True:
+                    if results.get(grouping_value) is None:
+                        results[grouping_value] = 0
+                    results[grouping_value] += 1
+                else:
+                    if results.get(grouping_value) is None:
+                        results[grouping_value] = []
+                    results[grouping_value].append(item_identity)
+        elif noitems is True:
+            results[None] += 1
         else:
             results[None].append(item_identity)
     if not results[None]:
@@ -395,7 +403,10 @@ def group_items_by(items: list[dict], grouping: str,
     if sort is True:
         # Currently sort means to sort the groups in descending order of the
         # number of items in each group list; and secondarily by the group value.
-        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
+        if noitems is True:
+            results = dict(sorted(results.items(), key=lambda item: (-item[1], item[0] or "")))
+        else:
+            results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
     if (raw is True) or (not results):
         return results
     return {
@@ -408,6 +419,7 @@ def group_items_by(items: list[dict], grouping: str,
 
 def group_items_by_groupings(items: List[dict], groupings: List[str],
                              sort: bool = False,
+                             noitems: bool = False,
                              identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
@@ -431,6 +443,15 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
                 sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
     for grouping in groupings[1:]:
         sub_group_items_by(grouped_items["group_items"], grouping)
+    if noitems is True:
+        def change_group_items_list_to_group_items_count(grouped_items: dict) -> None:
+            if isinstance(group_items := grouped_items.get("group_items"), dict):
+                for group_item_key in group_items:
+                    if isinstance(group_items[group_item_key], dict):
+                        change_group_items_list_to_group_items_count(group_items[group_item_key])
+                    elif isinstance(group_items[group_item_key], list):
+                        group_items[group_item_key] = len(group_items[group_item_key])
+        change_group_items_list_to_group_items_count(grouped_items)
     return grouped_items
 
 

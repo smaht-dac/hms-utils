@@ -144,13 +144,13 @@ def print_dictionary_as_table(header_name: str, header_value: str,
     print(table)
 
 
-def print_grouped_items(grouped_items: dict, display_items: bool = False,
-                        display_title: Optional[str] = None, indent: Optional[int] = None) -> None:
+def print_grouped_items(grouped_items: dict, noitems: bool = False,
+                        title: Optional[str] = None, indent: Optional[int] = None) -> None:
     if not (isinstance(indent, int) and (indent > 0)):
         indent = 0
     spaces = (" " * indent) if indent > 0 else ""
-    if isinstance(display_title, str) and display_title:
-        print(f"{spaces}{chars.rarrow} {display_title}")
+    if isinstance(title, str) and title:
+        print(f"{spaces}{chars.rarrow} {title}")
         indent += 2
         spaces = " " * indent
     group = grouped_items["group"]
@@ -166,9 +166,9 @@ def print_grouped_items(grouped_items: dict, display_items: bool = False,
             if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
                 message += f" ({grouped_items_count})"
             print(message)
-            print_grouped_items(grouped_items, display_items=display_items, indent=indent+4)
+            print_grouped_items(grouped_items, noitems=noitems, indent=indent+4)
         elif isinstance(grouped_items, list):
             print(f"{message} ({len(grouped_items)})")
-            if display_items is True:
+            if noitems is not True:
                 for grouped_item in grouped_items:
                     print(f"{spaces}    {chars.dot} {grouped_item}")
