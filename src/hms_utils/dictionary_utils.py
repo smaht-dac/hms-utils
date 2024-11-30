@@ -503,6 +503,39 @@ def get_properties(data: dict, name: str, fallback: Optional[Any] = None, sort: 
     return fallback if isinstance(fallback, list) else ([] if fallback is None else [fallback])
 
 
+def compare_dictionaries_ordered(a: dict, b: dict) -> bool:
+    # N.B. Written by ChatGPT and used without almost no review (just testing)!
+    def compare_lists_ordered(a: list, b: list):
+        if len(a) != len(b):
+            return False
+        for aitem, bitem in zip(a, b):
+            if isinstance(aitem, dict) and isinstance(bitem, dict):
+                if not compare_dictionaries_ordered(aitem, bitem):
+                    return False
+            elif isinstance(aitem, list) and isinstance(bitem, list):
+                if not compare_lists_ordered(aitem, bitem):
+                    return False
+            elif aitem != bitem:
+                return False
+        return True
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    if list(a.keys()) != list(b.keys()):
+        return False
+    for key in a:
+        avalue = a[key]
+        bvalue = b[key]
+        if isinstance(avalue, dict) and isinstance(bvalue, dict):
+            if not compare_dictionaries_ordered(avalue, bvalue):
+                return False
+        elif isinstance(avalue, list) and isinstance(bvalue, list):
+            if not compare_lists_ordered(avalue, bvalue):
+                return False
+        elif avalue != bvalue:
+            return False
+    return True
+
+
 def order_dictionary_by_dependencies(items: List[dict],
                                      dependencies: Union[List[str], str, Callable],
                                      identifying_property_name: str = "uuid") -> List[dict]:
