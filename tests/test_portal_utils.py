@@ -240,12 +240,26 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 2,
                 "group_items": {
-                    "ST004": [
-                        "c53931bc-e3dc-4a37-97f3-05ffa2dc438b"
-                    ],
-                    "ST003": [
-                        "1a5b9cea-104e-45f3-9bef-8ed06aeede24"
-                    ]
+                    "ST004": {
+                        "group": "release_tracker_description",
+                        "item_count": 1,
+                        "group_count": 1,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "c53931bc-e3dc-4a37-97f3-05ffa2dc438b"
+                            ]
+                        }
+                    },
+                    "ST003": {
+                        "group": "release_tracker_description",
+                        "item_count": 1,
+                        "group_count": 1,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "1a5b9cea-104e-45f3-9bef-8ed06aeede24"
+                            ]
+                        }
+                    }
                 }
             },
             "HG00438": {
@@ -253,10 +267,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "HG02486": {
@@ -264,10 +287,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "HG02622": {
@@ -275,10 +307,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "HG005": {
@@ -286,10 +327,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "HG02257": {
@@ -297,10 +347,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "HG002": {
@@ -308,10 +367,19 @@ def test_portal_utils_a():
                 "item_count": 2,
                 "group_count": 1,
                 "group_items": {
-                    None: [
-                        "dbba7681-88ea-4a09-884d-ff64cc6c557a",
-                        "f2584000-f810-44b6-8eb7-855298c58eb3"
-                    ]
+                    None: {
+                        "group": "release_tracker_description",
+                        "item_count": 2,
+                        "group_count": 2,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "dbba7681-88ea-4a09-884d-ff64cc6c557a"
+                            ],
+                            "WGS ONT PromethION 24 bam": [
+                                "f2584000-f810-44b6-8eb7-855298c58eb3"
+                            ]
+                        }
+                    }
                 }
             },
             "COLO829T": {
@@ -319,11 +387,18 @@ def test_portal_utils_a():
                 "item_count": 3,
                 "group_count": 1,
                 "group_items": {
-                    "DAC_DONOR_COLO829": [
-                        "ea0f5f17-5753-42ed-b141-186e8261c58e",
-                        "f9cc4a7a-9508-441b-91f2-99530f8c82c7",
-                        "fffceff8-4283-485d-b7ab-0cc19d3d1fa7"
-                    ]
+                    "DAC_DONOR_COLO829": {
+                        "group": "release_tracker_description",
+                        "item_count": 3,
+                        "group_count": 1,
+                        "group_items": {
+                            "WGS Illumina NovaSeq X bam": [
+                                "ea0f5f17-5753-42ed-b141-186e8261c58e",
+                                "f9cc4a7a-9508-441b-91f2-99530f8c82c7",
+                                "fffceff8-4283-485d-b7ab-0cc19d3d1fa7"
+                            ]
+                        }
+                    }
                 }
             },
             "COLO829BL": {

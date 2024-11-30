@@ -198,22 +198,21 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
         return {}
     if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
-    main_grouped_items = None
-    grouped_items = None
-    for grouping in groupings:
-        if main_grouped_items is None:
-            if not (main_grouped_items := group_items_by(items, grouping, sort=sort,
-                                                         identifying_property=identifying_property)):
-                break
-            grouped_items = main_grouped_items
-            continue
-        for grouped_item_key in (group_items := grouped_items["group_items"]):
-            grouped_items = group_items_by(
-                select_items(items, lambda item: item.get(identifying_property) in group_items[grouped_item_key]),
-                grouping, sort=sort, identifying_property=identifying_property)
-            if grouped_items:
-                group_items[grouped_item_key] = grouped_items
-    return main_grouped_items
+    if not (grouped_items := group_items_by(items, groupings[0], sort=sort, identifying_property=identifying_property)):
+        return {}
+    def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
+        nonlocal items, sort, identifying_property
+        for grouped_item_key in group_items:
+            if isinstance(group_items[grouped_item_key], list):
+                sub_items = select_items(
+                    items, lambda item: item.get(identifying_property) in group_items[grouped_item_key])
+                group_items[grouped_item_key] = group_items_by(
+                    sub_items, grouping, sort=sort, identifying_property=identifying_property)
+            elif isinstance(group_items[grouped_item_key], dict):
+                sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
+    for grouping in groupings[1:]:
+        sub_group_items_by(grouped_items["group_items"], grouping)
+    return grouped_items
 
 
 def print_grouped_items(grouped_items: dict, display_items: bool = False,
