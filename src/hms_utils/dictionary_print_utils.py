@@ -146,6 +146,8 @@ def print_dictionary_as_table(header_name: str, header_value: str,
 
 def print_grouped_items(grouped_items: dict, noitems: bool = False,
                         title: Optional[str] = None, indent: Optional[int] = None) -> None:
+    if not (isinstance(grouped_items, dict) and grouped_items):
+        return
     if not (isinstance(indent, int) and (indent > 0)):
         indent = 0
     spaces = (" " * indent) if indent > 0 else ""
@@ -153,9 +155,12 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
         print(f"{spaces}{chars.rarrow} {title}")
         indent += 2
         spaces = " " * indent
-    group = grouped_items["group"]
-    group_count = grouped_items["group_count"]
-    group_items = grouped_items["group_items"]
+    if not (group := grouped_items.get("group")):
+        return
+    if not (group_count := grouped_items.get("group_count")):
+        return
+    if not (group_items := grouped_items.get("group_items")):
+        return
     message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
     print(message)
     for group_item_key in group_items:

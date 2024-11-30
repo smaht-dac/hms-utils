@@ -483,7 +483,37 @@ def order_dictionary_by_dependencies(items: List[dict],
     return sorted_items
 
 
-def normalize_elastic_search_grouped_results(data: dict) -> dict:
+def normalize_elastic_search_aggregation_results(data: dict) -> dict:
+    # CAVEAT: Written by ChatGPT and used without almost no review (just testing)!
+    def process_field(field: dict) -> None:
+        if not isinstance(field, dict):
+            return
+        if not isinstance(buckets := field.get("buckets"), list):
+            return
+        group_name = field.get("meta", {}).get("field_name")
+        group_items = {}
+        item_count = 0
+        for bucket in buckets:
+            key = bucket["key"] if bucket["key"] != "No value" else "null"
+            doc_count = bucket["doc_count"]
+            item_count += doc_count
+            nested_field = next((v for k, v in bucket.items() if k.startswith("field_")), None)
+            if nested_field:
+                group_items[key] = process_field(nested_field)
+            else:
+                group_items[key] = doc_count
+        return {
+            "group": group_name,
+            "item_count": item_count,
+            "group_count": len(group_items),
+            "group_items": group_items,
+        }
+    if not (isinstance(data, dict) and isinstance(field := data.get("field_0"), dict)):
+        return {}
+    return process_field(field)
+
+
+def old_normalize_elastic_search_grouped_results(data: dict) -> dict:
     if not isinstance(data, dict):
         return {}
     if "buckets" not in data:
@@ -499,7 +529,7 @@ def normalize_elastic_search_grouped_results(data: dict) -> dict:
         doc_count = bucket["doc_count"]
         nested_field = next((k for k in bucket if k.startswith("field_")), None)
         if nested_field and isinstance(bucket[nested_field], dict):
-            result["group_items"][key] = normalize_elastic_search_grouped_results(bucket[nested_field])
+            result["group_items"][key] = old_normalize_elastic_search_grouped_results(bucket[nested_field])
         else:
             result["group_items"][key] = doc_count
     return result

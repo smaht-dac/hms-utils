@@ -14,6 +14,14 @@ from hms_utils.type_utils import is_uuid, to_non_empty_string_list
 
 class Portal(PortalFromUtils):
 
+    def get_metadata(self, object_id: str, raw: bool = False, database: bool = False,
+                     limit: Optional[int] = None, offset: Optional[int] = None,
+                     field: Optional[str] = None, deleted: bool = False,
+                     raise_exception: bool = True) -> Optional[dict]:
+        if isinstance(object_id, str):
+            object_id = object_id.lstrip("/")
+        return super().get_metadata(object_id, raw, database, limit, offset, field, deleted, raise_exception)
+
     def delete_metadata(self, object_id: str) -> Optional[dict]:
         if self.key:
             return delete_metadata(obj_id=object_id, key=self.key)
