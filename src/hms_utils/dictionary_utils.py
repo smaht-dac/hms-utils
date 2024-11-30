@@ -285,6 +285,7 @@ def group_items_by(items: list[dict], grouping: str,
                    identifying_property: Optional[str] = "uuid",
                    sort: bool = False,
                    noitems: bool = False,
+                   omit_unique_items_count: bool = False,
                    raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
@@ -328,18 +329,22 @@ def group_items_by(items: list[dict], grouping: str,
             results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] is None, item[0] or "")))
     if (raw is True) or (not results):
         return results
-    return {
+    results = {
         "group": grouping,
         "item_count": non_unique_item_count,
         "unique_item_count": len(items),
         "group_count": len(results),
         "group_items": results
     }
+    if omit_unique_items_count is True:
+        del results["unique_item_count"]
+    return results
 
 
 def group_items_by_groupings(items: List[dict], groupings: List[str],
                              sort: bool = False,
                              noitems: bool = False,
+                             omit_unique_items_count: bool = False,
                              identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
@@ -349,16 +354,19 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
         return {}
     if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
-    if not (grouped_items := group_items_by(items, groupings[0], sort=sort, identifying_property=identifying_property)):
+    if not (grouped_items := group_items_by(items, groupings[0], sort=sort,
+                                            omit_unique_items_count=omit_unique_items_count,
+                                            identifying_property=identifying_property)):
         return {}
     def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
-        nonlocal items, sort, identifying_property
+        nonlocal items, sort, omit_unique_items_count, identifying_property
         for grouped_item_key in group_items:
             if isinstance(group_items[grouped_item_key], list):
                 sub_items = select_items(
                     items, lambda item: item.get(identifying_property) in group_items[grouped_item_key])
                 group_items[grouped_item_key] = group_items_by(
-                    sub_items, grouping, sort=sort, identifying_property=identifying_property)
+                    sub_items, grouping, sort=sort,
+                    omit_unique_items_count=omit_unique_items_count, identifying_property=identifying_property)
             elif isinstance(group_items[grouped_item_key], dict):
                 sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
     for grouping in groupings[1:]:

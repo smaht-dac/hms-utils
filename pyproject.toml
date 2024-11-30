@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hms-utils"
-version = "1.4.231"
+version = "1.4.232"
 description = "Miscellaneous Python utilities from HMS DBMI"
 authors = ["Davd Michaels <david_michaels@4hms.harvard.deu>"]
 license = "MIT"
