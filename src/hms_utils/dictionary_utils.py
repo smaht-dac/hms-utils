@@ -492,8 +492,14 @@ def order_dictionary_by_dependencies(items: List[dict],
 
 
 def normalize_elastic_search_aggregation_results(data: dict) -> dict:
-    # CAVEAT: Written by ChatGPT and used without almost no review (just testing)!
-    def process_field(field: dict) -> None:
+    # CAVEAT: Written by ChatGPT and used with only a little review (just testing)!
+    def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
+        if isinstance(data, dict):
+            for key in data:
+                if isinstance(data[key], dict) and isinstance(data[key].get("buckets"), list):
+                    return data[key]
+        return None
+    def process_field(field: dict) -> None:  # noqa
         if not isinstance(field, dict):
             return
         if not isinstance(buckets := field.get("buckets"), list):
@@ -506,8 +512,7 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
                 key = None
             doc_count = bucket["doc_count"]
             item_count += doc_count
-            nested_field = next((v for k, v in bucket.items() if k.startswith("field_")), None)
-            if nested_field:
+            if nested_field := get_first_field_with_buckets_list_property(bucket):
                 group_items[key] = process_field(nested_field)
             else:
                 group_items[key] = doc_count
@@ -517,9 +522,9 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
             "group_count": len(group_items),
             "group_items": group_items,
         }
-    if not (isinstance(data, dict) and isinstance(field := data.get("field_0"), dict)):
+    if not isinstance(data, dict):
         return {}
-    return process_field(field)
+    return process_field(get_first_field_with_buckets_list_property(data))
 
 
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
