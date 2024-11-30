@@ -142,3 +142,33 @@ def print_dictionary_as_table(header_name: str, header_value: str,
     for key_name, key_value in sorted(dictionary.items(), key=lambda item: item[0]) if sort else dictionary.items():
         table.add_row([key_name, display_value(key_name, key_value)])
     print(table)
+
+
+def print_grouped_items(grouped_items: dict, display_items: bool = False,
+                        display_title: Optional[str] = None, indent: Optional[int] = None) -> None:
+    if not (isinstance(indent, int) and (indent > 0)):
+        indent = 0
+    spaces = (" " * indent) if indent > 0 else ""
+    if isinstance(display_title, str) and display_title:
+        print(f"{spaces}{chars.rarrow} {display_title}")
+        indent += 2
+        spaces = " " * indent
+    group = grouped_items["group"]
+    group_count = grouped_items["group_count"]
+    group_items = grouped_items["group_items"]
+    message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
+    print(message)
+    for group_item_key in group_items:
+        grouped_items = group_items[group_item_key]
+        message = (f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
+                   f" {group_item_key if group_item_key is not None else chars.null}")
+        if isinstance(grouped_items, dict):
+            if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
+                message += f" ({grouped_items_count})"
+            print(message)
+            print_grouped_items(grouped_items, display_items=display_items, indent=indent+4)
+        elif isinstance(grouped_items, list):
+            print(f"{message} ({len(grouped_items)})")
+            if display_items is True:
+                for grouped_item in grouped_items:
+                    print(f"{spaces}    {chars.dot} {grouped_item}")

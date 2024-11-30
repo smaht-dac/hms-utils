@@ -307,6 +307,241 @@ def find_dictionary_item(items: List[dict], property_value: Any, property_name: 
     return None
 
 
+def get_property(data: dict, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    """
+    Returns the value of the given property name within the given dictionary, where the given
+    property name can be a dot-separated list of property names, which indicate a path into
+    nested dictionaries within the given dictionary; returns None if not found.
+    """
+    if isinstance(data, dict) and isinstance(name, str) and name:
+        if keys := name.split("."):
+            nkeys = len(keys) ; key_index_max = nkeys - 1  # noqa
+            for key_index in range(nkeys):
+                if (value := data.get(keys[key_index], None)) is not None:
+                    if key_index == key_index_max:
+                        return value
+                    elif isinstance(value, dict):
+                        data = value
+                        continue
+                break
+    return fallback
+
+
+def get_properties(data: dict, name: str, fallback: Optional[Any] = None, sort: bool = False) -> List[Any]:
+    """
+    Returns the values of the given property name within the given dictionary as a list, where the
+    given property name can be a dot-separated list of property names, which indicate a path into
+    nested dictionaries within the given dictionary; and - where if any of the elements within
+    the path are lists then we iterate through each, collecting the values for each and including
+    each within the list of returned values.
+    """
+    if isinstance(data, dict) and isinstance(name, str) and name:
+        if keys := name.split("."):
+            nkeys = len(keys) ; key_index_max = nkeys - 1  # noqa
+            for key_index in range(nkeys):
+                if (value := data.get(keys[key_index], None)) is not None:
+                    if key_index == key_index_max:
+                        return [value]
+                    elif isinstance(value, dict):
+                        data = value
+                        continue
+                    elif isinstance(value, list) and value and ((sub_key_index := key_index + 1) < nkeys):
+                        sub_key = ".".join(keys[sub_key_index:])
+                        values = []
+                        for element in value:
+                            if isinstance(element_value := get_properties(element, sub_key), list):
+                                for element_value_item in element_value:
+                                    if (element_value_item is not None) and (element_value_item not in values):
+                                        values.append(element_value_item)
+                            elif (element_value is not None) and (element_value not in values):
+                                values.append(element_value)
+                        return sorted(values) if (sort is True) else values
+                break
+    return fallback if isinstance(fallback, list) else ([] if fallback is None else [fallback])
+
+
+def select_items(items: List[dict], predicate: Callable) -> List[dict]:
+    if not (isinstance(items, list) and items):
+        return []
+    return [item for item in items if predicate(item)]
+
+
+def group_items_by(items: list[dict], grouping: str,
+                   identifying_property: Optional[str] = "uuid",
+                   sort: bool = False,
+                   raw: bool = False) -> dict:
+    if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
+        return {}
+    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
+        identifying_property = None
+    # Initialize results with first None element to make sure items which are not
+    # part of a group are listed first; delete later of no such (ungrouped) items;
+    # though if sort is True then this is irrelevant.
+    results = {None: []}
+    for item in items:
+        if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
+            item_identity = identifying_value
+        else:
+            item_identity = item
+        if grouping_values := get_properties(item, grouping):
+            for grouping_value in grouping_values:
+                if results.get(grouping_value) is None:
+                    results[grouping_value] = []
+                results[grouping_value].append(item_identity)
+        else:
+            results[None].append(item_identity)
+    if not results[None]:
+        del results[None]
+    if sort is True:
+        # Currently sort means to sort the groups in descending order of the
+        # number of items in each group list; and secondarily by the group value.
+        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
+    if (raw is True) or (not results):
+        return results
+    return {
+        "group": grouping,
+        "item_count": len(items),
+        "group_count": len(results),
+        "group_items": results
+    }
+
+
+def group_items_by_groupings(items: List[dict], groupings: List[str],
+                             sort: bool = False,
+                             identifying_property: Optional[str] = "uuid") -> dict:
+    if not (isinstance(items, list) and items):
+        return {}
+    if isinstance(groupings, str) and groupings:
+        groupings = [groupings]
+    elif not (isinstance(groupings, list) and groupings):
+        return {}
+    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
+        identifying_property = None
+    if not (grouped_items := group_items_by(items, groupings[0], sort=sort, identifying_property=identifying_property)):
+        return {}
+    def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
+        nonlocal items, sort, identifying_property
+        for grouped_item_key in group_items:
+            if isinstance(group_items[grouped_item_key], list):
+                sub_items = select_items(
+                    items, lambda item: item.get(identifying_property) in group_items[grouped_item_key])
+                group_items[grouped_item_key] = group_items_by(
+                    sub_items, grouping, sort=sort, identifying_property=identifying_property)
+            elif isinstance(group_items[grouped_item_key], dict):
+                sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
+    for grouping in groupings[1:]:
+        sub_group_items_by(grouped_items["group_items"], grouping)
+    return grouped_items
+
+
+def compare_dictionaries_ordered(a: dict, b: dict) -> bool:
+    # CAVEAT: Written by ChatGPT and used without almost no review (just testing)!
+    def compare_lists_ordered(a: list, b: list):
+        if len(a) != len(b):
+            return False
+        for aitem, bitem in zip(a, b):
+            if isinstance(aitem, dict) and isinstance(bitem, dict):
+                if not compare_dictionaries_ordered(aitem, bitem):
+                    return False
+            elif isinstance(aitem, list) and isinstance(bitem, list):
+                if not compare_lists_ordered(aitem, bitem):
+                    return False
+            elif aitem != bitem:
+                return False
+        return True
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    if list(a.keys()) != list(b.keys()):
+        return False
+    for key in a:
+        avalue = a[key]
+        bvalue = b[key]
+        if isinstance(avalue, dict) and isinstance(bvalue, dict):
+            if not compare_dictionaries_ordered(avalue, bvalue):
+                return False
+        elif isinstance(avalue, list) and isinstance(bvalue, list):
+            if not compare_lists_ordered(avalue, bvalue):
+                return False
+        elif avalue != bvalue:
+            return False
+    return True
+
+
+def order_dictionary_by_dependencies(items: List[dict],
+                                     dependencies: Union[List[str], str, Callable],
+                                     identifying_property_name: str = "uuid") -> List[dict]:
+    """
+    Orders the given list of items (dictionaries) so that each item appears after its dependencies
+    as defined by the given dependencies argument, where this can be a property name or a list of
+    property names of identifying values, or a callable which returns the identifying values for
+    a given item. There must be a single identifying value for each record whose property name
+    is specified by the given identifying_property_name argument, or is "uuid" if none.
+    Returns the ordered list of items; does NOT make changes in place.
+    CAVEAT: This function was adapted from ChatGPT generated code.
+    """
+    if not isinstance(items, list):
+        return []
+    if not (isinstance(identifying_property_name, str) and identifying_property_name):
+        identifying_property_name = "uuid"
+    if not callable(dependencies):
+        dependent_property_names = []
+        if isinstance(dependencies, list):
+            for dependency in dependencies:
+                if isinstance(dependency, str) and dependency:
+                    dependent_property_names.append(dependency)
+        elif isinstance(dependencies, str) and dependencies:
+            dependent_property_names = [dependencies]
+        if not dependent_property_names:
+            return items
+        def get_dependencies(item: dict) -> List[str]:  # noqa
+            nonlocal dependent_property_names
+            dependency_values = []
+            for dependent_property_name in dependent_property_names:
+                if (dependency_value := item.get(dependent_property_name)) is not None:
+                    if isinstance(dependency_value_list := dependency_value, list):
+                        for dependency_value in dependency_value_list:
+                            if dependency_value is not None:
+                                dependency_values.append(dependency_value)
+                    else:
+                        dependency_values.append(dependency_value)
+            return dependency_values
+        dependencies = get_dependencies
+
+    # Create a map from identifying-value to item.
+    identifying_value_to_item_map = {item[identifying_property_name]: item for item in items}
+
+    # Create adjacency list and in-degree count for topological sort.
+    adjacency_list = defaultdict(list)
+    in_degree = defaultdict(int)
+
+    # Build graph.
+    for item in items:
+        identifying_value = item[identifying_property_name]
+        if isinstance(dependency_values := dependencies(item), list):
+            for dependency_value in dependency_values:
+                if dependency_value is not None:
+                    adjacency_list[dependency_value].append(identifying_value)
+                    in_degree[identifying_value] += 1
+
+    # Topological sort.
+    sorted_items = []
+    zero_in_degree = deque([identifying_value for identifying_value in identifying_value_to_item_map
+                            if in_degree[identifying_value] == 0])
+    while zero_in_degree:
+        current_identifying_value = zero_in_degree.popleft()
+        sorted_items.append(identifying_value_to_item_map[current_identifying_value])
+        for dependent_value in adjacency_list[current_identifying_value]:
+            in_degree[dependent_value] -= 1
+            if in_degree[dependent_value] == 0:
+                zero_in_degree.append(dependent_value)
+
+    # Check for cycles (unsatisfied dependencies).
+    if len(sorted_items) != len(items):
+        raise ValueError("The input contains cyclic dependencies and cannot be ordered.")
+
+    return sorted_items
+
+
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
 # This JSON class isa dictionary type which also suport "parent" property for each/every sub-dictionary
 # within the main dictionary. Should be able to use EXACTLY like a dicttionary type after creating with
@@ -448,164 +683,3 @@ class JSON(dict):
                     unmerged_paths.append(key_path)
         merge(merged, secondary)
         return merged, merged_paths, unmerged_paths
-
-
-def get_property(data: dict, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    """
-    Returns the value of the given property name within the given dictionary, where the given
-    property name can be a dot-separated list of property names, which indicate a path into
-    nested dictionaries within the given dictionary; returns None if not found.
-    """
-    if isinstance(data, dict) and isinstance(name, str) and name:
-        if keys := name.split("."):
-            nkeys = len(keys) ; key_index_max = nkeys - 1  # noqa
-            for key_index in range(nkeys):
-                if (value := data.get(keys[key_index], None)) is not None:
-                    if key_index == key_index_max:
-                        return value
-                    elif isinstance(value, dict):
-                        data = value
-                        continue
-                break
-    return fallback
-
-
-def get_properties(data: dict, name: str, fallback: Optional[Any] = None, sort: bool = False) -> List[Any]:
-    """
-    Returns the values of the given property name within the given dictionary as a list, where the
-    given property name can be a dot-separated list of property names, which indicate a path into
-    nested dictionaries within the given dictionary; and - where if any of the elements within
-    the path are lists then we iterate through each, collecting the values for each and including
-    each within the list of returned values.
-    """
-    if isinstance(data, dict) and isinstance(name, str) and name:
-        if keys := name.split("."):
-            nkeys = len(keys) ; key_index_max = nkeys - 1  # noqa
-            for key_index in range(nkeys):
-                if (value := data.get(keys[key_index], None)) is not None:
-                    if key_index == key_index_max:
-                        return [value]
-                    elif isinstance(value, dict):
-                        data = value
-                        continue
-                    elif isinstance(value, list) and value and ((sub_key_index := key_index + 1) < nkeys):
-                        sub_key = ".".join(keys[sub_key_index:])
-                        values = []
-                        for element in value:
-                            if isinstance(element_value := get_properties(element, sub_key), list):
-                                for element_value_item in element_value:
-                                    if (element_value_item is not None) and (element_value_item not in values):
-                                        values.append(element_value_item)
-                            elif (element_value is not None) and (element_value not in values):
-                                values.append(element_value)
-                        return sorted(values) if (sort is True) else values
-                break
-    return fallback if isinstance(fallback, list) else ([] if fallback is None else [fallback])
-
-
-def compare_dictionaries_ordered(a: dict, b: dict) -> bool:
-    # N.B. Written by ChatGPT and used without almost no review (just testing)!
-    def compare_lists_ordered(a: list, b: list):
-        if len(a) != len(b):
-            return False
-        for aitem, bitem in zip(a, b):
-            if isinstance(aitem, dict) and isinstance(bitem, dict):
-                if not compare_dictionaries_ordered(aitem, bitem):
-                    return False
-            elif isinstance(aitem, list) and isinstance(bitem, list):
-                if not compare_lists_ordered(aitem, bitem):
-                    return False
-            elif aitem != bitem:
-                return False
-        return True
-    if not isinstance(a, dict) or not isinstance(b, dict):
-        return False
-    if list(a.keys()) != list(b.keys()):
-        return False
-    for key in a:
-        avalue = a[key]
-        bvalue = b[key]
-        if isinstance(avalue, dict) and isinstance(bvalue, dict):
-            if not compare_dictionaries_ordered(avalue, bvalue):
-                return False
-        elif isinstance(avalue, list) and isinstance(bvalue, list):
-            if not compare_lists_ordered(avalue, bvalue):
-                return False
-        elif avalue != bvalue:
-            return False
-    return True
-
-
-def order_dictionary_by_dependencies(items: List[dict],
-                                     dependencies: Union[List[str], str, Callable],
-                                     identifying_property_name: str = "uuid") -> List[dict]:
-    """
-    Orders the given list of items (dictionaries) so that each item appears after its dependencies
-    as defined by the given dependencies argument, where this can be a property name or a list of
-    property names of identifying values, or a callable which returns the identifying values for
-    a given item. There must be a single identifying value for each record whose property name
-    is specified by the given identifying_property_name argument, or is "uuid" if none.
-    Returns the ordered list of items; does NOT make changes in place.
-    CAVEAT: This function was adapted from ChatGPT generated code.
-    """
-    if not isinstance(items, list):
-        return []
-    if not (isinstance(identifying_property_name, str) and identifying_property_name):
-        identifying_property_name = "uuid"
-    if not callable(dependencies):
-        dependent_property_names = []
-        if isinstance(dependencies, list):
-            for dependency in dependencies:
-                if isinstance(dependency, str) and dependency:
-                    dependent_property_names.append(dependency)
-        elif isinstance(dependencies, str) and dependencies:
-            dependent_property_names = [dependencies]
-        if not dependent_property_names:
-            return items
-        def get_dependencies(item: dict) -> List[str]:  # noqa
-            nonlocal dependent_property_names
-            dependency_values = []
-            for dependent_property_name in dependent_property_names:
-                if (dependency_value := item.get(dependent_property_name)) is not None:
-                    if isinstance(dependency_value_list := dependency_value, list):
-                        for dependency_value in dependency_value_list:
-                            if dependency_value is not None:
-                                dependency_values.append(dependency_value)
-                    else:
-                        dependency_values.append(dependency_value)
-            return dependency_values
-        dependencies = get_dependencies
-
-    # Create a map from identifying-value to item.
-    identifying_value_to_item_map = {item[identifying_property_name]: item for item in items}
-
-    # Create adjacency list and in-degree count for topological sort.
-    adjacency_list = defaultdict(list)
-    in_degree = defaultdict(int)
-
-    # Build graph.
-    for item in items:
-        identifying_value = item[identifying_property_name]
-        if isinstance(dependency_values := dependencies(item), list):
-            for dependency_value in dependency_values:
-                if dependency_value is not None:
-                    adjacency_list[dependency_value].append(identifying_value)
-                    in_degree[identifying_value] += 1
-
-    # Topological sort.
-    sorted_items = []
-    zero_in_degree = deque([identifying_value for identifying_value in identifying_value_to_item_map
-                            if in_degree[identifying_value] == 0])
-    while zero_in_degree:
-        current_identifying_value = zero_in_degree.popleft()
-        sorted_items.append(identifying_value_to_item_map[current_identifying_value])
-        for dependent_value in adjacency_list[current_identifying_value]:
-            in_degree[dependent_value] -= 1
-            if in_degree[dependent_value] == 0:
-                zero_in_degree.append(dependent_value)
-
-    # Check for cycles (unsatisfied dependencies).
-    if len(sorted_items) != len(items):
-        raise ValueError("The input contains cyclic dependencies and cannot be ordered.")
-
-    return sorted_items

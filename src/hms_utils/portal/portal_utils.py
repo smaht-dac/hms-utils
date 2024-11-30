@@ -5,7 +5,6 @@ import sys
 import webtest
 from typing import Callable, List, Optional, Union
 from dcicutils.captured_output import captured_output
-from hms_utils.dictionary_utils import get_properties
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.ff_utils import delete_field, delete_metadata, purge_metadata
 from dcicutils.common import APP_SMAHT, ORCHESTRATED_APPS
@@ -139,110 +138,6 @@ class Portal(PortalFromUtils):
                 exit(status)
 
         return portal
-
-
-def select_items(items: List[dict], predicate: Callable) -> List[dict]:
-    if not (isinstance(items, list) and items):
-        return []
-    return [item for item in items if predicate(item)]
-
-
-def group_items_by(items: list[dict], grouping: str,
-                   identifying_property: Optional[str] = "uuid",
-                   sort: bool = False,
-                   raw: bool = False) -> dict:
-    if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
-        return {}
-    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
-        identifying_property = None
-    # Initialize results with first None element to make sure items which are not
-    # part of a group are listed first; delete later of no such (ungrouped) items;
-    # though if sort is True then this is irrelevant.
-    results = {None: []}
-    for item in items:
-        if identifying_property and ((identifying_value := item.get(identifying_property)) is not None):
-            item_identity = identifying_value
-        else:
-            item_identity = item
-        if grouping_values := get_properties(item, grouping):
-            for grouping_value in grouping_values:
-                if results.get(grouping_value) is None:
-                    results[grouping_value] = []
-                results[grouping_value].append(item_identity)
-        else:
-            results[None].append(item_identity)
-    if not results[None]:
-        del results[None]
-    if sort is True:
-        # Currently sort means to sort the groups in descending order of the
-        # number of items in each group list; and secondarily by the group value.
-        results = dict(sorted(results.items(), key=lambda item: (-len(item[1]), item[0] or "")))
-    if (raw is True) or (not results):
-        return results
-    return {
-        "group": grouping,
-        "item_count": len(items),
-        "group_count": len(results),
-        "group_items": results
-    }
-
-
-def group_items_by_groupings(items: List[dict], groupings: List[str],
-                             sort: bool = False,
-                             identifying_property: Optional[str] = "uuid") -> dict:
-    if not (isinstance(items, list) and items):
-        return {}
-    if isinstance(groupings, str) and groupings:
-        groupings = [groupings]
-    elif not (isinstance(groupings, list) and groupings):
-        return {}
-    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
-        identifying_property = None
-    if not (grouped_items := group_items_by(items, groupings[0], sort=sort, identifying_property=identifying_property)):
-        return {}
-    def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
-        nonlocal items, sort, identifying_property
-        for grouped_item_key in group_items:
-            if isinstance(group_items[grouped_item_key], list):
-                sub_items = select_items(
-                    items, lambda item: item.get(identifying_property) in group_items[grouped_item_key])
-                group_items[grouped_item_key] = group_items_by(
-                    sub_items, grouping, sort=sort, identifying_property=identifying_property)
-            elif isinstance(group_items[grouped_item_key], dict):
-                sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
-    for grouping in groupings[1:]:
-        sub_group_items_by(grouped_items["group_items"], grouping)
-    return grouped_items
-
-
-def print_grouped_items(grouped_items: dict, display_items: bool = False,
-                        display_title: Optional[str] = None, indent: Optional[int] = None) -> None:
-    if not (isinstance(indent, int) and (indent > 0)):
-        indent = 0
-    spaces = (" " * indent) if indent > 0 else ""
-    if isinstance(display_title, str) and display_title:
-        print(f"{spaces}{chars.rarrow} {display_title}")
-        indent += 2
-        spaces = " " * indent
-    group = grouped_items["group"]
-    group_count = grouped_items["group_count"]
-    group_items = grouped_items["group_items"]
-    message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
-    print(message)
-    for group_item_key in group_items:
-        grouped_items = group_items[group_item_key]
-        message = (f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
-                   f" {group_item_key if group_item_key is not None else chars.null}")
-        if isinstance(grouped_items, dict):
-            if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
-                message += f" ({grouped_items_count})"
-            print(message)
-            print_grouped_items(grouped_items, display_items=display_items, indent=indent+4)
-        elif isinstance(grouped_items, list):
-            print(f"{message} ({len(grouped_items)})")
-            if display_items is True:
-                for grouped_item in grouped_items:
-                    print(f"{spaces}    {chars.dot} {grouped_item}")
 
 
 def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils,
