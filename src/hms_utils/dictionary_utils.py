@@ -502,7 +502,8 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
         group_items = {}
         item_count = 0
         for bucket in buckets:
-            key = bucket["key"] if bucket["key"] != "No value" else "null"
+            if (key := bucket.get("key")) in ["No value", "null", "None", None]:
+                key = None
             doc_count = bucket["doc_count"]
             item_count += doc_count
             nested_field = next((v for k, v in bucket.items() if k.startswith("field_")), None)
@@ -519,28 +520,6 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
     if not (isinstance(data, dict) and isinstance(field := data.get("field_0"), dict)):
         return {}
     return process_field(field)
-
-
-def old_normalize_elastic_search_grouped_results(data: dict) -> dict:
-    if not isinstance(data, dict):
-        return {}
-    if "buckets" not in data:
-        return {}
-    result = {
-        "group": data.get("meta", {}).get("field_name", "group"),
-        "item_count": sum(bucket["doc_count"] for bucket in data["buckets"]),
-        "group_count": len(data["buckets"]),
-        "group_items": {}
-    }
-    for bucket in data["buckets"]:
-        key = bucket["key"] if bucket["key"] != "No value" else "null"
-        doc_count = bucket["doc_count"]
-        nested_field = next((k for k in bucket if k.startswith("field_")), None)
-        if nested_field and isinstance(bucket[nested_field], dict):
-            result["group_items"][key] = old_normalize_elastic_search_grouped_results(bucket[nested_field])
-        else:
-            result["group_items"][key] = doc_count
-    return result
 
 
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
