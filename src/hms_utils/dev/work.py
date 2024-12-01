@@ -1,7 +1,7 @@
 import calendar
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 from dcicutils.datetime_utils import parse_datetime_string
 
@@ -67,12 +67,16 @@ def create_query_for_files(
         "data_category": categories if categories else None,
         f"{date_property_name}.from": from_date if from_date else None,
         f"{date_property_name}.to": thru_date if from_date else None,
+        "from": 0,
+        "limit": 0,
+
     }
     query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
 
     query_string = urlencode(query_parameters, True)
     # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
     query_string = query_string.replace("=%21", "%21=")
+    aggregation_definition
 
     return query_string, aggregation_definition
 
@@ -86,6 +90,7 @@ def create_elasticsearch_aggregation_definition(fields: List[str],
         missing_value = "No value"
     if not (isinstance(max_buckets, int) and (max_buckets > 0)):
         max_buckets = 30
+
     aggregation = {
         field: {
             "terms": {
@@ -98,9 +103,29 @@ def create_elasticsearch_aggregation_definition(fields: List[str],
             }
         }
     }
+
+    if field == "file_status_tracking.released":  # TODO
+        aggregation = {
+            field: {
+                "date_histogram": {
+                    "field": f"embedded.{field}",
+                    "calendar_interval": "month",
+                    "format": "yyyy-MM",
+                    "missing": "1970-01",
+                    "order": {
+                        "_key": "desc"
+                    }
+                },
+                "meta": {
+                    "field_name": field
+                }
+            }
+        }
+
     if nested_aggregation := create_elasticsearch_aggregation_definition(fields[1:], max_buckets=max_buckets,
                                                                          missing_value=missing_value):
         aggregation[field]["aggs"] = nested_aggregation
+
     return aggregation
 
 
@@ -238,32 +263,56 @@ def _parse_datetime_string(value: Union[str, datetime, date],
 import json  # noqa
 import os  # noqa
 from urllib.parse import unquote  # noqa
-from hms_utils.dictionary_utils import group_items_by_groupings, normalize_elastic_search_aggregation_results  # noqa
+from hms_utils.dictionary_utils import get_property, group_items_by_groupings, normalize_elastic_search_aggregation_results  # noqa
 from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
 from hms_utils.portal.portal_utils import Portal, portal_custom_search  # noqa
 
 aggregations = [
+    "file_status_tracking.released",
     "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
     "donors.display_title",
     "release_tracker_description"
 ]
 
-query_string, aggregation_definition = create_query_for_files(type="OutputFile",
-                                                              # nmonths=24,
-                                                              aggregation=aggregations,
-                                                              max_buckets=MAX_BUCKET_COUNT,
-                                                              missing_value=TERM_NAME_FOR_NO_VALUE)
+if True:
+    query_string, aggregation_definition = create_query_for_files(type="OutputFile",
+                                                                  # nmonths=24,
+                                                                  aggregation=aggregations,
+                                                                  max_buckets=MAX_BUCKET_COUNT,
+                                                                  missing_value=TERM_NAME_FOR_NO_VALUE)
+    print(query_string)
+    print(unquote(query_string))
+    print(json.dumps(aggregation_definition, indent=4))
 
-print(query_string)
-print(unquote(query_string))
-print(json.dumps(aggregation_definition, indent=4))
+    # query = f"/search/?{query_string}&limit=0&from=0"
+    query = f"/search/?{query_string}"
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
+    result = portal_custom_search(portal, query, aggregations=aggregation_definition)
+    print(json.dumps(result, indent=4))
+    result_aggregations = result.get("aggregations")
+    result_aggregations_normalized = normalize_elastic_search_aggregation_results(result_aggregations)
+    print_grouped_items(result_aggregations_normalized)
 
-query = f"/search/?{query_string}&limit=0&from=0"
-import pdb ; pdb.set_trace()  # noqa
-portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
-result = portal_custom_search(portal, query, aggregations=aggregation_definition)
-print(json.dumps(result, indent=4))
-print(query)
-result_aggregations = result.get("aggregations")
-result_aggregations_normalized = normalize_elastic_search_aggregation_results(result_aggregations)
-print_grouped_items(result_aggregations_normalized)
+if False:
+    portal = Portal("smaht-local")
+    query = "/search/?type=OutputFile&status=released&data_category%21=Quality+Control"
+    files = portal.get_metadata(query, limit=1000).get("@graph")
+    def map_grouping_value(grouping_name: str, grouping_value: str) -> str:  # noqa
+        if grouping_name == "file_status_tracking.released":
+            # Hack to turn something like "2024-11-28T04:42:29.531456+00:00" into "2024-11".
+            return grouping_value[:7]
+        return grouping_value
+    def map_grouped_item(grouped_item: Any) -> str:  # noqa
+        global files
+        for file in files:
+            if file.get("uuid") == grouped_item:
+                if released_date := _parse_datetime_string(get_property(file, "file_status_tracking.released")):
+                    released_date = released_date.strftime(f"%Y-%m-%d")
+                    grouped_item += f" ({released_date})"
+        return grouped_item
+    grouped_files = group_items_by_groupings(files,
+                                             groupings=aggregations,
+                                             sort={"file_status_tracking.released": "-key", None: True},
+                                             map_grouping_value=map_grouping_value)
+    print(json.dumps(grouped_files, indent=4))
+    print_grouped_items(grouped_files, map_grouped_item=map_grouped_item, noitems=True)
