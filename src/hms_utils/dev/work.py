@@ -1,12 +1,40 @@
 import calendar
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 from dcicutils.datetime_utils import parse_datetime_string
 
-MAX_BUCKET_COUNT = 30
-TERM_NAME_FOR_NO_VALUE = "No value"
+AGGREGATION_FIELD_RELEASE_DATE = "file_status_tracking.released"
+AGGREGATION_FIELD_CELL_LINE = "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
+AGGREGATION_FIELD_DONOR = "donors.display_title"
+AGGREGATION_FIELD_FILE_DESCRIPTOR = "release_tracker_description"
+
+AGGREGATIONS = [
+    AGGREGATION_FIELD_RELEASE_DATE,
+    AGGREGATION_FIELD_CELL_LINE,
+    AGGREGATION_FIELD_DONOR,
+    AGGREGATION_FIELD_FILE_DESCRIPTOR
+]
+
+AGGREGATIONS_BY_CELL_LINE = [
+    AGGREGATION_FIELD_RELEASE_DATE,
+    AGGREGATION_FIELD_CELL_LINE,
+    AGGREGATION_FIELD_FILE_DESCRIPTOR
+]
+
+AGGREGATIONS_BY_DONOR = [
+    AGGREGATION_FIELD_RELEASE_DATE,
+    AGGREGATION_FIELD_DONOR,
+    AGGREGATION_FIELD_FILE_DESCRIPTOR
+]
+
+AGGREGATION_MAX_BUCKETS = 30
+AGGREGATION_NO_VALUE = "No value"
+
+DEFAULT_FILE_TYPE = "OutputFile"
+DEFAULT_FILE_STATUS = "released"
+DEFAULT_FILE_CATEGORY_IGNORED = "Quality Control"
 
 
 def create_query_for_files(
@@ -21,9 +49,11 @@ def create_query_for_files(
         max_buckets: Optional[int] = None,
         missing_value: Optional[str] = None) -> Tuple[Optional[str], Optional[dict]]:
 
+    global AGGREGATION_FIELD_RELEASE_DATE
+
     types = []
     if type is None:
-        type = ["OutputFile"]
+        type = [DEFAULT_FILE_TYPE]
     if not isinstance(type, list):
         type = [type]
     for item in type:
@@ -32,7 +62,7 @@ def create_query_for_files(
 
     statuses = []
     if status is None:
-        status = ["released"]
+        status = [DEFAULT_FILE_STATUS]
     if not isinstance(status, list):
         status = [status]
     for item in status:
@@ -41,12 +71,12 @@ def create_query_for_files(
 
     categories = []
     if qcs is not True:
-        categories.append("!Quality Control")
+        categories.append(f"!{DEFAULT_FILE_CATEGORY_IGNORED}")
 
     from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths, strings=True)
     if from_date or thru_date:
         if not (isinstance(date_property_name, str) and (date_property_name := date_property_name.strip())):
-            date_property_name = "file_status_tracking.released"
+            date_property_name = AGGREGATION_FIELD_RELEASE_DATE
 
     if not isinstance(aggregation, dict):
         aggregations = []
@@ -55,9 +85,22 @@ def create_query_for_files(
         for item in aggregation:
             if isinstance(item, str) and (item := item.strip()) and (item not in aggregations):
                 aggregations.append(item)
-        aggregation_definition = create_elasticsearch_aggregation_definition(aggregations,
-                                                                             max_buckets=max_buckets,
-                                                                             missing_value=missing_value)
+        def create_field_aggregation(field: str) -> Optional[dict]:  # noqa
+            if field == AGGREGATION_FIELD_RELEASE_DATE:
+                return {
+                    "date_histogram": {
+                        "field": f"embedded.{field}",
+                        "calendar_interval": "month",
+                        "format": "yyyy-MM",
+                        "missing": "1970-01",
+                        "order": {"_key": "desc"}
+                    }
+                }
+        aggregation_definition = create_elasticsearch_aggregation_definition(
+            aggregations,
+            max_buckets=max_buckets,
+            missing_value=missing_value,
+            create_field_aggregation=create_field_aggregation)
     else:
         aggregation_definition = aggregation
 
@@ -76,54 +119,40 @@ def create_query_for_files(
     query_string = urlencode(query_parameters, True)
     # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
     query_string = query_string.replace("=%21", "%21=")
-    aggregation_definition
 
     return query_string, aggregation_definition
 
 
 def create_elasticsearch_aggregation_definition(fields: List[str],
                                                 max_buckets: Optional[int] = None,
-                                                missing_value: Optional[str] = None) -> dict:
+                                                missing_value: Optional[str] = None,
+                                                create_field_aggregation: Optional[Callable] = None) -> dict:
+    global AGGREGATION_NO_VALUE
+
     if not (isinstance(fields, list) and fields and isinstance(field := fields[0], str) and field):
         return {}
     if not isinstance(missing_value, str):
-        missing_value = "No value"
+        missing_value = AGGREGATION_NO_VALUE
     if not (isinstance(max_buckets, int) and (max_buckets > 0)):
         max_buckets = 30
 
-    aggregation = {
-        field: {
+    if not (callable(create_field_aggregation) and
+            isinstance(field_aggregation := create_field_aggregation(field), dict)):
+        field_aggregation = {
             "terms": {
                 "field": f"embedded.{field}.raw",
                 "missing": missing_value,
                 "size": max_buckets
-            },
-            "meta": {
-                "field_name": field
-            }
-        }
-    }
-
-    if field == "file_status_tracking.released":  # TODO
-        aggregation = {
-            field: {
-                "date_histogram": {
-                    "field": f"embedded.{field}",
-                    "calendar_interval": "month",
-                    "format": "yyyy-MM",
-                    "missing": "1970-01",
-                    "order": {
-                        "_key": "desc"
-                    }
-                },
-                "meta": {
-                    "field_name": field
-                }
             }
         }
 
-    if nested_aggregation := create_elasticsearch_aggregation_definition(fields[1:], max_buckets=max_buckets,
-                                                                         missing_value=missing_value):
+    aggregation = {field: field_aggregation}
+    aggregation[field]["meta"] = {"field_name": field}
+
+    if nested_aggregation := create_elasticsearch_aggregation_definition(
+            fields[1:], max_buckets=max_buckets,
+            missing_value=missing_value,
+            create_field_aggregation=create_field_aggregation):
         aggregation[field]["aggs"] = nested_aggregation
 
     return aggregation
@@ -267,19 +296,12 @@ from hms_utils.dictionary_utils import get_property, group_items_by_groupings, n
 from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
 from hms_utils.portal.portal_utils import Portal, portal_custom_search  # noqa
 
-aggregations = [
-    "file_status_tracking.released",
-    "file_sets.libraries.analytes.samples.sample_sources.cell_line.code",
-    "donors.display_title",
-    "release_tracker_description"
-]
-
-if True:
-    query_string, aggregation_definition = create_query_for_files(type="OutputFile",
+if False:
+    query_string, aggregation_definition = create_query_for_files(type=DEFAULT_FILE_TYPE,
                                                                   # nmonths=24,
-                                                                  aggregation=aggregations,
-                                                                  max_buckets=MAX_BUCKET_COUNT,
-                                                                  missing_value=TERM_NAME_FOR_NO_VALUE)
+                                                                  aggregation=AGGREGATIONS,
+                                                                  max_buckets=AGGREGATION_MAX_BUCKETS,
+                                                                  missing_value=AGGREGATION_NO_VALUE)
     print(query_string)
     print(unquote(query_string))
     print(json.dumps(aggregation_definition, indent=4))
@@ -293,12 +315,12 @@ if True:
     result_aggregations_normalized = normalize_elastic_search_aggregation_results(result_aggregations)
     print_grouped_items(result_aggregations_normalized)
 
-if False:
+if True:
     portal = Portal("smaht-local")
-    query = "/search/?type=OutputFile&status=released&data_category%21=Quality+Control"
+    query = f"/search/?type={DEFAULT_FILE_TYPE}&status={DEFAULT_FILE_STATUS}&data_category%21={DEFAULT_FILE_CATEGORY_IGNORED}"  # noqa
     files = portal.get_metadata(query, limit=1000).get("@graph")
     def map_grouping_value(grouping_name: str, grouping_value: str) -> str:  # noqa
-        if grouping_name == "file_status_tracking.released":
+        if grouping_name == AGGREGATION_FIELD_RELEASE_DATE:
             # Hack to turn something like "2024-11-28T04:42:29.531456+00:00" into "2024-11".
             return grouping_value[:7]
         return grouping_value
@@ -306,13 +328,13 @@ if False:
         global files
         for file in files:
             if file.get("uuid") == grouped_item:
-                if released_date := _parse_datetime_string(get_property(file, "file_status_tracking.released")):
+                if released_date := _parse_datetime_string(get_property(file, AGGREGATION_FIELD_RELEASE_DATE)):
                     released_date = released_date.strftime(f"%Y-%m-%d")
                     grouped_item += f" ({released_date})"
         return grouped_item
     grouped_files = group_items_by_groupings(files,
-                                             groupings=aggregations,
-                                             sort={"file_status_tracking.released": "-key", None: True},
+                                             groupings=AGGREGATIONS,
+                                             sort={AGGREGATION_FIELD_RELEASE_DATE: "-key", None: True},
                                              map_grouping_value=map_grouping_value)
     print(json.dumps(grouped_files, indent=4))
     print_grouped_items(grouped_files, map_grouped_item=map_grouped_item, noitems=True)
