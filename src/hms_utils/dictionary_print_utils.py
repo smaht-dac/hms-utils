@@ -145,7 +145,9 @@ def print_dictionary_as_table(header_name: str, header_value: str,
 
 
 def print_grouped_items(grouped_items: dict, noitems: bool = False,
-                        title: Optional[str] = None, indent: Optional[int] = None) -> None:
+                        title: Optional[str] = None,
+                        map_grouped_item: Optional[Callable] = None,
+                        indent: Optional[int] = None) -> None:
     if not (isinstance(grouped_items, dict) and grouped_items):
         return
     if not (isinstance(indent, int) and (indent > 0)):
@@ -161,6 +163,8 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
         return
     if not (group_items := grouped_items.get("group_items")):
         return
+    if not callable(map_grouped_item):
+        map_grouped_item = None
     message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
     print(message)
     for group_item_key in group_items:
@@ -171,11 +175,13 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
             if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
                 message += f" ({grouped_items_count})"
             print(message)
-            print_grouped_items(grouped_items, noitems=noitems, indent=indent+4)
+            print_grouped_items(grouped_items, noitems=noitems, map_grouped_item=map_grouped_item, indent=indent+4)
         elif isinstance(grouped_items, list):
             print(f"{message} ({len(grouped_items)})")
             if noitems is not True:
                 for grouped_item in grouped_items:
+                    if map_grouped_item:
+                        grouped_item = map_grouped_item(grouped_item)
                     print(f"{spaces}    {chars.dot} {grouped_item}")
         elif isinstance(grouped_items, int):
             print(f"{message} ({grouped_items})")
