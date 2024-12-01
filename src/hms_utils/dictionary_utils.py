@@ -282,15 +282,18 @@ def select_items(items: List[dict], predicate: Callable) -> List[dict]:
 
 
 def group_items_by(items: list[dict], grouping: str,
-                   identifying_property: Optional[str] = "uuid",
                    sort: bool = False,
                    noitems: bool = False,
                    omit_unique_items_count: bool = False,
+                   map_grouping_value: Optional[Callable] = None,
+                   identifying_property: Optional[str] = "uuid",
                    raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
     if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
         identifying_property = None
+    if not callable(map_grouping_value):
+        map_grouping_value = None
     # Initialize results with first None element to make sure items which are not
     # part of a group are listed first; delete later of no such (ungrouped) items;
     # though if sort is True then this is irrelevant.
@@ -303,6 +306,9 @@ def group_items_by(items: list[dict], grouping: str,
             item_identity = item
         if grouping_values := get_properties(item, grouping):
             for grouping_value in grouping_values:
+                if map_grouping_value:
+                    if (grouping_value := map_grouping_value(grouping, grouping_value)) is None:
+                        continue
                 if noitems is True:
                     if results.get(grouping_value) is None:
                         results[grouping_value] = 0
@@ -345,6 +351,7 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
                              sort: bool = False,
                              noitems: bool = False,
                              omit_unique_items_count: bool = False,
+                             map_grouping_value: Optional[Callable] = None,
                              identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
@@ -356,17 +363,20 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
         identifying_property = None
     if not (grouped_items := group_items_by(items, groupings[0], sort=sort,
                                             omit_unique_items_count=omit_unique_items_count,
+                                            map_grouping_value=map_grouping_value,
                                             identifying_property=identifying_property)):
         return {}
     def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
-        nonlocal items, sort, omit_unique_items_count, identifying_property
+        nonlocal items, sort, omit_unique_items_count, map_grouping_value, identifying_property
         for grouped_item_key in group_items:
             if isinstance(group_items[grouped_item_key], list):
                 sub_items = select_items(
                     items, lambda item: item.get(identifying_property) in group_items[grouped_item_key])
                 group_items[grouped_item_key] = group_items_by(
                     sub_items, grouping, sort=sort,
-                    omit_unique_items_count=omit_unique_items_count, identifying_property=identifying_property)
+                    omit_unique_items_count=omit_unique_items_count,
+                    map_grouping_value=map_grouping_value,
+                    identifying_property=identifying_property)
             elif isinstance(group_items[grouped_item_key], dict):
                 sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
     for grouping in groupings[1:]:
@@ -508,8 +518,9 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
         group_items = {}
         item_count = 0
         for bucket in buckets:
-            if (key := bucket.get("key")) in ["No value", "null", "None", None]:
-                key = None
+            if not (key := bucket.get("key_as_string")):
+                if (key := bucket.get("key")) in ["No value", "null", "None", None]:
+                    key = None
             doc_count = bucket["doc_count"]
             item_count += doc_count
             if nested_field := get_first_field_with_buckets_list_property(bucket):

@@ -81,8 +81,6 @@ def main():
         f"additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
     ])).replace("&", "?", 1)
 
-    import pdb ; pdb.set_trace()  # noqa
-    pass
     # /search/?type=OutputFile&additional_facet=file_sets.libraries.analytes.samples.sample_sources.cell_line.code&status=released&file_status_tracking.released.from=2024-11-20&format=json
 
     if argv.debug:
