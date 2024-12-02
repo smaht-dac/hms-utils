@@ -147,6 +147,7 @@ def print_dictionary_as_table(header_name: str, header_value: str,
 def print_grouped_items(grouped_items: dict, noitems: bool = False,
                         title: Optional[str] = None,
                         map_grouped_item: Optional[Callable] = None,
+                        remove_prefix_grouping_value: bool = False,
                         indent: Optional[int] = None) -> None:
     if not (isinstance(grouped_items, dict) and grouped_items):
         return
@@ -169,13 +170,17 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
     print(message)
     for group_item_key in group_items:
         grouped_items = group_items[group_item_key]
+        if (remove_prefix_grouping_value is True) and isinstance(group_item_key, str):
+            if (colon_index := group_item_key.find(":")) > 0:
+                group_item_key = group_item_key[colon_index + 1:]
         message = (f"{spaces}  {chars.rarrow if indent == 0 else chars.rarrow_hollow}"
                    f" {group_item_key if group_item_key is not None else chars.null}")
         if isinstance(grouped_items, dict):
             if isinstance(grouped_items_count := grouped_items.get("item_count"), int):
                 message += f" ({grouped_items_count})"
             print(message)
-            print_grouped_items(grouped_items, noitems=noitems, map_grouped_item=map_grouped_item, indent=indent+4)
+            print_grouped_items(grouped_items, noitems=noitems, map_grouped_item=map_grouped_item,
+                                remove_prefix_grouping_value=remove_prefix_grouping_value, indent=indent+4)
         elif isinstance(grouped_items, list):
             print(f"{message} ({len(grouped_items)})")
             if noitems is not True:

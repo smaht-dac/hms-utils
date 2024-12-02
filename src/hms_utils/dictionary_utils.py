@@ -309,11 +309,11 @@ def group_items_by(items: list[dict], grouping: str,
             for grouping_value in grouping_values:
                 # This prefixing with the grouping name was added later when we realized it is useful to have,
                 # for each individual item grouped, the name of the grouping for which it is from.
-                if prefix_grouping_value:
-                    grouping_value = f"{grouping}:{grouping_value}"
                 if map_grouping_value:
                     if (grouping_value := map_grouping_value(grouping, grouping_value)) is None:
                         continue
+                if prefix_grouping_value is True:
+                    grouping_value = f"{grouping}:{grouping_value}"
                 if noitems is True:
                     if results.get(grouping_value) is None:
                         results[grouping_value] = 0
