@@ -286,14 +286,15 @@ def group_items_by(items: list[dict], grouping: str,
                    noitems: bool = False,
                    omit_unique_items_count: bool = False,
                    map_grouping_value: Optional[Callable] = None,
+                   prefix_grouping_value: bool = False,
                    identifying_property: Optional[str] = "uuid",
                    raw: bool = False) -> dict:
     if not (isinstance(items, list) and items and isinstance(grouping, str) and (grouping := grouping.strip())):
         return {}
-    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
-        identifying_property = None
     if not callable(map_grouping_value):
         map_grouping_value = None
+    if not (isinstance(identifying_property, str) and (identifying_property := identifying_property.strip())):
+        identifying_property = None
     # Initialize results with first None element to make sure items which are not
     # part of a group are listed first; delete later of no such (ungrouped) items;
     # though if sort is True then this is irrelevant.
@@ -306,6 +307,10 @@ def group_items_by(items: list[dict], grouping: str,
             item_identity = item
         if grouping_values := get_properties(item, grouping):
             for grouping_value in grouping_values:
+                # This prefixing with the grouping name was added later when we realized it is useful to have,
+                # for each individual item grouped, the name of the grouping for which it is from.
+                if prefix_grouping_value:
+                    grouping_value = f"{grouping}:{grouping_value}"
                 if map_grouping_value:
                     if (grouping_value := map_grouping_value(grouping, grouping_value)) is None:
                         continue
@@ -352,6 +357,7 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
                              noitems: bool = False,
                              omit_unique_items_count: bool = False,
                              map_grouping_value: Optional[Callable] = None,
+                             prefix_grouping_value: bool = False,
                              identifying_property: Optional[str] = "uuid") -> dict:
     if not (isinstance(items, list) and items):
         return {}
@@ -364,6 +370,7 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
     if not (grouped_items := group_items_by(items, groupings[0], sort=sort,
                                             omit_unique_items_count=omit_unique_items_count,
                                             map_grouping_value=map_grouping_value,
+                                            prefix_grouping_value=prefix_grouping_value,
                                             identifying_property=identifying_property)):
         return {}
     def sub_group_items_by(group_items: dict, grouping: str) -> None:  # noqa
@@ -376,11 +383,13 @@ def group_items_by_groupings(items: List[dict], groupings: List[str],
                     sub_items, grouping, sort=sort,
                     omit_unique_items_count=omit_unique_items_count,
                     map_grouping_value=map_grouping_value,
+                    prefix_grouping_value=prefix_grouping_value,
                     identifying_property=identifying_property)
             elif isinstance(group_items[grouped_item_key], dict):
                 sub_group_items_by(group_items[grouped_item_key]["group_items"], grouping)
     for grouping in groupings[1:]:
-        sub_group_items_by(grouped_items["group_items"], grouping)
+        if isinstance(grouping, str) and (grouping := grouping.strip()):
+            sub_group_items_by(grouped_items["group_items"], grouping)
     if noitems is True:
         def change_group_items_list_to_group_items_count(grouped_items: dict) -> None:
             if isinstance(group_items := grouped_items.get("group_items"), dict):
