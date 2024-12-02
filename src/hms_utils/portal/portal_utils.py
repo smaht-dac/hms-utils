@@ -149,27 +149,32 @@ class Portal(PortalFromUtils):
         return portal
 
 
+class PyramidRequestForTesting(pyramid.request.Request):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._params = None
+        self.vapp = None
+    @property  # noqa
+    def params(self) -> MultiDict:
+        if self._params is not None:
+            return self._params
+        return super().params
+    @params.setter  # noqa
+    def params(self, value: MultiDict) -> None:
+        if not isinstance(value, MultiDict):
+            raise Exception("Must set pyramid.request.Request.params to MultiDict.")
+        self._params = value
+
+
 def create_pyramid_request_for_testing(
-        portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
+        portal_or_vapp_or_request: Union[PortalFromUtils, webtest.app.TestApp],
         args: Optional[Union[str, dict]] = None) -> Optional[pyramid.request.Request]:
-    class PyramidRequest(pyramid.request.Request):  # noqa
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self._params = None
-        @property  # noqa
-        def params(self) -> MultiDict:
-            if self._params is not None:
-                return self._params
-            return super().params
-        @params.setter  # noqa
-        def params(self, value: MultiDict) -> None:
-            if not isinstance(value, MultiDict):
-                raise Exception("Must set pyramid.request.Request.params to MultiDict.")
-            self._params = value
-    if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
-        if not (isinstance(portal_or_vapp, PortalFromUtils) and
-                isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
-            return None
+    if not isinstance(vapp := portal_or_vapp_or_request, webtest.app.TestApp):
+        if not (isinstance(portal_or_vapp_or_request, PortalFromUtils) and
+                isinstance(vapp := portal_or_vapp_or_request.vapp, webtest.app.TestApp)):
+            if not (isinstance(portal_or_vapp_or_request, PyramidRequestForTesting) and
+                    isinstance(vapp := portal_or_vapp_or_request.vapp, webtest.app.TestApp)):
+                return None
     if not isinstance(router := vapp.app, pyramid.router.Router):
         return None
     if not isinstance(registry := router.registry, pyramid.registry.Registry):
@@ -180,8 +185,9 @@ def create_pyramid_request_for_testing(
         return None
     if not isinstance(environ := request.environ, dict):
         return None
-    request = PyramidRequest(environ)
+    request = PyramidRequestForTesting(environ)
     request.registry = registry
+    request.vapp = vapp
     if isinstance(args, dict):
         params = []
         for key in args:
