@@ -7,6 +7,9 @@ from urllib.parse import urlencode
 from dcicutils.datetime_utils import parse_datetime_string
 from encoded.root import SMAHTRoot
 
+from snovault.search.search import search as snovault_search
+from snovault.search.search_utils import make_search_subreq as snovault_make_search_subreq
+
 AGGREGATION_FIELD_RELEASE_DATE = "file_status_tracking.released"
 AGGREGATION_FIELD_CELL_LINE = "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
 AGGREGATION_FIELD_DONOR = "donors.display_title"
@@ -43,23 +46,25 @@ DEFAULT_INCLUDE_CURRENT_MONTH = True
 
 def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -> dict:
 
-    status = request_args("status", None)
-    category = request_args("category", None)
-    from_date = request_arg("from", None)
-    thru_date = request_arg("thru", None)
-    nmonths = request_arg_int("months", DEFAULT_RECENT_MONTHS)
-    include_current_month = request_arg_bool("include_current_month", False)
+    status = request_args(request, "status", None)
+    category = request_args(request, "category", None)
+    from_date = request_arg(request, "from", None)
+    thru_date = request_arg(request, "thru", None)
+    nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
+    include_current_month = request_arg_bool(request, "include_current_month", False)
 
     if isinstance(aggregations := request.params.getall("aggregation"), list) and aggregations:
         results = recent_files_summary_by(aggregations)
     else:
         # Default case: Do these two concurrently (TODO) ...
         results_by_cell_line = recent_files_summary_by(
+            request,
             aggregations=AGGREGATIONS_BY_CELL_LINE,
             status=status, category=category,
             from_date=from_date, thru_date=thru_date, nmonths=nmonths,
             include_current_month=include_current_month)
         results_by_donor = recent_files_summary_by(
+            request,
             aggregations=AGGREGATIONS_BY_DONOR,
             status=status, category=category,
             from_date=from_date, thru_date=thru_date, nmonths=nmonths,
@@ -68,28 +73,8 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
     return results
 
 
-def request_arg(request: pyramid.request.Request, name: str, fallback: Optional[str] = None) -> Optional[str]:
-    return value if (value := request.params.get(name, None)) is not None else fallback
-
-
-def request_arg_int(request: pyramid.request.Request, name: str, fallback: Optional[int] = 0) -> Optional[Any]:
-    if (value := request_arg(request, name)) is not None:
-        try:
-            return int(value)
-        except Exception:
-            pass
-    return fallback
-
-
-def request_arg_bool(request: pyramid.request.Request, name: str, fallback: Optional[bool] = False) -> Optional[bool]:
-    return fallback if (value := request_arg(request, name)) is None else (value == "true")
-
-
-def request_args(request: pyramid.request.Request, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    return value if (value := request.params.getall(name)) else fallback
-
-
-def recent_files_summary_by(aggregations: List[str],
+def recent_files_summary_by(request: pyramid.request.Request,
+                            aggregations: List[str],
                             status: Optional[str],
                             category: Optional[str],
                             from_date: Optional[str],
@@ -105,8 +90,12 @@ def recent_files_summary_by(aggregations: List[str],
                                                                    aggregation=aggregations,
                                                                    max_buckets=AGGREGATION_MAX_BUCKETS,
                                                                    missing_value=AGGREGATION_NO_VALUE)
-    results = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
+
+    query = f"/search/?{query_string}"
+    request = snovault_make_search_subreq(request, path=query, method="GET")
+    results = snovault_search(None, request, custom_aggregations=aggregation_definitions)
     results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"))
+    print(json.dumps(results_normalized, indent=4))
     return results_normalized
 
 
@@ -240,7 +229,6 @@ def create_elasticsearch_aggregation_definitions(fields: List[str],
 
 
 def normalize_elastic_search_aggregation_results(data: dict) -> dict:
-    # CAVEAT: Written by ChatGPT and used with only a little review (just testing)!
     def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
         if isinstance(data, dict):
             for key in data:
@@ -278,6 +266,27 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
 
 def combine_search_aggregation_results(*args) -> dict:
     pass
+
+
+def request_arg(request: pyramid.request.Request, name: str, fallback: Optional[str] = None) -> Optional[str]:
+    return value if (value := request.params.get(name, None)) is not None else fallback
+
+
+def request_arg_int(request: pyramid.request.Request, name: str, fallback: Optional[int] = 0) -> Optional[Any]:
+    if (value := request_arg(request, name)) is not None:
+        try:
+            return int(value)
+        except Exception:
+            pass
+    return fallback
+
+
+def request_arg_bool(request: pyramid.request.Request, name: str, fallback: Optional[bool] = False) -> Optional[bool]:
+    return fallback if (value := request_arg(request, name)) is None else (value == "true")
+
+
+def request_args(request: pyramid.request.Request, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    return value if (value := request.params.getall(name)) else fallback
 
 
 def parse_date_related_arguments(
@@ -423,11 +432,9 @@ import os  # noqa
 from urllib.parse import unquote  # noqa
 from hms_utils.dictionary_utils import get_property, group_items_by_groupings, normalize_elastic_search_aggregation_results  # noqa
 from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-from hms_utils.portal.portal_utils import Portal, portal_custom_search  # noqa
+from hms_utils.portal.portal_utils import create_pyramid_request_for_testing, portal_custom_search, Portal  # noqa
 
-portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
-
-if True:
+if False:
     print(f"\nRECENT RELEASED FILES BY DATE & CELL-LINE & DONOR & FILE-DESCRIPTOR ...\n")
     query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
                                                                    status=DEFAULT_FILE_STATUSES,
@@ -438,11 +445,12 @@ if True:
                                                                    aggregation=AGGREGATIONS,
                                                                    max_buckets=AGGREGATION_MAX_BUCKETS,
                                                                    missing_value=AGGREGATION_NO_VALUE)
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
     result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
     print_grouped_items(result_aggregations)
 
-if True:
+if False:
     print(f"\nRECENT RELEASED FILES BY DATE & CELL-LINE & FILE-DESCRIPTOR ...\n")
     query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
                                                                    status=DEFAULT_FILE_STATUSES,
@@ -453,11 +461,12 @@ if True:
                                                                    aggregation=AGGREGATIONS_BY_CELL_LINE,
                                                                    max_buckets=AGGREGATION_MAX_BUCKETS,
                                                                    missing_value=AGGREGATION_NO_VALUE)
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
     result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
     print_grouped_items(result_aggregations)
 
-if True:
+if False:
     print(f"\nRECENT RELEASED FILES BY DATE & DONOR & FILE-DESCRIPTOR ...\n")
     query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
                                                                    status=DEFAULT_FILE_STATUSES,
@@ -468,6 +477,25 @@ if True:
                                                                    aggregation=AGGREGATIONS_BY_DONOR,
                                                                    max_buckets=AGGREGATION_MAX_BUCKETS,
                                                                    missing_value=AGGREGATION_NO_VALUE)
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
     result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
     print_grouped_items(result_aggregations)
+
+
+def test():
+    # Arguments to /recent_files_summary endpoint/API.
+    request_args = {
+        "abc": ["def", 123],
+        "ghi": "jkl"
+    }
+    # Dummy for local testing.
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
+    request = create_pyramid_request_for_testing(portal.vapp, request_args)
+    # Call the /recent_files_summary endpoint/API.
+    results = recent_files_summary(None, request)
+    # Dump the results.
+    print(json.dumps(results, indent=4))
+
+
+test()
