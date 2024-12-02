@@ -4,6 +4,7 @@ import pyramid
 import sys
 import webtest
 from typing import Callable, List, Optional, Union
+from webob.multidict import MultiDict
 from dcicutils.captured_output import captured_output
 from dcicutils.portal_utils import Portal as PortalFromUtils
 from dcicutils.ff_utils import delete_field, delete_metadata, purge_metadata
@@ -148,8 +149,23 @@ class Portal(PortalFromUtils):
         return portal
 
 
-def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils,
-                                                             webtest.app.TestApp]) -> Optional[pyramid.request.Request]:
+def create_pyramid_request_for_testing(
+        portal_or_vapp: Union[PortalFromUtils, webtest.app.TestApp],
+        args: Optional[Union[str, dict]] = None) -> Optional[pyramid.request.Request]:
+    class PyramidRequest(pyramid.request.Request):  # noqa
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._params = None
+        @property  # noqa
+        def params(self) -> MultiDict:
+            if self._params is not None:
+                return self._params
+            return super().params
+        @params.setter  # noqa
+        def params(self, value: MultiDict) -> None:
+            if not isinstance(value, MultiDict):
+                raise Exception("Must set pyramid.request.Request.params to MultiDict.")
+            self._params = value
     if not isinstance(vapp := portal_or_vapp, webtest.app.TestApp):
         if not (isinstance(portal_or_vapp, PortalFromUtils) and
                 isinstance(vapp := portal_or_vapp.vapp, webtest.app.TestApp)):
@@ -164,8 +180,19 @@ def create_pyramid_request_for_testing(portal_or_vapp: Union[PortalFromUtils,
         return None
     if not isinstance(environ := request.environ, dict):
         return None
-    request = pyramid.request.Request(environ)
+    request = PyramidRequest(environ)
     request.registry = registry
+    if isinstance(args, dict):
+        params = []
+        for key in args:
+            if isinstance(value := args[key], (list, tuple)):
+                for item in value:
+                    params.append((key, item))
+            else:
+                params.append((key, value))
+        request.params = MultiDict(params)
+    elif isinstance(args, MultiDict):
+        request.params = args
     return request
 
 
