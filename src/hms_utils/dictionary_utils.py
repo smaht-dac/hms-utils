@@ -510,8 +510,7 @@ def order_dictionary_by_dependencies(items: List[dict],
     return sorted_items
 
 
-def normalize_elastic_search_aggregation_results(data: dict) -> dict:
-    # CAVEAT: Written by ChatGPT and used with only a little review (just testing)!
+def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = False) -> dict:
     def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
         if isinstance(data, dict):
             for key in data:
@@ -530,6 +529,8 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
             if not (key := bucket.get("key_as_string")):
                 if (key := bucket.get("key")) in ["No value", "null", "None", None]:
                     key = None
+            if (prefix_grouping_value is True) and key and group_name:
+                key = f"{group_name}:{key}"
             doc_count = bucket["doc_count"]
             item_count += doc_count
             if nested_field := get_first_field_with_buckets_list_property(bucket):
