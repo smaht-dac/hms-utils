@@ -53,6 +53,40 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
     nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
     include_current_month = request_arg_bool(request, "include_current_month", False)
 
+    if True:
+        query_string, aggregation_by_cell_line = create_query_for_files(type=DEFAULT_FILE_TYPES,
+                                                                   status=DEFAULT_FILE_STATUSES,
+                                                                   category=DEFAULT_FILE_CATEGORIES,
+                                                                   nmonths=DEFAULT_RECENT_MONTHS,
+                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
+                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
+                                                                   aggregation=AGGREGATIONS_BY_CELL_LINE,
+                                                                   aggregation_property_name="group_by_cell_line",
+                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
+                                                                   missing_value=AGGREGATION_NO_VALUE)
+        query_string, aggregation_by_donor = create_query_for_files(type=DEFAULT_FILE_TYPES,
+                                                                   status=DEFAULT_FILE_STATUSES,
+                                                                   category=DEFAULT_FILE_CATEGORIES,
+                                                                   nmonths=DEFAULT_RECENT_MONTHS,
+                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
+                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
+                                                                   aggregation=AGGREGATIONS_BY_DONOR,
+                                                                   aggregation_property_name="group_by_donor",
+                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
+                                                                   missing_value=AGGREGATION_NO_VALUE)
+        aggregation = {
+            "GROUP_BY_CELL_LINE": aggregation_by_cell_line["group_by_cell_line"],
+            "GROUP_BY_DONOR": aggregation_by_donor["group_by_donor"]
+        }
+        import pdb ; pdb.set_trace()  # noqa
+        pass
+        query = f"/search/?{query_string}"
+        request = snovault_make_search_subreq(request, path=query, method="GET")
+        results = snovault_search(None, request, custom_aggregations=aggregation)
+        results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"), prefix_grouping_value=True)
+        import pdb ; pdb.set_trace()  # noqa
+        pass
+
     if isinstance(aggregations := request.params.getall("aggregation"), list) and aggregations:
         results = recent_files_summary_by(aggregations)
     else:
@@ -60,24 +94,27 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         results_by_donor = recent_files_summary_by(
             request,
             aggregations=AGGREGATIONS_BY_DONOR,
+            aggregation_property_name="group_by_donor",
             status=status, category=category,
             from_date=from_date, thru_date=thru_date, nmonths=nmonths,
             include_current_month=include_current_month)
         results_by_cell_line = recent_files_summary_by(
             request,
             aggregations=AGGREGATIONS_BY_CELL_LINE,
+            aggregation_property_name="group_by_cell_line",
             status=status, category=category,
             from_date=from_date, thru_date=thru_date, nmonths=nmonths,
             include_current_month=include_current_month)
         results = combine_search_aggregation_results(results_by_cell_line, results_by_donor)
-    from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-    print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-    print_grouped_items(results, remove_prefix_grouping_value=False)
+
+    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
+    # print_grouped_items(results, remove_prefix_grouping_value=False)
     return results
 
 
 def recent_files_summary_by(request: pyramid.request.Request,
                             aggregations: List[str],
+                            aggregation_property_name: Optional[str],
                             status: Optional[str],
                             category: Optional[str],
                             from_date: Optional[str],
@@ -91,15 +128,16 @@ def recent_files_summary_by(request: pyramid.request.Request,
                                                                    include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
                                                                    date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
                                                                    aggregation=aggregations,
+                                                                   aggregation_property_name=aggregation_property_name,
                                                                    max_buckets=AGGREGATION_MAX_BUCKETS,
                                                                    missing_value=AGGREGATION_NO_VALUE)
 
     query = f"/search/?{query_string}"
     request = snovault_make_search_subreq(request, path=query, method="GET")
+    import pdb ; pdb.set_trace()  # noqa
     results = snovault_search(None, request, custom_aggregations=aggregation_definitions)
     results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"),
                                                                       prefix_grouping_value=True)
-    print(json.dumps(results_normalized, indent=4))
     # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
     # print_grouped_items(results_normalized, remove_prefix_grouping_value=True)
     return results_normalized
@@ -115,6 +153,7 @@ def create_query_for_files(
         include_current_month: bool = False,
         date_property_name: Optional[str] = None,
         aggregation: Optional[Union[str, List[str], dict]] = None,
+        aggregation_property_name: Optional[str] = None,
         max_buckets: Optional[int] = None,
         missing_value: Optional[str] = None) -> Tuple[Optional[str], Optional[dict]]:
 
@@ -173,6 +212,7 @@ def create_query_for_files(
                 }
         aggregation_definitions = create_elasticsearch_aggregation_definitions(
             aggregations,
+            aggregation_property_name=aggregation_property_name,
             max_buckets=max_buckets,
             missing_value=missing_value,
             create_field_aggregation=create_field_aggregation)
@@ -195,10 +235,12 @@ def create_query_for_files(
     # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
     query_string = query_string.replace("=%21", "%21=")
 
+    print(json.dumps(aggregation_definitions, indent=4))
     return query_string, aggregation_definitions
 
 
 def create_elasticsearch_aggregation_definitions(fields: List[str],
+                                                 aggregation_property_name: Optional[str] = None,
                                                  max_buckets: Optional[int] = None,
                                                  missing_value: Optional[str] = None,
                                                  create_field_aggregation: Optional[Callable] = None) -> dict:
@@ -222,14 +264,17 @@ def create_elasticsearch_aggregation_definitions(fields: List[str],
             }
         }
 
-    aggregation = {field: field_aggregation}
-    aggregation[field]["meta"] = {"field_name": field}
+    if not (isinstance(aggregation_property_name, str) and
+            (aggregation_property_name := aggregation_property_name.strip())):
+        aggregation_property_name = field
+    aggregation = {aggregation_property_name: field_aggregation}
+    aggregation[aggregation_property_name]["meta"] = {"field_name": field}
 
     if nested_aggregation := create_elasticsearch_aggregation_definitions(
             fields[1:], max_buckets=max_buckets,
             missing_value=missing_value,
             create_field_aggregation=create_field_aggregation):
-        aggregation[field]["aggs"] = nested_aggregation
+        aggregation[aggregation_property_name]["aggs"] = nested_aggregation
 
     return aggregation
 
@@ -515,7 +560,7 @@ def test():
     portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     request = create_pyramid_request_for_testing(portal.vapp, request_args)
     # Call the /recent_files_summary endpoint/API.
-    _ = recent_files_summary(None, request)
+    results = recent_files_summary(None, request)
     # Dump the results.
     # print(json.dumps(results, indent=4))
 
