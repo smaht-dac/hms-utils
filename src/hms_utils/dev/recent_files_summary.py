@@ -52,8 +52,82 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
     thru_date = request_arg(request, "thru", None)
     nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
     include_current_month = request_arg_bool(request, "include_current_month", False)
+    date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
+
+    def create_elasticsearch_aggregation_query(groupings: List[str]) -> dict:
+        global AGGREGATION_FIELD_RELEASE_DATE, AGGREGATION_MAX_BUCKETS, AGGREGATION_NO_VALUE
+        aggregations = []
+        if not isinstance(groupings, list):
+            groupings = [groupings]
+        for item in groupings:
+            if isinstance(item, str) and (item := item.strip()) and (item not in aggregations):
+                aggregations.append(item)
+        if not aggregations:
+            return {}
+        def create_field_aggregation(field: str) -> Optional[dict]:  # noqa
+            global AGGREGATION_FIELD_RELEASE_DATE
+            if field == AGGREGATION_FIELD_RELEASE_DATE:
+                return {
+                    "date_histogram": {
+                        "field": f"embedded.{field}",
+                        "calendar_interval": "month",
+                        "format": "yyyy-MM",
+                        "missing": "1970-01",
+                        "order": {"_key": "desc"}
+                    }
+                }
+        aggregation = _create_elasticsearch_aggregation_query(
+            aggregations,
+            aggregation_property_name="TODO_GET_RID_OF_THIS",
+            max_buckets=AGGREGATION_MAX_BUCKETS,
+            missing_value=AGGREGATION_NO_VALUE,
+            create_field_aggregation=create_field_aggregation)
+        return aggregation["TODO_GET_RID_OF_THIS"]
+
+    def create_query(request: pyramid.request.Request) -> str:
+
+        global AGGREGATION_FIELD_RELEASE_DATE, DEFAULT_FILE_CATEGORIES, DEFAULT_FILE_STATUSES, DEFAULT_FILE_TYPES
+
+        types = request_args(request, "type", DEFAULT_FILE_TYPES)
+        statuses = request_args(request, "status", DEFAULT_FILE_STATUSES)
+        categories = request_args(request, "category", DEFAULT_FILE_CATEGORIES)
+        from_date = request_arg(request, "from")
+        thru_date = request_arg(request, "thru")
+        include_current_month = request_arg_bool(request, "include_current_month")
+        date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
+
+        from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths,
+                                                            include_current_month=include_current_month, strings=True)
+        query_parameters = {
+            "type": types if types else None,
+            "status": status if status else None,
+            "data_category": categories if categories else None,
+            f"{date_property_name}.from": from_date if from_date else None,
+            f"{date_property_name}.to": thru_date if from_date else None,
+            "from": 0,
+            "limit": 0,
+
+        }
+        query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
+        query_string = urlencode(query_parameters, True)
+        # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
+        query_string = query_string.replace("=%21", "%21=")
+        return query_string
+
+    def execute_query(request: pyramid.request.Request, query: str, aggregations: dict) -> str:
+        request = snovault_make_search_subreq(request, path=query, method="GET")
+        return snovault_search(None, request, custom_aggregations=aggregations)
 
     if True:
+        query = f"/search/?{create_query(request)}"
+        aggregations = {
+            "group_by_cell_line": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_CELL_LINE),
+            "group_by_donor": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_DONOR)
+        }
+        import pdb ; pdb.set_trace()  # noqa
+        results = execute_query(request, query, aggregations)
+        results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"), prefix_grouping_value=True)
+        import pdb ; pdb.set_trace()  # noqa
         query_string, aggregation_by_cell_line = create_query_for_files(type=DEFAULT_FILE_TYPES,
                                                                    status=DEFAULT_FILE_STATUSES,
                                                                    category=DEFAULT_FILE_CATEGORIES,
@@ -78,12 +152,6 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
             "GROUP_BY_CELL_LINE": aggregation_by_cell_line["group_by_cell_line"],
             "GROUP_BY_DONOR": aggregation_by_donor["group_by_donor"]
         }
-        import pdb ; pdb.set_trace()  # noqa
-        pass
-        query = f"/search/?{query_string}"
-        request = snovault_make_search_subreq(request, path=query, method="GET")
-        results = snovault_search(None, request, custom_aggregations=aggregation)
-        results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"), prefix_grouping_value=True)
         import pdb ; pdb.set_trace()  # noqa
         pass
 
@@ -210,7 +278,7 @@ def create_query_for_files(
                         "order": {"_key": "desc"}
                     }
                 }
-        aggregation_definitions = create_elasticsearch_aggregation_definitions(
+        aggregation_definitions = _create_elasticsearch_aggregation_query(
             aggregations,
             aggregation_property_name=aggregation_property_name,
             max_buckets=max_buckets,
@@ -239,7 +307,7 @@ def create_query_for_files(
     return query_string, aggregation_definitions
 
 
-def create_elasticsearch_aggregation_definitions(fields: List[str],
+def _create_elasticsearch_aggregation_query(fields: List[str],
                                                  aggregation_property_name: Optional[str] = None,
                                                  max_buckets: Optional[int] = None,
                                                  missing_value: Optional[str] = None,
@@ -270,7 +338,7 @@ def create_elasticsearch_aggregation_definitions(fields: List[str],
     aggregation = {aggregation_property_name: field_aggregation}
     aggregation[aggregation_property_name]["meta"] = {"field_name": field}
 
-    if nested_aggregation := create_elasticsearch_aggregation_definitions(
+    if nested_aggregation := _create_elasticsearch_aggregation_query(
             fields[1:], max_buckets=max_buckets,
             missing_value=missing_value,
             create_field_aggregation=create_field_aggregation):
@@ -352,8 +420,15 @@ def request_arg_bool(request: pyramid.request.Request, name: str, fallback: Opti
     return fallback if (value := request_arg(request, name)) is None else (value == "true")
 
 
-def request_args(request: pyramid.request.Request, name: str, fallback: Optional[Any] = None) -> Optional[Any]:
-    return value if (value := request.params.getall(name)) else fallback
+def request_args(request: pyramid.request.Request,
+                 name: str, fallback: Optional[str] = None, duplicates: bool = False) -> List[str]:
+    args = []
+    if isinstance(value := request.params.getall(name), list):
+        for item in value:
+            if isinstance(item, str) and (item := item.strip()):
+                if (item not in args) or (duplicates is True):
+                    args.append(item)
+    return args if args else fallback
 
 
 def parse_date_related_arguments(
