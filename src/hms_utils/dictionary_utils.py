@@ -516,6 +516,8 @@ def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_val
             for key in data:
                 if isinstance(data[key], dict) and isinstance(data[key].get("buckets"), list):
                     return data[key]
+            if data.get("buckets", list):
+                return data
         return None
     def process_field(field: dict) -> None:  # noqa
         if not isinstance(field, dict):
