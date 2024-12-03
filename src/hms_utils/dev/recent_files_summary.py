@@ -57,19 +57,22 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         results = recent_files_summary_by(aggregations)
     else:
         # Default case: Do these two concurrently (TODO) ...
-        results_by_cell_line = recent_files_summary_by(
-            request,
-            aggregations=AGGREGATIONS_BY_CELL_LINE,
-            status=status, category=category,
-            from_date=from_date, thru_date=thru_date, nmonths=nmonths,
-            include_current_month=include_current_month)
         results_by_donor = recent_files_summary_by(
             request,
             aggregations=AGGREGATIONS_BY_DONOR,
             status=status, category=category,
             from_date=from_date, thru_date=thru_date, nmonths=nmonths,
             include_current_month=include_current_month)
+        results_by_cell_line = recent_files_summary_by(
+            request,
+            aggregations=AGGREGATIONS_BY_CELL_LINE,
+            status=status, category=category,
+            from_date=from_date, thru_date=thru_date, nmonths=nmonths,
+            include_current_month=include_current_month)
         results = combine_search_aggregation_results(results_by_cell_line, results_by_donor)
+    from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
+    print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+    print_grouped_items(results, remove_prefix_grouping_value=False)
     return results
 
 
@@ -94,8 +97,11 @@ def recent_files_summary_by(request: pyramid.request.Request,
     query = f"/search/?{query_string}"
     request = snovault_make_search_subreq(request, path=query, method="GET")
     results = snovault_search(None, request, custom_aggregations=aggregation_definitions)
-    results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"))
+    results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"),
+                                                                      prefix_grouping_value=True)
     print(json.dumps(results_normalized, indent=4))
+    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
+    # print_grouped_items(results_normalized, remove_prefix_grouping_value=True)
     return results_normalized
 
 
@@ -264,8 +270,24 @@ def normalize_elastic_search_aggregation_results(data: dict) -> dict:
     return process_field(get_first_field_with_buckets_list_property(data))
 
 
-def combine_search_aggregation_results(*args) -> dict:
-    pass
+def combine_search_aggregation_results(target: dict, source: dict) -> dict:
+    if not (isinstance(target, dict) and isinstance(source, dict) and source and
+            isinstance(target_group_items := target.get("group_items"), dict) and
+            isinstance(source_group_items := source.get("group_items"), dict)):
+        return {}
+    for source_group_item_key in source_group_items:
+        if not target_group_items.get(source_group_item_key):
+            target_group_items[source_group_item_key] = source_group_items[source_group_item_key]
+        elif isinstance(source_sub_group_items := source_group_items[source_group_item_key].get("group_items"), dict):
+            if isinstance(target_sub_group_items := target_group_items[source_group_item_key].get("group_items"), dict):
+                for source_sub_group_item_key in source_sub_group_items:
+                    if not target_sub_group_items.get(source_sub_group_item_key):
+                        # Should always be true since/if we are dealing with aggregations on two
+                        # different fields, and the grouping value is prefixed with the field name.
+                        target_sub_group_items[source_sub_group_item_key] = \
+                            source_sub_group_items[source_sub_group_item_key]
+    # TODO: Still need to sort appropriately and update counts etc ...
+    return target
 
 
 def request_arg(request: pyramid.request.Request, name: str, fallback: Optional[str] = None) -> Optional[str]:
@@ -493,9 +515,9 @@ def test():
     portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     request = create_pyramid_request_for_testing(portal.vapp, request_args)
     # Call the /recent_files_summary endpoint/API.
-    results = recent_files_summary(None, request)
+    _ = recent_files_summary(None, request)
     # Dump the results.
-    print(json.dumps(results, indent=4))
+    # print(json.dumps(results, indent=4))
 
 
 test()
