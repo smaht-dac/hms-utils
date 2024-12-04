@@ -650,8 +650,8 @@ def test():
     # Dump the results.
     # print(json.dumps(results, indent=4))
 
-
-def merge_elasticsearch_aggregations(target: dict, source: dict, _aggregation_path: List[str] = []) -> dict:
+def merge_elasticsearch_aggregations(target: dict, source: dict,
+                                     copy: bool = False, _aggregation_path: List[str] = []) -> dict:
 
     def is_aggregation(bucket: dict, bucket_key: Optional[str] = None) -> bool:
         if not (isinstance(bucket, dict) and isinstance(bucket.get("buckets"), list)):
@@ -688,7 +688,21 @@ def merge_elasticsearch_aggregations(target: dict, source: dict, _aggregation_pa
     if not (aggregation_key := is_aggregation(source) and is_aggregation(target)):
         return {}
 
-    _aggregation_path += [aggregation_key]
+    if copy is True:
+        target = deepcopy(target)
+
+    #_aggregation_path += [aggregation_key]
+    #if not (target_aggregation := find_aggregation(target, _aggregation_path)):
+    # if not (target_aggregation := find_aggregation(target, [aggregation_key])):
+    #    import pdb ; pdb.set_trace()  # noqa
+    #    pass
+    #import pdb ; pdb.set_trace()  # noqa
+
+    if not (target_aggregation := find_aggregation(target, [aggregation_key])):
+        import pdb ; pdb.set_trace()  # noqa
+        pass
+    import pdb ; pdb.set_trace()  # noqa
+    pass
 
     for source_bucket in source["buckets"]:
         if not isinstance(source_bucket, dict):
@@ -703,16 +717,23 @@ def merge_elasticsearch_aggregations(target: dict, source: dict, _aggregation_pa
                 print(f"IS-AGGREGATION: {source_bucket_key} | {source_bucket_field}")
                 print(target["buckets"])
                 print(source_bucket_value)
-                import pdb ; pdb.set_trace()  # noqa
-                x = find_aggregation(target, _aggregation_path)
-                y = find_bucket(target, _aggregation_path, source_bucket_value)
-                # x = find_aggregation(target, ['file_status_tracking.released', 'file_sets.libraries.analytes.samples.sample_sources.cell_line.code'])
-                merge_elasticsearch_aggregations(source_bucket[source_bucket_key],
-                                                 source_bucket[source_bucket_key], _aggregation_path)
+                # if target_bucket := find_aggregation(target, _aggregation_path + [source_bucket_field]):
+                if target_bucket := find_aggregation(target, [aggregation_key, source_bucket_field]):
+                    import pdb ; pdb.set_trace()  # noqa
+                    merge_elasticsearch_aggregations(target_bucket,
+                                                     source_bucket[source_bucket_key], [aggregation_key, source_bucket_field])
+                    # source_bucket[source_bucket_key], _aggregation_path + [source_bucket_field])
                 is_source_bucket_aggregation = True
         if not is_source_bucket_aggregation:
             # Terminal buckets which contain no nested aggregations/buckets; merge in source.
             print(f"TERMINAL: {source_bucket}")
+            import pdb ; pdb.set_trace()  # noqa
             pass
+            x = find_aggregation(target, _aggregation_path)
+            y = find_bucket(target, _aggregation_path, source_bucket_value)
+            pass
+
+
+merge_elasticsearch_aggregations(group_by_cell_line, group_by_donor)
 
 test()
