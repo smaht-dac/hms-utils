@@ -3,8 +3,7 @@ from copy import deepcopy
 from typing import Any, List, Optional, Tuple
 
 
-def merge_elasticsearch_aggregations(target: dict, source: dict,
-                                     copy: bool = False) -> Tuple[Optional[dict], Optional[int]]:
+def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bool = False) -> Optional[dict]:
 
     def get_aggregation_key(aggregation: dict, aggregation_key: Optional[str] = None) -> Optional[str]:
         if isinstance(aggregation, dict) and isinstance(aggregation.get("buckets"), list):
@@ -48,43 +47,44 @@ def merge_elasticsearch_aggregations(target: dict, source: dict,
                     return aggregation_bucket
         return None
 
+    def merge(target: dict, source: dict) -> Tuple[Optional[dict], Optional[int]]:
+        merged_item_count = 0
+        for source_bucket in source["buckets"]:
+            if (((source_bucket_value := get_aggregation_bucket_value(source_bucket)) is None) or
+                ((source_bucket_item_count := get_aggregation_bucket_doc_count(source_bucket)) is None)):  # noqa
+                continue
+            if (target_bucket := find_aggregation_bucket(target, source_bucket_value)):
+                if source_nested_aggregation := get_nested_aggregation(source_bucket):
+                    if target_nested_aggregation := get_nested_aggregation(target_bucket):
+                        merged_item_count, _ = merge(target_nested_aggregation, source_nested_aggregation)
+                        if merged_item_count is None:
+                            if source_nested_aggregation_key := get_aggregation_key(source_nested_aggregation):
+                                target_bucket[source_nested_aggregation_key] = \
+                                    source_bucket[source_nested_aggregation_key]
+                                target_bucket["doc_count"] += \
+                                    get_aggregation_buckets_doc_count(source_bucket[source_nested_aggregation_key])
+                        elif merged_item_count > 0:
+                            target_bucket["doc_count"] += merged_item_count
+                elif get_aggregation_bucket_value(target_bucket) is not None:
+                    if get_aggregation_bucket_doc_count(target_bucket) is not None:
+                        target_bucket["doc_count"] += source_bucket_item_count
+                        merged_item_count += source_bucket_item_count
+                continue
+            target["buckets"].append(source_bucket)
+            if merged_item_count is not None:
+                merged_item_count += source_bucket_item_count
+        return merged_item_count, target
+
     if not ((aggregation_key := get_aggregation_key(source)) and (get_aggregation_key(target) == aggregation_key)):
         return None, None
 
     if copy is True:
         target = deepcopy(target)
 
-    merged_item_count = 0
-
-    for source_bucket in source["buckets"]:
-        if (((source_bucket_value := get_aggregation_bucket_value(source_bucket)) is None) or
-            ((source_bucket_item_count := get_aggregation_bucket_doc_count(source_bucket)) is None)):  # noqa
-            continue
-        if (target_bucket := find_aggregation_bucket(target, source_bucket_value)):
-            if source_nested_aggregation := get_nested_aggregation(source_bucket):
-                if target_nested_aggregation := get_nested_aggregation(target_bucket):
-                    merged_item_count, _ = merge_elasticsearch_aggregations(target_nested_aggregation,
-                                                                            source_nested_aggregation, copy=False)
-                    if merged_item_count is None:
-                        if source_nested_aggregation_key := get_aggregation_key(source_nested_aggregation):
-                            target_bucket[source_nested_aggregation_key] = source_bucket[source_nested_aggregation_key]
-                            target_bucket["doc_count"] += \
-                                get_aggregation_buckets_doc_count(source_bucket[source_nested_aggregation_key])
-                    elif merged_item_count > 0:
-                        target_bucket["doc_count"] += merged_item_count
-            elif get_aggregation_bucket_value(target_bucket) is not None:
-                if get_aggregation_bucket_doc_count(target_bucket) is not None:
-                    target_bucket["doc_count"] += source_bucket_item_count
-                    merged_item_count += source_bucket_item_count
-            continue
-        target["buckets"].append(source_bucket)
-        if merged_item_count is not None:
-            merged_item_count += source_bucket_item_count
-
-    return merged_item_count, target
+    return merge(target, source)[1]
 
 
-def normalize_elastic_search_aggregation_results(aggregation: dict) -> dict:
+def normalize_elasticsearch_aggregation_results(aggregation: dict) -> dict:
 
     def get_aggregation_key(aggregation: dict, aggregation_key: Optional[str] = None) -> Optional[str]:
         # TODO: same as merge function
@@ -126,7 +126,7 @@ def normalize_elastic_search_aggregation_results(aggregation: dict) -> dict:
                     return group_item
         return None
 
-    def normalize_aggregation(aggregation: dict, key: Optional[str] = None, value: Optional[str] = None) -> dict:
+    def normalize(aggregation: dict, key: Optional[str] = None, value: Optional[str] = None) -> dict:
         if not (aggregation_key := get_aggregation_key(aggregation)):
             return {}
         group_items = [] ; item_count = 0  # noqa
@@ -137,8 +137,7 @@ def normalize_elastic_search_aggregation_results(aggregation: dict) -> dict:
             item_count += bucket_item_count
             if nested_aggregations := get_nested_aggregations(bucket):
                 for nested_aggregation in nested_aggregations:
-                    if normalized_aggregation := normalize_aggregation(nested_aggregation,
-                                                                       aggregation_key, bucket_value):
+                    if normalized_aggregation := normalize(nested_aggregation, aggregation_key, bucket_value):
                         if group_item := find_group_item(group_items, bucket_value):
                             # group_item["items"].extend(normalized_aggregation["items"])
                             for normalized_aggregation_item in normalized_aggregation["items"]:
@@ -157,10 +156,10 @@ def normalize_elastic_search_aggregation_results(aggregation: dict) -> dict:
                 del result["value"]
         return result
 
-    return normalize_aggregation(aggregation)
+    return normalize(aggregation)
 
 
-def normalize_elastic_search_aggregation_results_legacy(data: dict, prefix_grouping_value: bool = True) -> dict:
+def normalize_elasticsearch_aggregation_results_legacy(data: dict, prefix_grouping_value: bool = True) -> dict:
 
     def get_nested_aggregations(data: dict) -> List[dict]:
         results = []
@@ -172,7 +171,7 @@ def normalize_elastic_search_aggregation_results_legacy(data: dict, prefix_group
                 results.append(data)
         return results
 
-    def normalize_aggregation(aggregation: dict) -> None:
+    def normalize(aggregation: dict) -> None:
         nonlocal prefix_grouping_value
         if not (isinstance(aggregation, dict) and isinstance(buckets := aggregation.get("buckets"), list)):
             return
@@ -188,7 +187,7 @@ def normalize_elastic_search_aggregation_results_legacy(data: dict, prefix_group
             item_count += doc_count
             if nested_aggregations := get_nested_aggregations(bucket):
                 for nested_aggregation in nested_aggregations:
-                    if normalized_aggregation := normalize_aggregation(nested_aggregation):
+                    if normalized_aggregation := normalize(nested_aggregation):
                         if group_items.get(key):
                             group_items[key]["group_items"] = {**group_items[key]["group_items"],
                                                                **normalized_aggregation["group_items"]}
@@ -211,7 +210,7 @@ def normalize_elastic_search_aggregation_results_legacy(data: dict, prefix_group
     normalized_aggregations = {}
     if items_with_buckets_list_property := get_nested_aggregations(data):
         for item_with_buckets_list_property in items_with_buckets_list_property:
-            if normalized_aggregation := normalize_aggregation(item_with_buckets_list_property):
+            if normalized_aggregation := normalize(item_with_buckets_list_property):
                 if normalized_aggregations:
                     # Here just for completeness; in practice no multiple groupings at top-level.
                     normalized_aggregations["group_items"] = {**normalized_aggregations["group_items"],
