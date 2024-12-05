@@ -84,7 +84,7 @@ def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bo
     return merge(target, source)[1]
 
 
-def normalize_elasticsearch_aggregation_results(aggregation: dict) -> dict:
+def normalize_elasticsearch_aggregation_results(aggregation: dict, remove_empty_items: bool = True) -> dict:
 
     def get_aggregation_key(aggregation: dict, aggregation_key: Optional[str] = None) -> Optional[str]:
         # TODO: same as merge function
@@ -127,6 +127,7 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict) -> dict:
         return None
 
     def normalize(aggregation: dict, key: Optional[str] = None, value: Optional[str] = None) -> dict:
+        nonlocal remove_empty_items
         if not (aggregation_key := get_aggregation_key(aggregation)):
             return {}
         group_items = [] ; item_count = 0  # noqa
@@ -147,8 +148,11 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict) -> dict:
                             group_item = normalized_aggregation
                             group_items.append(group_item)
                     else:
-                        group_item = {"name": aggregation_key, "value": bucket_value, "count": bucket_item_count}
-                        group_items.append(group_item)
+                        if (remove_empty_items is False) or (bucket_item_count > 0):
+                            group_item = {"name": aggregation_key, "value": bucket_value, "count": bucket_item_count}
+                            group_items.append(group_item)
+        if (remove_empty_items is not False) and (not group_items):
+            return {}
         result = {"name": key, "value": value, "count": item_count, "items": group_items}
         if key is None:
             del result["name"]
