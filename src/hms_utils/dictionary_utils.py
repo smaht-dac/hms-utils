@@ -510,6 +510,73 @@ def order_dictionary_by_dependencies(items: List[dict],
     return sorted_items
 
 
+def merge_elasticsearch_aggregations(target: dict, source: dict,
+                                     copy: bool = False) -> Tuple[Optional[dict], Optional[int]]:
+
+    def get_aggregation_key(aggregation: dict, aggregation_key: Optional[str] = None) -> Optional[str]:
+        if isinstance(aggregation, dict) and isinstance(aggregation.get("buckets"), list):
+            if isinstance(field_name := aggregation.get("meta", {}).get("field_name"), str) and field_name:
+                if isinstance(aggregation_key, str) and aggregation_key:
+                    if field_name != aggregation_key:
+                        return None
+                return field_name
+        return None
+
+    def get_nested_aggregation(aggregation: dict) -> Optional[dict]:
+        if isinstance(aggregation, dict):
+            for key in aggregation:
+                if get_aggregation_key(aggregation[key], key):
+                    return aggregation[key]
+        return None
+
+    def get_aggregation_bucket_value(aggregation_bucket: dict) -> Optional[Any]:
+        if isinstance(aggregation_bucket, dict):
+            return aggregation_bucket.get("key_as_string", aggregation_bucket.get("key"))
+        return None
+
+    def get_aggregation_bucket_doc_count(aggregation_bucket: dict) -> Optional[int]:
+        if isinstance(aggregation_bucket, dict):
+            if isinstance(doc_count := aggregation_bucket.get("doc_count"), int):
+                return doc_count
+        return None
+
+    def find_aggregation_bucket(aggregation: dict, value: str) -> Optional[dict]:
+        if get_aggregation_key(aggregation):
+            for aggregation_bucket in aggregation["buckets"]:
+                if get_aggregation_bucket_value(aggregation_bucket) == value:
+                    return aggregation_bucket
+        return None
+
+    if not ((aggregation_key := get_aggregation_key(source)) and (get_aggregation_key(target) == aggregation_key)):
+        return None, None
+
+    if copy is True:
+        target = deepcopy(target)
+
+    merged_item_count = 0
+
+    for source_bucket in source["buckets"]:
+        if (((source_bucket_value := get_aggregation_bucket_value(source_bucket)) is None) or
+            ((source_bucket_item_count:= get_aggregation_bucket_doc_count(source_bucket)) is None)):  # noqa
+            continue
+        if (target_bucket := find_aggregation_bucket(target, source_bucket_value)):
+            if source_nested_aggregation := get_nested_aggregation(source_bucket):
+                if target_nested_aggregation := get_nested_aggregation(target_bucket):
+                    merged_item_count, _ = merge_elasticsearch_aggregations(target_nested_aggregation,
+                                                                            source_nested_aggregation, copy=False)
+                    if merged_item_count > 0:
+                        target_bucket["doc_count"] += merged_item_count
+            elif get_aggregation_bucket_value(target_bucket) is not None:
+                if get_aggregation_bucket_doc_count(target_bucket) is not None:
+                    target_bucket["doc_count"] += source_bucket_item_count
+                    merged_item_count += source_bucket_item_count
+            continue
+        target["buckets"].append(source_bucket)
+        merged_item_count += source_bucket_item_count
+
+    return merged_item_count, target
+
+
 def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = False) -> dict:
 
     def get_items_with_buckets_list_property(data: dict) -> List[dict]:
