@@ -577,7 +577,7 @@ def merge_elasticsearch_aggregations(target: dict, source: dict,
     return merged_item_count, target
 
 
-def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = False) -> dict:
+def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = True) -> dict:
 
     def get_items_with_buckets_list_property(data: dict) -> List[dict]:
         results = []
@@ -590,6 +590,7 @@ def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_val
         return results
 
     def normalize_aggregation(aggregation: dict) -> None:
+        nonlocal prefix_grouping_value
         if not (isinstance(aggregation, dict) and isinstance(buckets := aggregation.get("buckets"), list)):
             return
         group_items = {}
@@ -597,7 +598,7 @@ def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_val
         for bucket in buckets:
             if (key := bucket.get("key_as_string", bucket.get("key"))) in ["No value", "null", "None"]:
                 key = None
-            if (prefix_grouping_value is True) and isinstance(key, str) and key:
+            if (prefix_grouping_value is not False) and isinstance(key, str) and key:
                 if (field_name := aggregation.get("meta", {}).get("field_name")):
                     key = f"{field_name}:{key}"
             doc_count = bucket["doc_count"]
