@@ -49,6 +49,8 @@ def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bo
 
     def merge(target: dict, source: dict) -> Tuple[Optional[dict], Optional[int]]:
         merged_item_count = 0
+        if not ((aggregation_key := get_aggregation_key(source)) and (get_aggregation_key(target) == aggregation_key)):
+            return None, None
         for source_bucket in source["buckets"]:
             if (((source_bucket_value := get_aggregation_bucket_value(source_bucket)) is None) or
                 ((source_bucket_item_count := get_aggregation_bucket_doc_count(source_bucket)) is None)):  # noqa
@@ -70,17 +72,10 @@ def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bo
                         target_bucket["doc_count"] += source_bucket_item_count
                         merged_item_count += source_bucket_item_count
                 continue
-            target["buckets"].append(source_bucket)
-            if merged_item_count is not None:
-                merged_item_count += source_bucket_item_count
         return merged_item_count, target
-
-    if not ((aggregation_key := get_aggregation_key(source)) and (get_aggregation_key(target) == aggregation_key)):
-        return None, None
 
     if copy is True:
         target = deepcopy(target)
-
     return merge(target, source)[1]
 
 
