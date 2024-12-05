@@ -158,15 +158,23 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
         print(f"{spaces}{chars.rarrow} {title}")
         indent += 2
         spaces = " " * indent
-    if not (group := grouped_items.get("group")):
-        return
     if not (group_count := grouped_items.get("group_count")):
         return
     if not (group_items := grouped_items.get("group_items")):
         return
     if not callable(map_grouped_item):
         map_grouped_item = None
-    message = f"{spaces}{chars.diamond} GROUP: {group} ({group_count})"
+    if not (group_name := grouped_items.get("group")):
+        group_names = []
+        for group_item_key in group_items:
+            if (colon_index := group_item_key.find(":")) > 0:
+                if (group_name := group_item_key[0:colon_index]) and (group_name not in group_names):
+                    group_names.append(group_name)
+        group_name = f" {chars.dot} ".join(group_names)
+        group_names = len(group_names) > 1
+    else:
+        group_names = False
+    message = f"{spaces}{chars.diamond} GROUP{'S' if group_names else ''}: {group_name} ({group_count})"
     print(message)
     for group_item_key in group_items:
         grouped_items = group_items[group_item_key]
