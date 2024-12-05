@@ -8,6 +8,36 @@ def dj(value):
     import json
     print(json.dumps(value, indent=4, default=str))
 
+# ❖ GROUP: file_status_tracking.released (2)
+#   ▶ file_status_tracking.released:2024-11 (37)
+#     ❖ GROUP: donors.display_title (4)
+#       ▷ donors.display_title:DAC_DONOR_COLO829 (21)
+#         ❖ GROUP: release_tracker_description (4)
+#           ▷ release_tracker_description:WGS Illumina NovaSeq X bam (4)
+#           ▷ release_tracker_description:Fiber-seq PacBio Revio bam (8)
+#           ▷ release_tracker_description:WGS ONT PromethION 24 bam (2)
+#           ▷ release_tracker_description:XXX WGS Illumina NovaSeq X bam (7)
+#       ▷ donors.display_title:DAC_DONOR_COLO829_XYZZY (3)
+#         ❖ GROUP: release_tracker_description (2)
+#           ▷ release_tracker_description:WGS Illumina NovaSeq X bam (1)
+#           ▷ release_tracker_description:Fiber-seq PacBio Revio bam (2)
+#       ▷ file_sets.libraries.analytes.samples.sample_sources.cell_line.code:COLO829T (8)
+#         ❖ GROUP: release_tracker_description (3)
+#           ▷ release_tracker_description:WGS Illumina NovaSeq X bam (4)
+#           ▷ release_tracker_description:Fiber-seq PacBio Revio bam (3)
+#           ▷ release_tracker_description:WGS ONT PromethION 24 bam (1)
+#       ▷ file_sets.libraries.analytes.samples.sample_sources.cell_line.code:COLO829BL (5)
+#         ❖ GROUP: release_tracker_description (2)
+#           ▷ release_tracker_description:WGS Illumina NovaSeq X bam (3)
+#           ▷ release_tracker_description:Fiber-seq PacBio Revio bam (2)
+#   ▶ file_status_tracking.released:2024-12 (15)
+#     ❖ GROUP: donors.display_title (1)
+#       ▷ donors.display_title:DAC_DONOR_COLO829 (15)
+#         ❖ GROUP: release_tracker_description (3)
+#           ▷ release_tracker_description:WGS Illumina NovaSeq X bam (8)
+#           ▷ release_tracker_description:Fiber-seq PacBio Revio bam (5)
+#           ▷ release_tracker_description:WGS ONT PromethION 24 bam (2)
+
 group_by_donor = {
         "meta": { "field_name": "file_status_tracking.released" },
         "buckets": [
@@ -174,15 +204,8 @@ def merge_elasticsearch_aggregations(target: dict, source: dict, copy: bool = Fa
 
 
 def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = False) -> dict:
-    def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
-        if isinstance(data, dict):
-            for key in data:
-                if isinstance(data[key], dict) and isinstance(data[key].get("buckets"), list):
-                    return data[key]
-            if data.get("buckets", list):
-                return data
-        return None
-    def get_items_with_buckets_list_property(data: dict) -> List[dict]:  # noqa 
+
+    def get_items_with_buckets_list_property(data: dict) -> List[dict]:
         results = []
         if isinstance(data, dict):
             for key in data:
@@ -191,72 +214,57 @@ def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_val
             if (not results) and data.get("buckets", list):
                 results.append(data)
         return results
-    def process_field(field: dict) -> None:  # noqa
-        if not isinstance(field, dict):
+
+    def process_field(field: dict) -> None:
+        if not (isinstance(field, dict) and isinstance(buckets := field.get("buckets"), list)):
             return
-        if not isinstance(buckets := field.get("buckets"), list):
-            return
-        group_name = field.get("meta", {}).get("field_name")
         group_items = {}
         item_count = 0
         for bucket in buckets:
-            if not (key := bucket.get("key_as_string")):
-                if (key := bucket.get("key")) in ["No value", "null", "None", None]:
-                    key = None
-            if (prefix_grouping_value is True) and key and group_name:
-                key = f"{group_name}:{key}"
+            if (key := bucket.get("key_as_string", bucket.get("key"))) in ["No value", "null", "None"]:
+                key = None
+            if (prefix_grouping_value is True) and isinstance(key, str) and key:
+                if (group_name := field.get("meta", {}).get("field_name")):
+                    key = f"{group_name}:{key}"
             doc_count = bucket["doc_count"]
             item_count += doc_count
-
-            if True:
-                if nested_fields := get_items_with_buckets_list_property(bucket):
-                    for nested_field in nested_fields:
-                        if processed_field := process_field(nested_field):
-                            if group_items.get(key):
-                                group_items[key]["item_count"] += processed_field["item_count"]
-                                group_items[key]["group_count"] += processed_field["group_count"]
-                                group_items[key]["group_items"] = {**group_items[key]["group_items"],
-                                                                   **processed_field["group_items"]}
-                            else:
-                                group_items[key] = processed_field
+            if nested_fields := get_items_with_buckets_list_property(bucket):
+                for nested_field in nested_fields:
+                    if processed_field := process_field(nested_field):
+                        if group_items.get(key):
+                            group_items[key]["group_items"] = {**group_items[key]["group_items"],
+                                                               **processed_field["group_items"]}
+                            group_items[key]["item_count"] += processed_field["item_count"]
+                            group_items[key]["group_count"] += processed_field["group_count"]
                         else:
-                            group_items[key] = doc_count
-                else:
-                    group_items[key] = doc_count
-            else:
-                if nested_field := get_first_field_with_buckets_list_property(bucket):
-                    group_items[key] = process_field(nested_field)
-                else:
-                    group_items[key] = doc_count
+                            group_items[key] = processed_field
+                    else:
+                        group_items[key] = doc_count
 
         return {
-            "group": group_name,
+                # "group": group_name,
             "item_count": item_count,
             "group_count": len(group_items),
             "group_items": group_items,
         }
+
     if not isinstance(data, dict):
         return {}
-    # x = get_first_field_with_buckets_list_property(data)
-    # import pdb ; pdb.set_trace()  # noqa
 
-    if True:
-        processed_fields = {}
-        if items_with_buckets_list_property := get_items_with_buckets_list_property(data):
-            for item_with_buckets_list_property in items_with_buckets_list_property:
-                if processed_field := process_field(item_with_buckets_list_property):
-                    if processed_fields:
-                        processed_fields["group_items"] = {**processed_fields["group_items"], **processed_field["group_items"]}
-                    else:
-                        processed_fields = processed_field
-            return processed_fields
-    else:
-        return process_field(get_first_field_with_buckets_list_property(data))
+    processed_fields = {}
+    if items_with_buckets_list_property := get_items_with_buckets_list_property(data):
+        for item_with_buckets_list_property in items_with_buckets_list_property:
+            if processed_field := process_field(item_with_buckets_list_property):
+                if processed_fields:
+                    # Here just for completeness; in practice no multiple groupings at top-level.
+                    processed_fields["group_items"] = {**processed_fields["group_items"], **processed_field["group_items"]}
+                else:
+                    processed_fields = processed_field
+        return processed_fields
 
 merge_elasticsearch_aggregations(group_by_cell_line, group_by_donor)
 dj(group_by_cell_line)
-# import pdb ; pdb.set_trace()  # noqa
-pass
 x = normalize_elastic_search_aggregation_results(group_by_cell_line, prefix_grouping_value=True)
 dj(x)
-#print_grouped_items(x)
+import pdb ; pdb.set_trace()  # noqa
+print_grouped_items(x)
