@@ -167,11 +167,14 @@ def print_grouped_items(grouped_items: dict, noitems: bool = False,
     if not (group_name := grouped_items.get("group")):
         group_names = []
         for group_item_key in group_items:
-            if (colon_index := group_item_key.find(":")) > 0:
+            if isinstance(group_item_key, str) and ((colon_index := group_item_key.find(":")) > 0):
                 if (group_name := group_item_key[0:colon_index]) and (group_name not in group_names):
                     group_names.append(group_name)
-        group_name = f" {chars.dot} ".join(group_names)
-        group_names = len(group_names) > 1
+        if group_names:
+            group_name = f" {chars.dot} ".join(group_names)
+            group_names = len(group_names) > 1
+        else:
+            group_name = "UNKNOWN"
     else:
         group_names = False
     message = f"{spaces}{chars.diamond} GROUP{'S' if group_names else ''}: {group_name} ({group_count})"

@@ -511,43 +511,63 @@ def order_dictionary_by_dependencies(items: List[dict],
 
 
 def normalize_elastic_search_aggregation_results(data: dict, prefix_grouping_value: bool = False) -> dict:
-    def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
+
+    def get_items_with_buckets_list_property(data: dict) -> List[dict]:
+        results = []
         if isinstance(data, dict):
             for key in data:
                 if isinstance(data[key], dict) and isinstance(data[key].get("buckets"), list):
-                    return data[key]
-            if data.get("buckets", list):
-                return data
-        return None
-    def process_field(field: dict) -> None:  # noqa
-        if not isinstance(field, dict):
+                    results.append(data[key])
+            if (not results) and data.get("buckets", list):
+                results.append(data)
+        return results
+
+    def normalize_aggregation(aggregation: dict) -> None:
+        if not (isinstance(aggregation, dict) and isinstance(buckets := aggregation.get("buckets"), list)):
             return
-        if not isinstance(buckets := field.get("buckets"), list):
-            return
-        group_name = field.get("meta", {}).get("field_name")
         group_items = {}
         item_count = 0
         for bucket in buckets:
-            if not (key := bucket.get("key_as_string")):
-                if (key := bucket.get("key")) in ["No value", "null", "None", None]:
-                    key = None
-            if (prefix_grouping_value is True) and key and group_name:
-                key = f"{group_name}:{key}"
+            if (key := bucket.get("key_as_string", bucket.get("key"))) in ["No value", "null", "None"]:
+                key = None
+            if (prefix_grouping_value is True) and isinstance(key, str) and key:
+                if (field_name := aggregation.get("meta", {}).get("field_name")):
+                    key = f"{field_name}:{key}"
             doc_count = bucket["doc_count"]
             item_count += doc_count
-            if nested_field := get_first_field_with_buckets_list_property(bucket):
-                group_items[key] = process_field(nested_field)
-            else:
-                group_items[key] = doc_count
+            if nested_aggregations := get_items_with_buckets_list_property(bucket):
+                for nested_aggregation in nested_aggregations:
+                    if normalized_aggregation := normalize_aggregation(nested_aggregation):
+                        if group_items.get(key):
+                            group_items[key]["group_items"] = {**group_items[key]["group_items"],
+                                                               **normalized_aggregation["group_items"]}
+                            group_items[key]["item_count"] += normalized_aggregation["item_count"]
+                            group_items[key]["group_count"] += normalized_aggregation["group_count"]
+                        else:
+                            group_items[key] = normalized_aggregation
+                    else:
+                        group_items[key] = doc_count
+
         return {
-            "group": group_name,
             "item_count": item_count,
             "group_count": len(group_items),
             "group_items": group_items,
         }
+
     if not isinstance(data, dict):
         return {}
-    return process_field(get_first_field_with_buckets_list_property(data))
+
+    normalized_aggregations = {}
+    if items_with_buckets_list_property := get_items_with_buckets_list_property(data):
+        for item_with_buckets_list_property in items_with_buckets_list_property:
+            if normalized_aggregation := normalize_aggregation(item_with_buckets_list_property):
+                if normalized_aggregations:
+                    # Here just for completeness; in practice no multiple groupings at top-level.
+                    normalized_aggregations["group_items"] = {**normalized_aggregations["group_items"],
+                                                              **normalized_aggregation["group_items"]}
+                else:
+                    normalized_aggregations = normalized_aggregation
+    return normalized_aggregations
 
 
 # THIS WILL GO AWAY (and using one in dicationary_parented) WHEN hms_config is obsoleted to config/cli.
