@@ -1,4 +1,5 @@
 import calendar
+from copy import deepcopy
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 import pyramid
@@ -10,7 +11,16 @@ from encoded.root import SMAHTRoot
 from snovault.search.search import search as snovault_search
 from snovault.search.search_utils import make_search_subreq as snovault_make_search_subreq
 
+from hms_utils.elasticsearch_utils import merge_elasticsearch_aggregation_results, normalize_elasticsearch_aggregation_results
+from hms_utils.elasticsearch_utils import normalize_elasticsearch_aggregation_results_legacy
+
+def dj(value):
+    import json
+    print(json.dumps(value, indent=4, default=str))
+
+
 AGGREGATION_FIELD_RELEASE_DATE = "file_status_tracking.released"
+AGGREGATION_FIELD_RELEASE_DATE = "date_created"
 AGGREGATION_FIELD_CELL_LINE = "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
 AGGREGATION_FIELD_DONOR = "donors.display_title"
 AGGREGATION_FIELD_FILE_DESCRIPTOR = "release_tracker_description"
@@ -34,7 +44,7 @@ AGGREGATIONS_BY_DONOR = [
     AGGREGATION_FIELD_FILE_DESCRIPTOR
 ]
 
-AGGREGATION_MAX_BUCKETS = 25
+AGGREGATION_MAX_BUCKETS = 100
 AGGREGATION_NO_VALUE = "No value"
 
 DEFAULT_FILE_TYPES = ["OutputFile"]
@@ -46,14 +56,41 @@ DEFAULT_INCLUDE_CURRENT_MONTH = True
 
 def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -> dict:
 
-    # status = request_args(request, "status", None)
-    # category = request_args(request, "category", None)
-    # from_date = request_arg(request, "from", None)
-    # thru_date = request_arg(request, "thru", None)
-    # nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
-    # include_current_month = request_arg_bool(request, "include_current_month", False)
-    # date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
-    # ignore_ungrouped = request_arg(request, "ignore_ungrouped", True)
+    def create_query(request: pyramid.request.Request) -> str:
+
+        global AGGREGATION_FIELD_RELEASE_DATE, DEFAULT_FILE_CATEGORIES, DEFAULT_FILE_STATUSES, DEFAULT_FILE_TYPES
+
+        types = request_args(request, "type", DEFAULT_FILE_TYPES)
+        statuses = request_args(request, "status", DEFAULT_FILE_STATUSES)
+        categories = request_args(request, "category", DEFAULT_FILE_CATEGORIES)
+        from_date = request_arg(request, "from")
+        thru_date = request_arg(request, "thru")
+        nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
+        include_current_month = request_arg_bool(request, "include_current_month")
+        date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
+        # Nevermind on this because it will filter out EITHER files without donor OR cell-line, i.e. only query FOR files with BOTH
+        # which we definitely do not want; in fact normally a file will have one or the other but not both..
+        # ignore_ungrouped = request_arg(request, "ignore_ungrouped", True)
+
+        from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths,
+                                                            include_current_month=include_current_month, strings=True)
+        query_parameters = {
+            "type": types if types else None,
+            "status": statuses if statuses else None,
+            "data_category": categories if categories else None,
+            f"{date_property_name}.from": from_date if from_date else None,
+            f"{date_property_name}.to": thru_date if from_date else None,
+            # f"{AGGREGATION_FIELD_CELL_LINE}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
+            # f"{AGGREGATION_FIELD_DONOR}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
+            "from": 0,
+            "limit": 0,
+
+        }
+        query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
+        query_string = urlencode(query_parameters, True)
+        # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
+        query_string = query_string.replace("=%21", "%21=")
+        return query_string
 
     def create_elasticsearch_aggregation_query(groupings: List[str]) -> dict:
         global AGGREGATION_FIELD_RELEASE_DATE, AGGREGATION_MAX_BUCKETS, AGGREGATION_NO_VALUE
@@ -85,222 +122,106 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
             create_field_aggregation=create_field_aggregation)
         return aggregation["TODO_GET_RID_OF_THIS"]
 
-    def create_query(request: pyramid.request.Request) -> str:
-
-        global AGGREGATION_FIELD_RELEASE_DATE, DEFAULT_FILE_CATEGORIES, DEFAULT_FILE_STATUSES, DEFAULT_FILE_TYPES
-
-        types = request_args(request, "type", DEFAULT_FILE_TYPES)
-        statuses = request_args(request, "status", DEFAULT_FILE_STATUSES)
-        categories = request_args(request, "category", DEFAULT_FILE_CATEGORIES)
-        from_date = request_arg(request, "from")
-        thru_date = request_arg(request, "thru")
-        nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
-        include_current_month = request_arg_bool(request, "include_current_month")
-        date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
-        ignore_ungrouped = request_arg(request, "ignore_ungrouped", True)
-
-        from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths,
-                                                            include_current_month=include_current_month, strings=True)
-        query_parameters = {
-            "type": types if types else None,
-            "status": statuses if statuses else None,
-            "data_category": categories if categories else None,
-            f"{date_property_name}.from": from_date if from_date else None,
-            f"{date_property_name}.to": thru_date if from_date else None,
-            f"{AGGREGATION_FIELD_CELL_LINE}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
-            f"{AGGREGATION_FIELD_DONOR}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
-            "from": 0,
-            "limit": 0,
-
-        }
-        query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
-        query_string = urlencode(query_parameters, True)
-        # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
-        query_string = query_string.replace("=%21", "%21=")
-        return query_string
-
     def execute_query(request: pyramid.request.Request, query: str, aggregations: dict) -> str:
         request = snovault_make_search_subreq(request, path=query, method="GET")
         return snovault_search(None, request, custom_aggregations=aggregations)
 
-    if True:
-        query = f"/search/?{create_query(request)}"
-        aggregations = {
-            "group_by_cell_line": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_CELL_LINE),
-            "group_by_donor": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_DONOR)
-        }
-        print("QUERY:")
-        print(json.dumps(aggregations, indent=4))
-        results = execute_query(request, query, aggregations)
-        print("RESULTS:")
-        print(json.dumps(results, indent=4))
-        print(json.dumps(results["aggregations"], indent=4))
-        import pdb ; pdb.set_trace()  # noqa
-        from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-        results_normalized = normalize_elastic_search_aggregation_results(results["aggregations"]["group_by_cell_line"], prefix_grouping_value=True)
-        print_grouped_items(results_normalized, remove_prefix_grouping_value=False)
-        results_normalized = normalize_elastic_search_aggregation_results(results["aggregations"]["group_by_donor"], prefix_grouping_value=True)
-        print_grouped_items(results_normalized, remove_prefix_grouping_value=False)
-        print(json.dumps(results_normalized, indent=4))
-        import pdb ; pdb.set_trace()  # noqa
-        pass
-
-    if isinstance(aggregations := request.params.getall("aggregation"), list) and aggregations:
-        results = recent_files_summary_by(aggregations)
-    else:
-        # Default case: Do these two concurrently (TODO) ...
-        results_by_donor = recent_files_summary_by(
-            request,
-            aggregations=AGGREGATIONS_BY_DONOR,
-            aggregation_property_name="group_by_donor",
-            status=status, category=category,
-            from_date=from_date, thru_date=thru_date, nmonths=nmonths,
-            include_current_month=include_current_month)
-        results_by_cell_line = recent_files_summary_by(
-            request,
-            aggregations=AGGREGATIONS_BY_CELL_LINE,
-            aggregation_property_name="group_by_cell_line",
-            status=status, category=category,
-            from_date=from_date, thru_date=thru_date, nmonths=nmonths,
-            include_current_month=include_current_month)
-        results = combine_search_aggregation_results(results_by_cell_line, results_by_donor)
-
-    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-    # print_grouped_items(results, remove_prefix_grouping_value=False)
-    return results
-
-
-def recent_files_summary_by(request: pyramid.request.Request,
-                            aggregations: List[str],
-                            aggregation_property_name: Optional[str],
-                            status: Optional[str],
-                            category: Optional[str],
-                            from_date: Optional[str],
-                            thru_date: Optional[str],
-                            nmonths: Optional[str],
-                            include_current_month: bool = False):
-    query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
-                                                                   status=DEFAULT_FILE_STATUSES,
-                                                                   category=DEFAULT_FILE_CATEGORIES,
-                                                                   nmonths=DEFAULT_RECENT_MONTHS,
-                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
-                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
-                                                                   aggregation=aggregations,
-                                                                   aggregation_property_name=aggregation_property_name,
-                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
-                                                                   missing_value=AGGREGATION_NO_VALUE)
-
-    query = f"/search/?{query_string}"
-    request = snovault_make_search_subreq(request, path=query, method="GET")
-    results = snovault_search(None, request, custom_aggregations=aggregation_definitions)
-    results_normalized = normalize_elastic_search_aggregation_results(results.get("aggregations"),
-                                                                      prefix_grouping_value=True)
-    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-    # print_grouped_items(results_normalized, remove_prefix_grouping_value=True)
-    return results_normalized
-
-
-def create_query_for_files(
-        type: Optional[Union[str, List[str]]] = None,
-        status: Optional[Union[str, List[str]]] = None,
-        category: Optional[Union[str, List[str]]] = None,
-        from_date: Optional[str] = None,
-        thru_date: Optional[str] = None,
-        nmonths: Optional[str] = None,
-        include_current_month: bool = False,
-        date_property_name: Optional[str] = None,
-        aggregation: Optional[Union[str, List[str], dict]] = None,
-        aggregation_property_name: Optional[str] = None,
-        max_buckets: Optional[int] = None,
-        missing_value: Optional[str] = None) -> Tuple[Optional[str], Optional[dict]]:
-
-    global AGGREGATION_FIELD_RELEASE_DATE
-
-    types = []
-    if type is None:
-        type = DEFAULT_FILE_TYPES
-    if not isinstance(type, list):
-        type = [type]
-    for item in type:
-        if isinstance(item, str) and (item := item.strip()) and (item not in types):
-            types.append(item)
-
-    statuses = []
-    if status is None:
-        status = DEFAULT_FILE_STATUSES
-    if not isinstance(status, list):
-        status = [status]
-    for item in status:
-        if isinstance(item, str) and (item := item.strip()) and (item not in statuses):
-            statuses.append(item)
-
-    categories = []
-    if category is None:
-        category = DEFAULT_FILE_CATEGORIES
-    if not isinstance(category, list):
-        category = [category]
-    for item in category:
-        if isinstance(item, str) and (item := item.strip()) and (item not in categories):
-            categories.append(item)
-
-    from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths,
-                                                        include_current_month=include_current_month, strings=True)
-    if from_date or thru_date:
-        if not (isinstance(date_property_name, str) and (date_property_name := date_property_name.strip())):
-            date_property_name = AGGREGATION_FIELD_RELEASE_DATE
-
-    if not isinstance(aggregation, dict):
-        aggregations = []
-        if not isinstance(aggregation, list):
-            aggregation = [aggregation]
-        for item in aggregation:
-            if isinstance(item, str) and (item := item.strip()) and (item not in aggregations):
-                aggregations.append(item)
-        def create_field_aggregation(field: str) -> Optional[dict]:  # noqa
-            if field == AGGREGATION_FIELD_RELEASE_DATE:
-                return {
-                    "date_histogram": {
-                        "field": f"embedded.{field}",
-                        "calendar_interval": "month",
-                        "format": "yyyy-MM",
-                        "missing": "1970-01",
-                        "order": {"_key": "desc"}
-                    }
-                }
-        aggregation_definitions = _create_elasticsearch_aggregation_query(
-            aggregations,
-            aggregation_property_name=aggregation_property_name,
-            max_buckets=max_buckets,
-            missing_value=missing_value,
-            create_field_aggregation=create_field_aggregation)
-    else:
-        aggregation_definitions = aggregation
-
-    query_parameters = {
-        "type": types if types else None,
-        "status": status if status else None,
-        "data_category": categories if categories else None,
-        f"{date_property_name}.from": from_date if from_date else None,
-        f"{date_property_name}.to": thru_date if from_date else None,
-        "from": 0,
-        "limit": 0,
-
+    query = f"/search/?{create_query(request)}"
+    aggregations = {
+        "group_by_cell_line": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_CELL_LINE),
+        "group_by_donor": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_DONOR)
     }
-    query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
 
-    query_string = urlencode(query_parameters, True)
-    # Hackishness to change "=!" to "!=" in search_param_lists value for e.g.: "data_category": ["!Quality Control"]
-    query_string = query_string.replace("=%21", "%21=")
+    print("QUERY:")
+    print(query)
+    print("AGGREGATION QUERY:")
+    dj(aggregations)
+    results = execute_query(request, query, aggregations)
+    # print("RAW RESULTS:")
+    # dj(results)
 
-    # print(json.dumps(aggregation_definitions, indent=4))
-    return query_string, aggregation_definitions
+    if aggregation_results := results.get("aggregations"):
+        results_by_cell_line = aggregation_results.get("group_by_cell_line")
+        print("RAW CELL-LINE RESULTS:")
+        dj(results_by_cell_line)
+        results_by_donor = aggregation_results.get("group_by_donor")
+        print("RAW DONOR RESULTS:")
+        dj(results_by_donor)
+        results = merge_elasticsearch_aggregation_results(results_by_cell_line, results_by_donor)
+        print("MERGED RESULTS:")
+        dj(results)
+        #
+        # Note that the doc_count values returned by ElasticSearch do actually seem to be for unique items,
+        # i.e. if an item appears in two different groups (e.g. if, say, f2584000-f810-44b6-8eb7-855298c58eb3
+        # has file_sets.libraries.analytes.samples.sample_sources.cell_line.code values for both HG00438 and HG005),
+        # then it its doc_count will not count it twice. This creates a situation where it might look like the counts
+        # are wrong in this returned merged/normalized result set where the outer item count is less than the sum of
+        # the individual counts withni each sub-group. For example, the below result shows a top-level doc_count of 1
+        # even though there are 2 documents, 1 in the HG00438 group and the other in the HG005 it would be because
+        # the same unique file has a cell_line.code of both HG00438 and HG005.
+        # {
+        #     "meta": { "field_name": "file_status_tracking.released" },
+        #     "buckets": [
+        #         {
+        #             "key_as_string": "2024-12", "key": 1733011200000, "doc_count": 1,
+        #             "file_sets.libraries.analytes.samples.sample_sources.cell_line.code": {
+        #                 "meta": { "field_name": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code" },
+        #                 "buckets": [
+        #                     {   "key": "HG00438", "doc_count": 1,
+        #                         "release_tracker_description": {
+        #                             "meta": { "field_name": "release_tracker_description" },
+        #                             "buckets": [
+        #                                 { "key": "WGS Illumina NovaSeq X bam", "doc_count": 1 },
+        #                             ]
+        #                         }
+        #                     },
+        #                     {   "key": "HG005", "doc_count": 1,
+        #                         "release_tracker_description": {
+        #                             "meta": { "field_name": "release_tracker_description" },
+        #                             "buckets": [
+        #                                 { "key": "Fiber-seq PacBio Revio bam", "doc_count": 1 }
+        #                             ]
+        #                         }
+        #                     }
+        #                 ]
+        #             }
+        #         }
+        #     ]
+        # }
+        #
+        return normalize_elasticsearch_aggregation_results(results)
+
+#   results_by_cell_line = results["aggregations"]["group_by_cell_line"]
+#   results_by_donor = results["aggregations"]["group_by_donor"]
+#   results_merged = merge_elasticsearch_aggregation_results(results_by_cell_line, results_by_donor, copy=True)
+#   print("MERGED RESULTS:")
+#   dj(results_merged)
+#   print("NORMALIZED RESULTS:")
+#   results_normalized = normalize_elasticsearch_aggregation_results(results_merged)
+#   dj(results_normalized)
+
+#   return results_normalized
+
+    # results_by_cell_line = normalize_elasticsearch_aggregation_results(results_group_by_cell_line)
+
+    # results_by_cell_line = normalize_elasticsearch_aggregation_results(results_group_by_cell_line)
+    # results_by_donor = normalize_elasticsearch_aggregation_results(results_group_by_donor)
+
+    # print("RESULTS BY CELL-LINE (NORMALIZED):")
+    # dj(results_by_cell_line)
+
+    # print("RESULTS BY DONOR (NORMALIZED):")
+    # dj(results_by_donor)
+
+    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
+    # print_grouped_items(results_normalized)
 
 
 def _create_elasticsearch_aggregation_query(fields: List[str],
-                                                 aggregation_property_name: Optional[str] = None,
-                                                 max_buckets: Optional[int] = None,
-                                                 missing_value: Optional[str] = None,
-                                                 create_field_aggregation: Optional[Callable] = None) -> dict:
+                                            aggregation_property_name: Optional[str] = None,
+                                            max_buckets: Optional[int] = None,
+                                            missing_value: Optional[str] = None,
+                                            create_field_aggregation: Optional[Callable] = None) -> dict:
 
     global AGGREGATION_MAX_BUCKETS, AGGREGATION_NO_VALUE
 
@@ -334,84 +255,6 @@ def _create_elasticsearch_aggregation_query(fields: List[str],
         aggregation[aggregation_property_name]["aggs"] = nested_aggregation
 
     return aggregation
-
-
-def normalize_elastic_search_aggregation_results(data: dict) -> dict:
-    import pdb ; pdb.set_trace()  # noqa
-    pass
-    def get_first_field_with_buckets_list_property(data: dict) -> Optional[dict]:  # noqa 
-        if isinstance(data, dict):
-            for key in data:
-                if isinstance(data[key], dict) and isinstance(data[key].get("buckets"), list):
-                    return data[key]
-        return None
-    def process_field(field: dict) -> None:  # noqa
-        if not isinstance(field, dict):
-            return
-        if not isinstance(buckets := field.get("buckets"), list):
-            return
-        group_name = field.get("meta", {}).get("field_name")
-        group_items = {}
-        item_count = 0
-        for bucket in buckets:
-            if not (key := bucket.get("key_as_string")):
-                if (key := bucket.get("key")) in ["No value", "null", "None", None]:
-                    key = None
-            doc_count = bucket["doc_count"]
-            item_count += doc_count
-            if nested_field := get_first_field_with_buckets_list_property(bucket):
-                group_items[key] = process_field(nested_field)
-            else:
-                group_items[key] = doc_count
-        return {
-            "group": group_name,
-            "item_count": item_count,
-            "group_count": len(group_items),
-            "group_items": group_items,
-        }
-    if not isinstance(data, dict):
-        return {}
-    return process_field(get_first_field_with_buckets_list_property(data))
-
-
-def combine_search_aggregation_results(target: dict, source: dict) -> dict:
-    if not (isinstance(target, dict) and isinstance(source, dict) and source and
-            isinstance(target_group_items := target.get("group_items"), dict) and
-            isinstance(source_group_items := source.get("group_items"), dict)):
-        return {}
-    for source_group_item_key in source_group_items:
-        if not target_group_items.get(source_group_item_key):
-            target_group_items[source_group_item_key] = source_group_items[source_group_item_key]
-        elif isinstance(source_sub_group_items := source_group_items[source_group_item_key].get("group_items"), dict):
-            if isinstance(target_sub_group_items := target_group_items[source_group_item_key].get("group_items"), dict):
-                for source_sub_group_item_key in source_sub_group_items:
-                    if not target_sub_group_items.get(source_sub_group_item_key):
-                        # Should always be true since/if we are dealing with aggregations on two
-                        # different fields, and the grouping value is prefixed with the field name.
-                        target_sub_group_items[source_sub_group_item_key] = \
-                            source_sub_group_items[source_sub_group_item_key]
-    # TODO: Still need to sort appropriately and update counts etc ...
-    return target
-
-
-def obsolete_combine_search_aggregation_results(target: dict, source: dict) -> dict:
-    if not (isinstance(target, dict) and isinstance(source, dict) and source and
-            isinstance(target_group_items := target.get("group_items"), dict) and
-            isinstance(source_group_items := source.get("group_items"), dict)):
-        return {}
-    for source_group_item_key in source_group_items:
-        if not target_group_items.get(source_group_item_key):
-            target_group_items[source_group_item_key] = source_group_items[source_group_item_key]
-        elif isinstance(source_sub_group_items := source_group_items[source_group_item_key].get("group_items"), dict):
-            if isinstance(target_sub_group_items := target_group_items[source_group_item_key].get("group_items"), dict):
-                for source_sub_group_item_key in source_sub_group_items:
-                    if not target_sub_group_items.get(source_sub_group_item_key):
-                        # Should always be true since/if we are dealing with aggregations on two
-                        # different fields, and the grouping value is prefixed with the field name.
-                        target_sub_group_items[source_sub_group_item_key] = \
-                            source_sub_group_items[source_sub_group_item_key]
-    # TODO: Still need to sort appropriately and update counts etc ...
-    return target
 
 
 def request_arg(request: pyramid.request.Request, name: str, fallback: Optional[str] = None) -> Optional[str]:
@@ -580,61 +423,11 @@ def _parse_datetime_string(value: Union[str, datetime, date],
     return value
 
 
-import json  # noqa
 import os  # noqa
 from urllib.parse import unquote  # noqa
-from hms_utils.dictionary_utils import get_property, group_items_by_groupings, normalize_elastic_search_aggregation_results  # noqa
+# from hms_utils.dictionary_utils import get_property, group_items_by_groupings, normalize_elasticsearch_aggregation_results as adsfadf  # noqa
 from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
 from hms_utils.portal.portal_utils import create_pyramid_request_for_testing, portal_custom_search, Portal  # noqa
-
-if False:
-    print(f"\nRECENT RELEASED FILES BY DATE & CELL-LINE & DONOR & FILE-DESCRIPTOR ...\n")
-    query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
-                                                                   status=DEFAULT_FILE_STATUSES,
-                                                                   category=DEFAULT_FILE_CATEGORIES,
-                                                                   nmonths=DEFAULT_RECENT_MONTHS,
-                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
-                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
-                                                                   aggregation=AGGREGATIONS,
-                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
-                                                                   missing_value=AGGREGATION_NO_VALUE)
-    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
-    result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
-    result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
-    print_grouped_items(result_aggregations)
-
-if False:
-    print(f"\nRECENT RELEASED FILES BY DATE & CELL-LINE & FILE-DESCRIPTOR ...\n")
-    query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
-                                                                   status=DEFAULT_FILE_STATUSES,
-                                                                   category=DEFAULT_FILE_CATEGORIES,
-                                                                   nmonths=DEFAULT_RECENT_MONTHS,
-                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
-                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
-                                                                   aggregation=AGGREGATIONS_BY_CELL_LINE,
-                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
-                                                                   missing_value=AGGREGATION_NO_VALUE)
-    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
-    result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
-    result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
-    print_grouped_items(result_aggregations)
-
-if False:
-    print(f"\nRECENT RELEASED FILES BY DATE & DONOR & FILE-DESCRIPTOR ...\n")
-    query_string, aggregation_definitions = create_query_for_files(type=DEFAULT_FILE_TYPES,
-                                                                   status=DEFAULT_FILE_STATUSES,
-                                                                   category=DEFAULT_FILE_CATEGORIES,
-                                                                   nmonths=DEFAULT_RECENT_MONTHS,
-                                                                   include_current_month=DEFAULT_INCLUDE_CURRENT_MONTH,
-                                                                   date_property_name=AGGREGATION_FIELD_RELEASE_DATE,
-                                                                   aggregation=AGGREGATIONS_BY_DONOR,
-                                                                   max_buckets=AGGREGATION_MAX_BUCKETS,
-                                                                   missing_value=AGGREGATION_NO_VALUE)
-    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
-    result = portal_custom_search(portal, f"/search/?{query_string}", aggregations=aggregation_definitions)
-    result_aggregations = normalize_elastic_search_aggregation_results(result.get("aggregations"))
-    print_grouped_items(result_aggregations)
-
 
 def test():
     # Arguments to /recent_files_summary endpoint/API.
@@ -648,92 +441,8 @@ def test():
     # Call the /recent_files_summary endpoint/API.
     results = recent_files_summary(None, request)
     # Dump the results.
-    # print(json.dumps(results, indent=4))
+    print("FINAL RESULTS:")
+    dj(results)
 
-def merge_elasticsearch_aggregations(target: dict, source: dict,
-                                     copy: bool = False, _aggregation_path: List[str] = []) -> dict:
-
-    def is_aggregation(bucket: dict, bucket_key: Optional[str] = None) -> bool:
-        if not (isinstance(bucket, dict) and isinstance(bucket.get("buckets"), list)):
-            return None
-        bucket_field = bucket.get("meta", {}).get("field_name")
-        if isinstance(bucket_key, str) and bucket_key:
-            if bucket_field != bucket_key:
-                return None
-        return bucket_field
-
-    def find_aggregation(aggregation: dict, aggregation_path: List[str]) -> Optional[dict]:
-        if aggregation_field := is_aggregation(aggregation):
-            if not aggregation_path:
-                return aggregation
-            elif aggregation_field != aggregation_path[0]:
-                return None
-            elif not (aggregation_path := aggregation_path[1:]):
-                return aggregation
-            for aggregation_bucket in aggregation["buckets"]: 
-                for aggregation_bucket_key in aggregation_bucket:
-                    if is_aggregation(aggregation_bucket[aggregation_bucket_key]):
-                        if aggregation := find_aggregation(aggregation_bucket[aggregation_bucket_key],
-                                                           aggregation_path):
-                            return aggregation
-        return None
-
-    def find_bucket(aggregation: dict, aggregation_path: List[str], value: str) -> Optional[dict]:
-        if aggregation := find_aggregation(aggregation, aggregation_path):
-            for aggregation_bucket in aggregation["buckets"]: 
-                if aggregation_bucket.get("key_as_string", aggregation_bucket.get("key")) == value:
-                    return aggregation_bucket
-        return None
-
-    if not (aggregation_key := is_aggregation(source) and is_aggregation(target)):
-        return {}
-
-    if copy is True:
-        target = deepcopy(target)
-
-    #_aggregation_path += [aggregation_key]
-    #if not (target_aggregation := find_aggregation(target, _aggregation_path)):
-    # if not (target_aggregation := find_aggregation(target, [aggregation_key])):
-    #    import pdb ; pdb.set_trace()  # noqa
-    #    pass
-    #import pdb ; pdb.set_trace()  # noqa
-
-    if not (target_aggregation := find_aggregation(target, [aggregation_key])):
-        import pdb ; pdb.set_trace()  # noqa
-        pass
-    import pdb ; pdb.set_trace()  # noqa
-    pass
-
-    for source_bucket in source["buckets"]:
-        if not isinstance(source_bucket, dict):
-            continue
-        if not isinstance(source_bucket_value := source_bucket.get("key_as_string", source_bucket.get("key")), str):
-            continue
-        if not isinstance(source_bucket_item_count := source_bucket.get("doc_count"), int):
-            continue
-        is_source_bucket_aggregation = False
-        for source_bucket_key in source_bucket:
-            if source_bucket_field := is_aggregation(source_bucket[source_bucket_key], source_bucket_key):
-                print(f"IS-AGGREGATION: {source_bucket_key} | {source_bucket_field}")
-                print(target["buckets"])
-                print(source_bucket_value)
-                # if target_bucket := find_aggregation(target, _aggregation_path + [source_bucket_field]):
-                if target_bucket := find_aggregation(target, [aggregation_key, source_bucket_field]):
-                    import pdb ; pdb.set_trace()  # noqa
-                    merge_elasticsearch_aggregations(target_bucket,
-                                                     source_bucket[source_bucket_key], [aggregation_key, source_bucket_field])
-                    # source_bucket[source_bucket_key], _aggregation_path + [source_bucket_field])
-                is_source_bucket_aggregation = True
-        if not is_source_bucket_aggregation:
-            # Terminal buckets which contain no nested aggregations/buckets; merge in source.
-            print(f"TERMINAL: {source_bucket}")
-            import pdb ; pdb.set_trace()  # noqa
-            pass
-            x = find_aggregation(target, _aggregation_path)
-            y = find_bucket(target, _aggregation_path, source_bucket_value)
-            pass
-
-
-merge_elasticsearch_aggregations(group_by_cell_line, group_by_donor)
 
 test()
