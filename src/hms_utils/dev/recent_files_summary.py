@@ -1,5 +1,4 @@
 import calendar
-from copy import deepcopy
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 import pyramid
@@ -12,7 +11,6 @@ from snovault.search.search import search as snovault_search
 from snovault.search.search_utils import make_search_subreq as snovault_make_search_subreq
 
 from hms_utils.elasticsearch_utils import merge_elasticsearch_aggregation_results, normalize_elasticsearch_aggregation_results
-from hms_utils.elasticsearch_utils import normalize_elasticsearch_aggregation_results_legacy
 
 def dj(value):
     import json
@@ -20,29 +18,9 @@ def dj(value):
 
 
 AGGREGATION_FIELD_RELEASE_DATE = "file_status_tracking.released"
-AGGREGATION_FIELD_RELEASE_DATE = "date_created"
 AGGREGATION_FIELD_CELL_LINE = "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
 AGGREGATION_FIELD_DONOR = "donors.display_title"
 AGGREGATION_FIELD_FILE_DESCRIPTOR = "release_tracker_description"
-
-AGGREGATIONS = [
-    AGGREGATION_FIELD_RELEASE_DATE,
-    AGGREGATION_FIELD_CELL_LINE,
-    AGGREGATION_FIELD_DONOR,
-    AGGREGATION_FIELD_FILE_DESCRIPTOR
-]
-
-AGGREGATIONS_BY_CELL_LINE = [
-    AGGREGATION_FIELD_RELEASE_DATE,
-    AGGREGATION_FIELD_CELL_LINE,
-    AGGREGATION_FIELD_FILE_DESCRIPTOR
-]
-
-AGGREGATIONS_BY_DONOR = [
-    AGGREGATION_FIELD_RELEASE_DATE,
-    AGGREGATION_FIELD_DONOR,
-    AGGREGATION_FIELD_FILE_DESCRIPTOR
-]
 
 AGGREGATION_MAX_BUCKETS = 100
 AGGREGATION_NO_VALUE = "No value"
@@ -56,21 +34,21 @@ DEFAULT_INCLUDE_CURRENT_MONTH = True
 
 def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -> dict:
 
+    date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
+    debug = request_arg_bool(request, "debug")
+
     def create_query(request: pyramid.request.Request) -> str:
 
-        global AGGREGATION_FIELD_RELEASE_DATE, DEFAULT_FILE_CATEGORIES, DEFAULT_FILE_STATUSES, DEFAULT_FILE_TYPES
+        global DEFAULT_FILE_CATEGORIES, DEFAULT_FILE_STATUSES, DEFAULT_FILE_TYPES
+        nonlocal date_property_name
 
         types = request_args(request, "type", DEFAULT_FILE_TYPES)
         statuses = request_args(request, "status", DEFAULT_FILE_STATUSES)
         categories = request_args(request, "category", DEFAULT_FILE_CATEGORIES)
         from_date = request_arg(request, "from")
         thru_date = request_arg(request, "thru")
-        nmonths = request_arg_int(request, "months", DEFAULT_RECENT_MONTHS)
+        nmonths = request_arg_int(request, "nmonths", request_arg_int(request, "months", DEFAULT_RECENT_MONTHS))
         include_current_month = request_arg_bool(request, "include_current_month")
-        date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
-        # Nevermind on this because it will filter out EITHER files without donor OR cell-line, i.e. only query FOR files with BOTH
-        # which we definitely do not want; in fact normally a file will have one or the other but not both..
-        # ignore_ungrouped = request_arg(request, "ignore_ungrouped", True)
 
         from_date, thru_date = parse_date_related_arguments(from_date, thru_date, nmonths=nmonths,
                                                             include_current_month=include_current_month, strings=True)
@@ -80,11 +58,8 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
             "data_category": categories if categories else None,
             f"{date_property_name}.from": from_date if from_date else None,
             f"{date_property_name}.to": thru_date if from_date else None,
-            # f"{AGGREGATION_FIELD_CELL_LINE}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
-            # f"{AGGREGATION_FIELD_DONOR}": f"!{AGGREGATION_NO_VALUE}" if ignore_ungrouped else None,
             "from": 0,
-            "limit": 0,
-
+            "limit": 0
         }
         query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
         query_string = urlencode(query_parameters, True)
@@ -93,7 +68,8 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         return query_string
 
     def create_elasticsearch_aggregation_query(groupings: List[str]) -> dict:
-        global AGGREGATION_FIELD_RELEASE_DATE, AGGREGATION_MAX_BUCKETS, AGGREGATION_NO_VALUE
+        global AGGREGATION_MAX_BUCKETS, AGGREGATION_NO_VALUE
+        nonlocal date_property_name
         aggregations = []
         if not isinstance(groupings, list):
             groupings = [groupings]
@@ -103,8 +79,8 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         if not aggregations:
             return {}
         def create_field_aggregation(field: str) -> Optional[dict]:  # noqa
-            global AGGREGATION_FIELD_RELEASE_DATE
-            if field == AGGREGATION_FIELD_RELEASE_DATE:
+            nonlocal date_property_name
+            if field == date_property_name:
                 return {
                     "date_histogram": {
                         "field": f"embedded.{field}",
@@ -127,9 +103,22 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         return snovault_search(None, request, custom_aggregations=aggregations)
 
     query = f"/search/?{create_query(request)}"
+
+    aggregations_by_cell_line = [
+        date_property_name,
+        AGGREGATION_FIELD_CELL_LINE,
+        AGGREGATION_FIELD_FILE_DESCRIPTOR
+    ]
+
+    aggregations_by_donor = [
+        date_property_name,
+        AGGREGATION_FIELD_DONOR,
+        AGGREGATION_FIELD_FILE_DESCRIPTOR
+    ]
+
     aggregations = {
-        "group_by_cell_line": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_CELL_LINE),
-        "group_by_donor": create_elasticsearch_aggregation_query(AGGREGATIONS_BY_DONOR)
+        "group_by_cell_line": create_elasticsearch_aggregation_query(aggregations_by_cell_line),
+        "group_by_donor": create_elasticsearch_aggregation_query(aggregations_by_donor)
     }
 
     print("QUERY:")
@@ -137,19 +126,22 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
     print("AGGREGATION QUERY:")
     dj(aggregations)
     results = execute_query(request, query, aggregations)
-    # print("RAW RESULTS:")
-    # dj(results)
+
+    if debug:
+        print("RAW RESULTS:")
+        dj(results)
 
     if aggregation_results := results.get("aggregations"):
         results_by_cell_line = aggregation_results.get("group_by_cell_line")
-        print("RAW CELL-LINE RESULTS:")
-        dj(results_by_cell_line)
         results_by_donor = aggregation_results.get("group_by_donor")
-        print("RAW DONOR RESULTS:")
-        dj(results_by_donor)
         results = merge_elasticsearch_aggregation_results(results_by_cell_line, results_by_donor)
-        print("MERGED RESULTS:")
-        dj(results)
+        if debug:
+            print("RAW CELL-LINE RESULTS:")
+            dj(results_by_cell_line)
+            print("RAW DONOR RESULTS:")
+            dj(results_by_donor)
+            print("MERGED RESULTS:")
+            dj(results)
         #
         # Note that the doc_count values returned by ElasticSearch do actually seem to be for unique items,
         # i.e. if an item appears in two different groups (e.g. if, say, f2584000-f810-44b6-8eb7-855298c58eb3
@@ -190,31 +182,6 @@ def recent_files_summary(context: SMAHTRoot, request: pyramid.request.Request) -
         # }
         #
         return normalize_elasticsearch_aggregation_results(results)
-
-#   results_by_cell_line = results["aggregations"]["group_by_cell_line"]
-#   results_by_donor = results["aggregations"]["group_by_donor"]
-#   results_merged = merge_elasticsearch_aggregation_results(results_by_cell_line, results_by_donor, copy=True)
-#   print("MERGED RESULTS:")
-#   dj(results_merged)
-#   print("NORMALIZED RESULTS:")
-#   results_normalized = normalize_elasticsearch_aggregation_results(results_merged)
-#   dj(results_normalized)
-
-#   return results_normalized
-
-    # results_by_cell_line = normalize_elasticsearch_aggregation_results(results_group_by_cell_line)
-
-    # results_by_cell_line = normalize_elasticsearch_aggregation_results(results_group_by_cell_line)
-    # results_by_donor = normalize_elasticsearch_aggregation_results(results_group_by_donor)
-
-    # print("RESULTS BY CELL-LINE (NORMALIZED):")
-    # dj(results_by_cell_line)
-
-    # print("RESULTS BY DONOR (NORMALIZED):")
-    # dj(results_by_donor)
-
-    # from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
-    # print_grouped_items(results_normalized)
 
 
 def _create_elasticsearch_aggregation_query(fields: List[str],
@@ -278,11 +245,17 @@ def request_args(request: pyramid.request.Request,
                  name: str, fallback: Optional[str] = None, duplicates: bool = False) -> List[str]:
     args = []
     if isinstance(value := request.params.getall(name), list):
+        # Note that request.paramss.getall always returns a list,
+        # even if the named query parameter is not specified at all.
+        if value == []:
+            if request.params.get(name) is None:
+                # Only return the fallback if the named query parameter was not specified at all.
+                return fallback
         for item in value:
             if isinstance(item, str) and (item := item.strip()):
                 if (item not in args) or (duplicates is True):
                     args.append(item)
-    return args if args else fallback
+    return args
 
 
 def parse_date_related_arguments(
@@ -430,17 +403,16 @@ from hms_utils.dictionary_print_utils import print_grouped_items  # noqa
 from hms_utils.portal.portal_utils import create_pyramid_request_for_testing, portal_custom_search, Portal  # noqa
 
 def test():
-    # Arguments to /recent_files_summary endpoint/API.
     request_args = {
-        "nmonths": 6,
-        "include_current_month": "true"
+        "nmonths": 18,
+        "include_current_month": "true",
+        "date_property_name": "date_created",
+        # "category": "",
+        "debug": "true"
     }
-    # Dummy for local testing.
     portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
     request = create_pyramid_request_for_testing(portal.vapp, request_args)
-    # Call the /recent_files_summary endpoint/API.
     results = recent_files_summary(None, request)
-    # Dump the results.
     print("FINAL RESULTS:")
     dj(results)
 
