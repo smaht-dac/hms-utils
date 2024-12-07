@@ -1,6 +1,5 @@
-from __future__ import annotations
 from copy import deepcopy
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 
 def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bool = False) -> Optional[dict]:
@@ -71,7 +70,12 @@ def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bo
                     if get_aggregation_bucket_doc_count(target_bucket) is not None:
                         target_bucket["doc_count"] += source_bucket_item_count
                         merged_item_count += source_bucket_item_count
-                continue
+            else:
+                target["buckets"].append(source_bucket)
+                if isinstance(target.get("doc_count"), int):
+                    target["doc_count"] += source_bucket_item_count
+                else:
+                    target["doc_count"] = source_bucket_item_count
         return merged_item_count, target
 
     if copy is True:
@@ -79,8 +83,11 @@ def merge_elasticsearch_aggregation_results(target: dict, source: dict, copy: bo
     return merge_results(target, source)[1]
 
 
-def normalize_elasticsearch_aggregation_results(aggregation: dict,
-                                                sort: bool = False, remove_empty_items: bool = True) -> dict:
+def normalize_elasticsearch_aggregation_results(
+        aggregation: dict,
+        sort: Union[bool, str, Callable, List[Union[bool, str, Callable]]] = False,
+        additional_properties: Optional[dict] = None,
+        remove_empty_items: bool = True) -> dict:
 
     def get_aggregation_key(aggregation: dict, aggregation_key: Optional[str] = None) -> Optional[str]:
         # TODO: same as in merge_elasticsearch_aggregation_results function
@@ -109,10 +116,12 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict,
         results = []
         if isinstance(data, dict):
             for key in data:
-                if get_aggregation_key(data[key]):
+                if get_aggregation_key(data[key]) and data[key]["buckets"]:
                     results.append(data[key])
-            if (not results) and data.get("buckets", list):
-                results.append(data)
+            if not results:
+                if ((isinstance(data.get("buckets"), list) and data["buckets"]) or
+                    (isinstance(data.get("key"), str) and isinstance(data.get("doc_count"), int))):  # noqa
+                    results.append(data)
         return results
 
     def find_group_item(group_items: List[dict], value: Any) -> Optional[dict]:
@@ -122,10 +131,15 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict,
                     return group_item
         return None
 
-    def normalize_results(aggregation: dict, key: Optional[str] = None, value: Optional[str] = None) -> dict:
+    def normalize_results(aggregation: dict,
+                          key: Optional[str] = None, value: Optional[str] = None,
+                          additional_properties: Optional[dict] = None) -> dict:
+
         nonlocal remove_empty_items
+
         if not (aggregation_key := get_aggregation_key(aggregation)):
             return {}
+
         group_items = [] ; item_count = 0  # noqa
         for bucket in aggregation["buckets"]:
             if (((bucket_value := get_aggregation_bucket_value(bucket)) is None) or
@@ -136,7 +150,6 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict,
                 for nested_aggregation in nested_aggregations:
                     if normalized_aggregation := normalize_results(nested_aggregation, aggregation_key, bucket_value):
                         if group_item := find_group_item(group_items, bucket_value):
-                            # group_item["items"].extend(normalized_aggregation["items"])
                             for normalized_aggregation_item in normalized_aggregation["items"]:
                                 group_item["items"].append(normalized_aggregation_item)
                                 group_item["count"] += normalized_aggregation_item["count"]
@@ -147,23 +160,60 @@ def normalize_elasticsearch_aggregation_results(aggregation: dict,
                         if (remove_empty_items is False) or (bucket_item_count > 0):
                             group_item = {"name": aggregation_key, "value": bucket_value, "count": bucket_item_count}
                             group_items.append(group_item)
+
         if (remove_empty_items is not False) and (not group_items):
             return {}
-        result = {"name": key, "value": value, "count": item_count, "items": group_items}
+        results = {"name": key, "value": value, "count": item_count, "items": group_items}
+
+        if isinstance(additional_properties, dict) and additional_properties:
+            results = {**additional_properties, **results}
+
         if key is None:
-            del result["name"]
+            del results["name"]
             if value is None:
-                del result["value"]
-        return result
+                del results["value"]
+
+        return results
 
     def sort_results(data: dict) -> None:
-        if isinstance(data, dict) and isinstance(items := data.get("items"), list):
-            items.sort(key=lambda item: (-item.get("count", 0), item.get("value", "")))
-            for item in items:
-                sort_results(item)
 
-    results = normalize_results(aggregation)
-    if sort is True:
+        nonlocal sort
+
+        def sort_items(items: List[dict], sort: Union[bool, str, Callable]) -> None:
+            sort_function_default = lambda item: (-item.get("count", 0), item.get("value", ""))  # noqa
+            if (sort is True) or (isinstance(sort, str) and (sort.strip().lower() == "default")):
+                items.sort(key=sort_function_default)
+            elif isinstance(sort, str) and (sort := sort.strip().lower()):
+                if sort.startswith("-"):
+                    sort_reverse = True
+                    sort = sort[1:]
+                else:
+                    sort_reverse = False
+                if (sort in ["default"]):
+                    items.sort(key=sort_function_default, reverse=sort_reverse)
+                elif (sort in ["key", "value"]):
+                    items.sort(key=lambda item: item.get("value", ""), reverse=sort_reverse)
+            elif callable(sort):
+                items.sort(key=lambda item: sort(item))
+
+        def sort_results_nested(data: dict, level: int = 0) -> None:
+            nonlocal sort
+            if isinstance(sort, list) and sort:
+                if level < len(sort):
+                    sort_level = sort[level]
+                else:
+                    sort_level = sort[len(sort) - 1]
+            else:
+                sort_level = sort
+            if isinstance(data, dict) and isinstance(items := data.get("items"), list):
+                sort_items(items, sort=sort_level)
+                for item in items:
+                    sort_results_nested(item, level=level + 1)
+
+        sort_results_nested(data)
+
+    results = normalize_results(aggregation, additional_properties=additional_properties)
+    if sort:
         sort_results(results)
     return results
 
