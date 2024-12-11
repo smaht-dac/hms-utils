@@ -59,8 +59,9 @@ def main():
     if not (portal := Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug, ping=argv.ping)):
         error()
 
+    import pdb ; pdb.set_trace()  # noqa
     if argv.user:
-        if not (portal_for_user := Portal.create(argv.user or argv.env, verbose=argv.verbose, debug=argv.debug)):
+        if not (portal_for_user := Portal.create(argv.env, verbose=argv.verbose, debug=argv.debug)):
             error()
         if portal.server != portal_for_user.server:
             error(f"Mismatched Portal environments: {portal.server} vs {portal_for_user.server}")

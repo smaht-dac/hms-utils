@@ -1,13 +1,20 @@
 import pyramid
 from typing import List, Optional
 from urllib.parse import urlencode
-from encoded.elasticsearch_utils import create_elasticsearch_aggregation_query
-from encoded.elasticsearch_utils import merge_elasticsearch_aggregation_results
-from encoded.elasticsearch_utils import normalize_elasticsearch_aggregation_results
+from encoded.root import SMAHTRoot
+from encoded.elasticsearch_utils import (
+    create_elasticsearch_aggregation_query,
+    merge_elasticsearch_aggregation_results,
+    normalize_elasticsearch_aggregation_results)
 from encoded.endpoint_utils import parse_date_range_related_arguments
 from encoded.endpoint_utils import request_arg, request_args, request_arg_bool, request_arg_int
+
 from snovault.search.search import search as snovault_search
 from snovault.search.search_utils import make_search_subreq as snovault_make_search_subreq
+
+from hms_utils.misc_utils import dj
+from hms_utils.chars import chars
+from hms_utils.terminal_utils import terminal_color
 
 QUERY_FILE_TYPES = ["OutputFile"]
 QUERY_FILE_STATUSES = ["released"]
@@ -23,336 +30,261 @@ AGGREGATION_FIELD_FILE_DESCRIPTOR = "release_tracker_description"
 AGGREGATION_MAX_BUCKETS = 100
 AGGREGATION_NO_VALUE = "No value"
 
+import os
+from encoded.recent_files_summary import recent_files_summary
+from hms_utils.dictionary_print_utils import print_grouped_items
+from hms_utils.portal.portal_utils import create_pyramid_request_for_testing, portal_custom_search, Portal
 
-def recent_files_summary(request: pyramid.request.Request) -> dict:
-    """
-    This supports the (new as of 2024-12)  /recent_files_summary endpoint (for C4-1192) to return,
-    by default, info for files released withing the past three months grouped by release-date,
-    cell-line or donor, and file-description. The specific fields used for these groupings are:
+def test():
 
-    - release-date: file_status_tracking.released
-    - cell-line: file_sets.libraries.analytes.samples.sample_sources.cell_line.code
-    - donor: donors.display_title
-    - file-dsecription: release_tracker_description
-
-    Note that release_tracker_description is a newer (2024-12)
-    calculated property - see PR-298 (branch: sn_file_release_tracker).
-
-    By default the current (assuminging partial) month IS included, so we really return info for
-    the past FULL three months plus for whatever time has currently elapsed for the current month. 
-    Use pass the include_current_month=false query argument to NOT include the current month.
-
-    The number of months of data can be controlled using the nmonths query argument, e.g. nmonths=6.
-
-    A specific date range can also be passed in e.g. using from_date=2024-08-01 and thru_date=2024-10-31.
-
-    For testing purposes, a date field other than the default file_status_tracking.released can
-    also be specified using the date_property_name query argument. And file statuses other than
-    released can be queried for using one or more status query arguments, e.g. status=uploaded. 
-    """
-
-    date_property_name = request_arg(request, "date_property_name", AGGREGATION_FIELD_RELEASE_DATE)
-    max_buckets = request_arg_bool(request, "max_buckets", AGGREGATION_MAX_BUCKETS)
-    nosort = request_arg_bool(request, "nosort")
-    debug = request_arg_bool(request, "debug")
-    debug_query = request_arg_bool(request, "debug_query")
-    raw = request_arg_bool(request, "raw")
-
-    def create_query(request: pyramid.request.Request) -> str:
-
-        global QUERY_FILE_CATEGORIES, QUERY_FILE_STATUSES, QUERY_FILE_TYPES
-        nonlocal date_property_name
-
-        types = request_args(request, "type", QUERY_FILE_TYPES)
-        statuses = request_args(request, "status", QUERY_FILE_STATUSES)
-        categories = request_args(request, "category", QUERY_FILE_CATEGORIES)
-        recent_months = request_arg_int(request, "nmonths", request_arg_int(request, "months", QUERY_RECENT_MONTHS))
-        from_date = request_arg(request, "from_date")
-        thru_date = request_arg(request, "thru_date")
-        include_current_month = request_arg_bool(request, "include_current_month", QUERY_INCLUDE_CURRENT_MONTH)
-
-        from_date, thru_date = parse_date_range_related_arguments(from_date, thru_date, nmonths=recent_months,
-                                                                  include_current_month=include_current_month,
-                                                                  strings=True)
-        query_parameters = {
-            "type": types if types else None,
-            "status": statuses if statuses else None,
-            "data_category": categories if categories else None,
-            f"{date_property_name}.from": from_date if from_date else None,
-            f"{date_property_name}.to": thru_date if from_date else None,
-            "from": 0,
-            "limit": 0
-        }
-        query_parameters = {key: value for key, value in query_parameters.items() if value is not None}
-        query_string = urlencode(query_parameters, True)
-        # Hackishness to change "=!" to "!=" in search_param_lists value for e.g. to turn this in the
-        # query_parameters above "data_category": ["!Quality Control"] into: data_category&21=Quality+Control
-        query_string = query_string.replace("=%21", "%21=")
-        return f"/search/?{query_string}"
-
-    def create_aggregations_query(aggregation_fields: List[str]) -> dict:
-        global AGGREGATION_NO_VALUE
-        nonlocal date_property_name, max_buckets
-        aggregations = []
-        if not isinstance(aggregation_fields, list):
-            aggregation_fields = [aggregation_fields]
-        for item in aggregation_fields:
-            if isinstance(item, str) and (item := item.strip()) and (item not in aggregations):
-                aggregations.append(item)
-        if not aggregations:
-            return {}
-        def create_field_aggregation(field: str) -> Optional[dict]:  # noqa
-            nonlocal date_property_name
-            if field == date_property_name:
-                return {
-                    "date_histogram": {
-                        "field": f"embedded.{field}",
-                        "calendar_interval": "month",
-                        "format": "yyyy-MM",
-                        "missing": "1970-01",
-                        "order": {"_key": "desc"}
-                    }
-                }
-        aggregation_query = create_elasticsearch_aggregation_query(
-            aggregations,
-            max_buckets=max_buckets,
-            missing_value=AGGREGATION_NO_VALUE,
-            create_field_aggregation=create_field_aggregation)
-        return aggregation_query[date_property_name]
-
-    def execute_query(request: pyramid.request.Request, query: str, aggregations_query: dict) -> str:
-        request = snovault_make_search_subreq(request, path=query, method="GET")
-        results = snovault_search(None, request, custom_aggregations=aggregations_query)
-        return results
-
-    query = create_query(request)
-
-    aggregations_by_cell_line = [
-        date_property_name,
-        AGGREGATION_FIELD_CELL_LINE,
-        AGGREGATION_FIELD_FILE_DESCRIPTOR
-    ]
-
-    aggregations_by_donor = [
-        date_property_name,
-        AGGREGATION_FIELD_DONOR,
-        AGGREGATION_FIELD_FILE_DESCRIPTOR
-    ]
-
-    aggregations_query = {
-        "group_by_cell_line": create_aggregations_query(aggregations_by_cell_line),
-        "group_by_donor": create_aggregations_query(aggregations_by_donor)
+    request_args = {
+        "nmonths": 18,
+        "include_current_month": "true",
+        # "date_property_name": "date_created",
+        "nocells": True,  # TODO: PROBABLY MAKE THIS THE DEFAULT (PER ELIZABETH SUGGESTION 2024-12-11) 
+        # "legacy": True,
+        # "nomixtures": True,
+        # "favor_donor": True,
+        "troubleshoot": True,
+        "troubleshoot_elasticsearch": True,
+        "debug": False,
+        "debug_query": False,
+        "include_missing": False,
+        "raw": False,
+        # "willrfix": True,
     }
 
-    if False:
-        aggregations_query["group_by_cell_line"]["filter"] = {
-            "bool": {
-                "must": [{
-                    "exists": {
-                        "field": f"embedded.{AGGREGATION_FIELD_CELL_LINE}.raw"
-                    }
-                }]
-            }
-        }
-        aggregations_query["group_by_donor"]["filter"] = {
-            "bool": {
-                "must": [{
-                    "exists": {
-                        "field": f"embedded.{AGGREGATION_FIELD_DONOR}.raw"
-                    }
-                }]
-            }
-        }
-        # aggregations_query["group_by_cell_line"]["aggs"] = {"date_histogram": aggregations_query["group_by_cell_line"]["aggs"]}
-        # aggregations_query["group_by_donor"]["aggs"] = {"date_histogram": aggregations_query["group_by_donor"]["aggs"]}
-        aggregations_query["group_by_cell_line"]["aggs"] = {
-            "date_histogram": {
-                "date_histogram": aggregations_query["group_by_cell_line"]["date_histogram"],
-                "aggs": aggregations_query["group_by_cell_line"]["aggs"]
-            }
-        }
-        del aggregations_query["group_by_cell_line"]["date_histogram"]
-        aggregations_query["group_by_donor"]["aggs"] = {
-            "date_histogram": {
-                "date_histogram": aggregations_query["group_by_donor"]["date_histogram"],
-                "aggs": aggregations_query["group_by_donor"]["aggs"]
-            }
-        }
-        del aggregations_query["group_by_donor"]["date_histogram"]
+    portal = Portal(os.path.expanduser("~/repos/smaht-portal/development.ini"))
 
-    xxx_aggregations_query = {
-    "group_by_cell_line": {
-      "filter": {
-        "bool": {
-          "must": [
-            {
-              "exists": {
-                "field": "embedded.file_sets.libraries.analytes.samples.sample_sources.cell_line.code.raw"
-              }
-            }
-          ]
-        }
-      },
-      "aggs": {
-        "date_histogram": {
-          "date_histogram": {
-            "field": "embedded.date_created",
-            "calendar_interval": "month",
-            "format": "yyyy-MM",
-            "missing": "1970-01",
-            "order": {
-              "_key": "desc"
-            }
-          },
-          "aggs": {
-            "file_sets.libraries.analytes.samples.sample_sources.cell_line.code": {
-              "terms": {
-                "field": "embedded.file_sets.libraries.analytes.samples.sample_sources.cell_line.code.raw",
-                "missing": "No value",
-                "size": 100
-              },
-              "meta": {
-                "field_name": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
-              },
-              "aggs": {
-                "release_tracker_description": {
-                  "terms": {
-                    "field": "embedded.release_tracker_description.raw",
-                    "missing": "No value",
-                    "size": 100
-                  },
-                  "meta": {
-                    "field_name": "release_tracker_description"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "group_by_donor": {
-      "filter": {
-        "bool": {
-          "must": [
-            {
-              "exists": {
-                "field": "embedded.donors.display_title.raw"
-              }
-            }
-          ]
-        }
-      },
-      "aggs": {
-        "date_histogram": {
-          "date_histogram": {
-            "field": "embedded.date_created",
-            "calendar_interval": "month",
-            "format": "yyyy-MM",
-            "missing": "1970-01",
-            "order": {
-              "_key": "desc"
-            }
-          },
-          "aggs": {
-            "donors.display_title": {
-              "terms": {
-                "field": "embedded.donors.display_title.raw",
-                "missing": "No value",
-                "size": 100
-              },
-              "meta": {
-                "field_name": "donors.display_title"
-              },
-              "aggs": {
-                "release_tracker_description": {
-                  "terms": {
-                    "field": "embedded.release_tracker_description.raw",
-                    "missing": "No value",
-                    "size": 100
-                  },
-                  "meta": {
-                    "field_name": "release_tracker_description"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-}
+    def request_embed(query: str, as_user: Optional[str] = None) -> Optional[dict]:
+        nonlocal portal
+        return portal.get_metadata(query)
 
-    if debug_query:
-        return {"query": query, "aggregations_query": aggregations_query}
+    request = create_pyramid_request_for_testing(portal.vapp, request_args)
+    request.embed = request_embed
 
-    raw_results = execute_query(request, query, aggregations_query)
+    results = recent_files_summary(request)
 
-    # Note that the doc_count values returned by ElasticSearch do actually seem to be for unique items,
-    # i.e. if an item appears in two different groups (e.g. if, say, f2584000-f810-44b6-8eb7-855298c58eb3
-    # has file_sets.libraries.analytes.samples.sample_sources.cell_line.code values for both HG00438 and HG005),
-    # then it its doc_count will not count it twice. This creates a situation where it might look like the counts
-    # are wrong in this returned merged/normalized result set where the outer item count is less than the sum of
-    # the individual counts withni each sub-group. For example, the below result shows a top-level doc_count of 1
-    # even though there are 2 documents, 1 in the HG00438 group and the other in the HG005 it would be because
-    # the same unique file has a cell_line.code of both HG00438 and HG005.
-    # {
-    #     "meta": { "field_name": "file_status_tracking.released" },
-    #     "buckets": [
-    #         {
-    #             "key_as_string": "2024-12", "key": 1733011200000, "doc_count": 1,
-    #             "file_sets.libraries.analytes.samples.sample_sources.cell_line.code": {
-    #                 "meta": { "field_name": "file_sets.libraries.analytes.samples.sample_sources.cell_line.code" },
-    #                 "buckets": [
-    #                     {   "key": "HG00438", "doc_count": 1,
-    #                         "release_tracker_description": {
-    #                             "meta": { "field_name": "release_tracker_description" },
-    #                             "buckets": [
-    #                                 { "key": "WGS Illumina NovaSeq X bam", "doc_count": 1 },
-    #                             ]
-    #                         }
-    #                     },
-    #                     {   "key": "HG005", "doc_count": 1,
-    #                         "release_tracker_description": {
-    #                             "meta": { "field_name": "release_tracker_description" },
-    #                             "buckets": [
-    #                                 { "key": "Fiber-seq PacBio Revio bam", "doc_count": 1 }
-    #                             ]
-    #                         }
-    #                     }
-    #                 ]
-    #             }
-    #         }
-    #     ]
-    # }
+    # print("FINAL RESULTS:")
+    # dj(results)
+    print_normalized_aggregation_results(results, uuids=True, uuid_details=True, verbose=False)
 
-    if raw:
-        # For debugging/troubleshooting only if raw=true then return raw ElasticSearch results.
-        if debug:
-            raw_results = {"query": query, "aggregations_query": aggregations_query, "raw_results": raw_results}
-        elif "@id" in raw_results:
-            # Unless we do this we get redirect to the URL in this field, for example
-            # to: /search/?type=OutputFile&status=released&data_category%21=Quality+Control
-            #         &file_status_tracking.released.from=2024-09-30
-            #         &file_status_tracking.released.to=2024-12-31&from=0&limit=0'
-            del raw_results["@id"]
-        return raw_results
 
-    if not (raw_results := raw_results.get("aggregations")):
-        return {}
+def print_normalized_aggregation_results(data: dict,
+                                         title: Optional[str] = None,
+                                         parent_grouping_name: Optional[str] = None,
+                                         parent_grouping_value: Optional[str] = None,
+                                         uuids: bool = False,
+                                         uuid_details: bool = False,
+                                         verbose: bool = False,
+                                         indent: int = 0) -> None:
 
-    raw_results_by_cell_line = raw_results.get("group_by_cell_line")
-    raw_results_by_donor = raw_results.get("group_by_donor")
-    import pdb ; pdb.set_trace()  # noqa
+    sample_source_property_name = "file_sets.libraries.analytes.samples.sample_sources.code"
+    cell_line_property_name = "file_sets.libraries.analytes.samples.sample_sources.cell_line.code"
+    donor_property_name = "donors.display_title"
+    red = lambda text: terminal_color(text, "red")
+    green = lambda text: terminal_color(text, "green")
+    bold = lambda text: terminal_color(text, "white", bold=True)
 
-    if False:
-        raw_results_by_cell_line["buckets"] = raw_results_by_cell_line["date_histogram"]["buckets"]
-        del raw_results_by_cell_line["date_histogram"]
-        raw_results_by_donor["buckets"] = raw_results_by_donor["date_histogram"]["buckets"]
-        del raw_results_by_donor["date_histogram"]
-        pass
+    def format_hit_property_values(hit: dict, property_name: str) -> Optional[str]:
+        nonlocal parent_grouping_name, parent_grouping_value
+        if property_value := hit.get(property_name):
+            if property_name == parent_grouping_name:
+                property_values = []
+                for property_value in property_value.split(","):
+                    if (property_value := property_value.strip()) == parent_grouping_value:
+                        property_values.append(green(property_value))
+                    else:
+                        property_values.append(property_value)
+                property_value = ", ".join(property_values)
+        return property_value
 
-    merged_results = merge_elasticsearch_aggregation_results(raw_results_by_cell_line, raw_results_by_donor)
-    additional_properties = {"query": query, "aggregations_query": aggregations_query} if debug else None
-    return normalize_elasticsearch_aggregation_results(merged_results, sort=not nosort,
-                                                       additional_properties=additional_properties)
+    def get_hits(data: dict) -> List[str]:
+        hits = []
+        if isinstance(portal_hits := data.get("debug", {}).get("portal_hits"), list):
+            for portal_hit in portal_hits:
+                if isinstance(portal_hit, dict) and isinstance(uuid := portal_hit.get("uuid"), str) and uuid:
+                    hits.append(portal_hit)
+        return hits
+
+    if not (isinstance(data, dict) and data):
+        return
+    if not (isinstance(indent, int) and (indent > 0)):
+        indent = 0
+    spaces = (" " * indent) if indent > 0 else ""
+    grouping_name = data.get("name")
+    if isinstance(grouping_value := data.get("value"), str) and grouping_value:
+        grouping = grouping_value
+        if (verbose is True) and isinstance(grouping_name, str) and grouping_name:
+            grouping = f"{grouping_name} {chars.dot} {grouping}"
+    elif not (isinstance(grouping := title, str) and  grouping):
+        grouping = "RESULTS"
+    grouping = f"{chars.diamond} {bold(grouping)}"
+    hits = get_hits(data) if (uuids is True) else []
+    if isinstance(count := data.get("count"), int):
+        note = ""
+        if len(hits) > count:
+            note = red(f" {chars.rarrow_hollow} more actual results: {len(hits) - count}")
+        print(f"{spaces}{grouping}: {count}{note}")
+    for hit in hits:
+        if isinstance(hit, dict) and isinstance(uuid := hit.get("uuid"), str) and uuid:
+            note = ""
+            if hit.get("elasticsearch_counted") is False:
+                note = red(f" {chars.xmark} not counted")
+            else:
+                note = f" {chars.check}"
+            print(f"{spaces}  {chars.dot} {uuid}{note}")
+            if uuid_details is True:
+                if sample_sources := format_hit_property_values(hit, sample_source_property_name):
+                    print(f"{spaces}    {chars.dot_hollow} sample-sources: {sample_sources}")
+                if cell_lines := format_hit_property_values(hit, cell_line_property_name):
+                    print(f"{spaces}    {chars.dot_hollow} cell-lines: {cell_lines}")
+                if donors := format_hit_property_values(hit, donor_property_name):
+                    print(f"{spaces}    {chars.dot_hollow} donors: {donors}")
+    if isinstance(items := data.get("items"), list):
+        for element in items:
+            print_normalized_aggregation_results(element,
+                                                 parent_grouping_name=grouping_name,
+                                                 parent_grouping_value=grouping_value,
+                                                 uuids=uuids, uuid_details=uuid_details,
+                                                 verbose=verbose, indent=indent+2)
+
+test()
+
+
+"""
+GROUPED BY CELL-LINE:
+
+❖ GROUP: date_created (3)
+  ▶ 2024-12 (20)
+    ❖ GROUP: file_sets.libraries.analytes.samples.sample_sources.cell_line.code (9)
+      ▷ ∅ (2)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (2)
+            • 1a5b9cea-104e-45f3-9bef-8ed06aeede24 • 2024-12-07 • ST003
+            • c53931bc-e3dc-4a37-97f3-05ffa2dc438b • 2024-12-07 • ST004
+      ▷ COLO829T (7)
+        ❖ GROUP: release_tracker_description (3)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • 03ae4878-4fe0-4730-934a-abf211ccf77e • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+          ▷ WGS Illumina NovaSeq X bam (4)
+            • ea0f5f17-5753-42ed-b141-186e8261c58e • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • f9cc4a7a-9508-441b-91f2-99530f8c82c7 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • fffceff8-4283-485d-b7ab-0cc19d3d1fa7 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • f5d1c1f5-febe-401b-aeea-a8da8de1ba32 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+          ▷ Fiber-seq PacBio Revio bam (2)
+            • ccfc6527-ccdc-4e16-9df9-fb9c1eaf38b5 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • 2578886d-e809-414b-a328-acdf699821b0 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+      ▷ HG00438 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02486 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02622 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG005 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02257 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG002 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ COLO829BL (5)
+        ❖ GROUP: release_tracker_description (2)
+          ▷ Fiber-seq PacBio Revio bam (2)
+            • 3dccda14-8b17-4157-b3e6-4d9f1fafda5f • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • bdfb8964-1102-4baa-bd54-52b2feda4b03 • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+          ▷ WGS Illumina NovaSeq X bam (3)
+            • 4cd1dff1-ceda-48c7-824e-26c43906083a • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • d8d46859-7e93-46fa-aaf7-8427177a14fb • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • dd8926f1-a560-4a7b-ae43-00d95b48b11e • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+  ▶ 2024-11 (1)
+    ❖ GROUP: file_sets.libraries.analytes.samples.sample_sources.cell_line.code (1)
+      ▷ COLO829T (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ Fiber-seq PacBio Revio bam (1)
+            • 2bde1fae-13af-4086-ba25-edba2594c732 • 2024-11-07 • COLO829T • DAC_DONOR_COLO829
+  ▶ 2024-10 (6)
+    ❖ GROUP: file_sets.libraries.analytes.samples.sample_sources.cell_line.code (6)
+      ▷ HG00438 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02486 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02622 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG005 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG02257 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ HG002 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+
+GROUPED BY DONOR:
+
+❖ GROUP: date_created (3)
+  ▶ 2024-12 (15)
+    ❖ GROUP: donors.display_title (4)
+      ▷ ∅ (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • dbba7681-88ea-4a09-884d-ff64cc6c557a • 2024-12-07 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+      ▷ DAC_DONOR_COLO829 (12)
+        ❖ GROUP: release_tracker_description (3)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • 03ae4878-4fe0-4730-934a-abf211ccf77e • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+          ▷ WGS Illumina NovaSeq X bam (7)
+            • ea0f5f17-5753-42ed-b141-186e8261c58e • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • f9cc4a7a-9508-441b-91f2-99530f8c82c7 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • 4cd1dff1-ceda-48c7-824e-26c43906083a • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • fffceff8-4283-485d-b7ab-0cc19d3d1fa7 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • d8d46859-7e93-46fa-aaf7-8427177a14fb • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • f5d1c1f5-febe-401b-aeea-a8da8de1ba32 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • dd8926f1-a560-4a7b-ae43-00d95b48b11e • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+          ▷ Fiber-seq PacBio Revio bam (4)
+            • 3dccda14-8b17-4157-b3e6-4d9f1fafda5f • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • bdfb8964-1102-4baa-bd54-52b2feda4b03 • 2024-12-07 • COLO829BL • DAC_DONOR_COLO829
+            • ccfc6527-ccdc-4e16-9df9-fb9c1eaf38b5 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+            • 2578886d-e809-414b-a328-acdf699821b0 • 2024-12-07 • COLO829T • DAC_DONOR_COLO829
+      ▷ ST003 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • 1a5b9cea-104e-45f3-9bef-8ed06aeede24 • 2024-12-07 • ST003
+      ▷ ST004 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS Illumina NovaSeq X bam (1)
+            • c53931bc-e3dc-4a37-97f3-05ffa2dc438b • 2024-12-07 • ST004
+  ▶ 2024-11 (1)
+    ❖ GROUP: donors.display_title (1)
+      ▷ DAC_DONOR_COLO829 (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ Fiber-seq PacBio Revio bam (1)
+            • 2bde1fae-13af-4086-ba25-edba2594c732 • 2024-11-07 • COLO829T • DAC_DONOR_COLO829
+  ▶ 2024-10 (1)
+    ❖ GROUP: donors.display_title (1)
+      ▷ ∅ (1)
+        ❖ GROUP: release_tracker_description (1)
+          ▷ WGS ONT PromethION 24 bam (1)
+            • f2584000-f810-44b6-8eb7-855298c58eb3 • 2024-10-16 • HG00438, HG02486, HG02622, HG005, HG02257, HG002
+"""
