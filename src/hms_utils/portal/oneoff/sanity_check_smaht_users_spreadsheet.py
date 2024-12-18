@@ -155,6 +155,7 @@ def map_spreadsheet_submission_centers(submission_centers: List[str]) -> List[st
                 if submission_center.lower() == "dac":
                     submission_center = "smaht_dac"
                 elif submission_center.lower() == "nih":
+                    # N.B. Hardcode that "nih" submission-center users have no submission-center.
                     submission_center = None
                 if submission_center and (submission_center not in mapped_submission_centers):
                     mapped_submission_centers.append(submission_center)
@@ -259,7 +260,8 @@ def _error(message: str, plain: bool = False) -> None:
 
 
 # https://docs.google.com/spreadsheets/d/1WYc_UKkpVUUBPJPbZdwwBX28f6Qr5I9PblOdGqu7g1M/view?gid=446162554#gid=446162554
-users_spreadsheet = os.path.expanduser("~/tmp/smaht_users_from_spreadsheet_20241126.tsv")
+# users_spreadsheet = os.path.expanduser("~/tmp/smaht_users_from_spreadsheet_20241126.tsv")
+users_spreadsheet = os.path.expanduser("~/Downloads/smaht_users_from_spreadsheet_20241218.tsv")
 
 portal_env = "smaht-data"
 dump = False

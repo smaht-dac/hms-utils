@@ -73,6 +73,7 @@ def main():
         user_status = user.get("status")
         user_groups = _get_group_display_value(user) or chars.null
         user_submission_centers = submission_centers or chars.null
+        # TODO: clear up my confusion around submits_for ...
         if (user_submits_for := _get_submits_for(user)):
             if argv.non_submitters:
                 continue
