@@ -1,12 +1,13 @@
 from copy import deepcopy
 from functools import lru_cache
 import json
-import os
 import sys
 from typing import List, Optional, Union
 import unicodedata
+from dcicutils.command_utils import yes_or_no
 from dcicutils.structured_data import StructuredDataSet
-from dcicutils.portal_utils import Portal
+from hms_utils.portal.portal_utils import Portal
+from hms_utils.argv import ARGV
 from hms_utils.dictionary_utils import sort_dictionary
 from hms_utils.chars import chars
 
@@ -20,6 +21,7 @@ class PROPERTY:
     SUBMITS_FOR = "submits_for"
     REVOKED = "revoked"
     STATUS = "status"
+    CONSORTIA = "consortia"
 
 
 USER_SPREADSHEET_COLUMN_MAP = {
@@ -34,9 +36,12 @@ USER_SPREADSHEET_COLUMN_MAP = {
     "Revoked": PROPERTY.REVOKED
 }
 
+USER_DEFAULT_CONSORTIUM = "smaht"
+
 
 def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, List[dict]],
                                                     portal_or_portal_env: Union[str, Portal],
+                                                    sort: bool = False,
                                                     verbose: bool = False,
                                                     debug: bool = False) -> None:
 
@@ -54,7 +59,7 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
     elif not isinstance(portal := portal_or_portal_env, Portal):
         return
     if isinstance(file_or_users, str):
-        users = read_users_from_spreadsheet(file_or_users)
+        users = read_users_from_spreadsheet(file_or_users, sort=sort)
     elif not isinstance(users := file_or_users, list):
         return
 
@@ -64,8 +69,9 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
         try:
             user_metadata = portal_get_user(portal, user[PROPERTY.EMAIL])
             if not (user_portal := get_user_from_portal_metadata(user_metadata)):
+                users_to_add.append(user)
                 _info(f"User from spreadsheet NOT FOUND in portal: {user[PROPERTY.EMAIL]}")
-                if verbose:
+                if debug:
                     print(json.dumps(user, indent=4))
                 continue
             if debug is True:
@@ -97,7 +103,7 @@ def sanity_check_users_from_spreadsheet_with_portal(file_or_users: Union[str, Li
     return users_to_add, users_to_update
 
 
-def read_users_from_spreadsheet(file: str):
+def read_users_from_spreadsheet(file: str, sort: bool = False) -> List[dict]:
     data = StructuredDataSet(file)
     data = data.data
     data = next(iter(data.values()))
@@ -106,6 +112,8 @@ def read_users_from_spreadsheet(file: str):
         users_from_spreadsheet_row = get_user_from_spreadsheet_row(item)
         for user_from_spreadsheet_row in users_from_spreadsheet_row:
             users.append(user_from_spreadsheet_row)
+    if sort is True:
+        users = sorted(users, key=lambda item: item.get(PROPERTY.EMAIL))
     return users
 
 
@@ -138,8 +146,15 @@ def get_user_from_spreadsheet_row(row: object) -> List[dict]:
                 user = deepcopy(user)
                 user[PROPERTY.EMAIL] = user_email.lower()
                 users.append(user)
-    if not user[PROPERTY.SUBMISSION_CENTERS]:
-        del user[PROPERTY.SUBMISSION_CENTERS]
+    #
+    # Don't delete an empty submission_centers property as this will cause Portal to set
+    # it to the default of ["smaht_dac"], when the submission_centers property is missing.
+    # Real example is anyone who has submission_center of "nih" in the spreadsheet should
+    # have no submission_centers at all (so we set it to empty not missing).
+    #
+    # if not user[PROPERTY.SUBMISSION_CENTERS]:
+    #     del user[PROPERTY.SUBMISSION_CENTERS]
+    #
     if not user[PROPERTY.SUBMITS_FOR]:
         del user[PROPERTY.SUBMITS_FOR]
     return users
@@ -226,6 +241,18 @@ def compile_diffs(user_from_spreadsheet: dict, user_from_portal: dict) -> List[s
     return diffs
 
 
+def add_users(portal: Portal, users_to_add: List[dict], verbose: bool = False, debug: bool = False) -> None:
+    for user_to_add in users_to_add:
+        if user_to_add.get(PROPERTY.CONSORTIA) is None:
+            # N.B. If/when the consortia property is missing set it automaticaly to: ["smaht"]
+            user_to_add[PROPERTY.CONSORTIA] = [USER_DEFAULT_CONSORTIUM]
+        if debug is True:
+            _debug(f"Adding using: {user_to_add.get(PROPERTY.EMAIL)}")
+        portal.post_metadata("User", user_to_add)
+        if verbose is True:
+            _debug(f"Added user: {user_to_add.get(PROPERTY.EMAIL)}")
+
+
 @lru_cache(maxsize=1)
 def portal_get_users(portal: Portal) -> List[dict]:
     users_query = f"/users?status=deleted&status=current&status=inactive&status=revoked&limit=100000"
@@ -259,30 +286,46 @@ def _error(message: str, plain: bool = False) -> None:
     print(("ERROR: " if plain is not True else "") + message, file=sys.stderr, flush=True)
 
 
-# https://docs.google.com/spreadsheets/d/1WYc_UKkpVUUBPJPbZdwwBX28f6Qr5I9PblOdGqu7g1M/view?gid=446162554#gid=446162554
-# users_spreadsheet = os.path.expanduser("~/tmp/smaht_users_from_spreadsheet_20241126.tsv")
-users_spreadsheet = os.path.expanduser("~/Downloads/smaht_users_from_spreadsheet_20241218.tsv")
+def main() -> int:
 
-portal_env = "smaht-data"
-dump = False
-process = True
-verbose = True
-debug = False
+    argv = ARGV({
+        ARGV.REQUIRED(str): ["users_spreadsheet_file"],
+        ARGV.REQUIRED(str): ["--env"],
+        ARGV.OPTIONAL(bool): ["--sort"],
+        ARGV.OPTIONAL(bool): ["--dump"],
+        ARGV.OPTIONAL(bool): ["--verbose"],
+        ARGV.OPTIONAL(bool): ["--debug"]
+    })
 
-users = read_users_from_spreadsheet(users_spreadsheet)
+    # https://docs.google.com/spreadsheets/d/1ryRJlJpJAdCYkIRnIactgmraSy0SLuG8GzQKWGqF7Os
+    # users_spreadsheet = os.path.expanduser("test.tsv")
+    users_spreadsheet_file = argv.users_spreadsheet_file
 
-if dump:
-    print(json.dumps(users, indent=4))
+    portal = Portal(argv.env)
 
-if process:
-    portal = Portal(portal_env)
+    users = read_users_from_spreadsheet(users_spreadsheet_file, sort=argv.sort)
+
+    if argv.dump:
+        print(json.dumps(users, indent=4))
+        return 0
+
     users_to_add, users_to_update = \
-        sanity_check_users_from_spreadsheet_with_portal(users, portal, verbose=verbose, debug=debug)
+        sanity_check_users_from_spreadsheet_with_portal(users, portal, sort=argv.sort,
+                                                        verbose=argv.verbose, debug=argv.debug)
 
-if users_to_add:
-    print("USERS TO ADD")
-    print(json.dumps(users_to_add, indent=4))
+    if users_to_add:
+        print("USERS TO ADD")
+        print(json.dumps(users_to_add, indent=4))
+        if yes_or_no(f"Do you want to add these users now to Portal environment: {portal.env} ?"):
+            add_users(portal, users_to_add, verbose=argv.verbose, debug=argv.debug)
 
-if users_to_update:
-    print("USERS TO UPDATE")
-    print(json.dumps(users_to_update, indent=4))
+    if users_to_update:
+        print("USERS TO UPDATE")
+        print(json.dumps(users_to_update, indent=4))
+
+    return 0
+
+
+if __name__ == "__main__":
+    status = main()
+    sys.exit(status if isinstance(status, int) else 0)
