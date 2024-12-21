@@ -26,7 +26,7 @@ from hms_utils.version_utils import get_version
 
 AWS_CONFIG_FILE_PATH = os.path.expanduser("~/.aws/config")
 AWS_PROFILE_ENVIRONMENT_VARIABLE_NAME = "AWS_PROFILE"
-AWS_COMMAND_PATH = "/usr/local/bin/aws"
+AWS_COMMAND_PATH = "aws"  # "/usr/local/bin/aws"
 AWS_DEFAULT_SECTION_NAME = "default"
 
 

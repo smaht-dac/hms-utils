@@ -1,6 +1,7 @@
 from copy import deepcopy
 from functools import lru_cache
 import json
+from prettytable import PrettyTable, HRuleStyle
 import sys
 from typing import List, Optional, Union
 import unicodedata
@@ -241,16 +242,38 @@ def compile_diffs(user_from_spreadsheet: dict, user_from_portal: dict) -> List[s
     return diffs
 
 
-def add_users(portal: Portal, users_to_add: List[dict], verbose: bool = False, debug: bool = False) -> None:
-    for user_to_add in users_to_add:
-        if user_to_add.get(PROPERTY.CONSORTIA) is None:
+def print_user(user: dict) -> None:
+    table = PrettyTable()
+    table.align = "l"
+    table.header = False
+    table.add_row(["Email", user[PROPERTY.EMAIL]])
+    table.add_row(["Name", user[PROPERTY.FIRST_NAME] + " " + user[PROPERTY.LAST_NAME]])
+    table.add_row(["Status", user[PROPERTY.STATUS]])
+    table.add_row(["Consortia", ", ".join(user[PROPERTY.CONSORTIA]) or chars.null])
+    table.add_row(["Submission Centers", ", ".join(user[PROPERTY.SUBMISSION_CENTERS]) or chars.null])
+    table.add_row(["Submits For", ", ".join(user.get(PROPERTY.SUBMITS_FOR, "")) or chars.null])
+    indent = 2
+    output = "\n".join(" " * indent + line for line in table.get_string().splitlines())
+
+    print(output)
+
+
+def add_users(portal: Portal, users_to_add: List[dict],
+              noconfirm: bool = False, verbose: bool = False, debug: bool = False) -> None:
+    for user in users_to_add:
+        if user.get(PROPERTY.CONSORTIA) is None:
             # N.B. If/when the consortia property is missing set it automaticaly to: ["smaht"]
-            user_to_add[PROPERTY.CONSORTIA] = [USER_DEFAULT_CONSORTIUM]
+            user[PROPERTY.CONSORTIA] = [USER_DEFAULT_CONSORTIUM]
+        print(f"{chars.rarrow} User to add: {user[PROPERTY.EMAIL]}")
+        print_user(user)
+        if noconfirm is not True:
+            if not yes_or_no(f"{chars.rarrow_hollow} Do you want to add the above user to portal environment: {portal.env} ?"):
+                continue
         if debug is True:
-            _debug(f"Adding using: {user_to_add.get(PROPERTY.EMAIL)}")
-        portal.post_metadata("User", user_to_add)
+            _debug(f"Adding using: {user.get(PROPERTY.EMAIL)}")
+        portal.post_metadata("User", user)
         if verbose is True:
-            _debug(f"Added user: {user_to_add.get(PROPERTY.EMAIL)}")
+            _debug(f"Added user: {user.get(PROPERTY.EMAIL)}")
 
 
 @lru_cache(maxsize=1)
