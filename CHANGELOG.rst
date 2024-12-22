@@ -4,6 +4,12 @@ hms-utils : CHANGE LOG
 
 1.4.0
 =====
+* 2024-12-22/dmichaels
+  Changed aws_aws_env.py to be pretty much standalone-able.
+  Pre-above commit: 1eda0e45d15e3086a173d2688d4330555428021a
+
+1.4.0
+=====
 * 2024-10-21/dmichaels
   Added argv.py
 

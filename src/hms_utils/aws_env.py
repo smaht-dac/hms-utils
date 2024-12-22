@@ -1,17 +1,17 @@
 from __future__ import annotations
 from boto3 import Session as BotoSession
 from collections import namedtuple
+import concurrent.futures
 import configparser
 from datetime import datetime, timedelta
+from importlib.metadata import version as get_package_version
 import io
 import os
 import re
 import subprocess
 import sys
-from typing import List, Optional, Tuple
-from hms_utils.terminal_utils import terminal_color
-from hms_utils.threading_utils import run_concurrently
-from hms_utils.version_utils import get_version
+from termcolor import colored
+from typing import Callable, Iterable, List, Optional, Tuple
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Convenience utility to view/manage SSO/Okta-based AWS credentials, defined in the ~/.aws/config file.
@@ -304,6 +304,47 @@ def normalize_string(value: str) -> str:
 
 def confirm(message: str) -> bool:
     return input(f"{message}? ").lower() in ["y", "yes"]
+
+
+def run_concurrently(functions: Iterable[Callable], nthreads: int = 4) -> None:
+    # FYI: Not pulling in from dcicutils.misc_utils becausethere is
+    # a call to logging.basicConfig() which is (for some reason) causing
+    # exceptions within the asynchronous function calls to be output.
+    if not (isinstance(nthreads, int) and (nthreads >= 0)):
+        nthreads = 4
+    if nthreads == 0:
+        for function in functions:
+            function()
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=nthreads) as executor:
+        concurrent.futures.as_completed([executor.submit(f) for f in functions])
+
+
+def terminal_color(value: str,
+                   color: Optional[str] = None,
+                   dark: bool = False,
+                   bold: bool = False,
+                   underline: bool = False,
+                   nocolor: bool = False) -> str:
+    if nocolor is True:
+        return value
+    attributes = []
+    if dark is True:
+        attributes.append("dark")
+    if bold is True:
+        attributes.append("bold")
+    if underline is True:
+        attributes.append("underline")
+    if isinstance(color, str) and color:
+        return colored(value, color.lower(), attrs=attributes)
+    return colored(value, attrs=attributes)
+
+
+def get_version(package_name: str = "hms-utils") -> str:
+    try:
+        return get_package_version(package_name)
+    except Exception:
+        return ""
 
 
 def usage(status: int = 1) -> None:
