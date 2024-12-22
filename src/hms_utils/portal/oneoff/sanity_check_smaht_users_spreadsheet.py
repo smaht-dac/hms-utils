@@ -1,7 +1,7 @@
 from copy import deepcopy
 from functools import lru_cache
 import json
-from prettytable import PrettyTable, HRuleStyle
+from prettytable import PrettyTable
 import sys
 from typing import List, Optional, Union
 import unicodedata
@@ -267,7 +267,8 @@ def add_users(portal: Portal, users_to_add: List[dict],
         print(f"{chars.rarrow} User to add: {user[PROPERTY.EMAIL]}")
         print_user(user)
         if noconfirm is not True:
-            if not yes_or_no(f"{chars.rarrow_hollow} Do you want to add the above user to portal environment: {portal.env} ?"):
+            if not yes_or_no(f"{chars.rarrow_hollow} Do you want to add"
+                             f"the above user to portal environment: {portal.env} ?"):
                 continue
         if debug is True:
             _debug(f"Adding using: {user.get(PROPERTY.EMAIL)}")
