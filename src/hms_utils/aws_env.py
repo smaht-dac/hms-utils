@@ -548,6 +548,7 @@ def main() -> None:
             else:
                 print(f"To make this AWS profile ({arg}) current execute:"
                       f" export {AWS_PROFILE_ENVIRONMENT_VARIABLE_NAME}={aws_profile_current.name}")
+                print(f"To make this command work without doing this: alias aws-env='source `hms-aws-env --shell`'")
             sys.exit(0)
 
     if (len(aws_profiles_selected) > 1) or verbose:
