@@ -35,7 +35,7 @@ pytest-runner = ">=5.1"
 [tool.poetry.scripts]
 hms-aws-ecs = "hms_utils.aws_ecs:main"
 hms-aws-env = "hms_utils.aws_env:main"
-hms-aws-env-shim = "hms_utils.aws_env:main"
+hms-aws-env-hidden = "hms_utils.aws_env:main"
 
 hms-config = "hms_utils.config.config_cli:main" # new
 hms-config-export = "hms_utils.config.config_cli:main_show_script_path"
